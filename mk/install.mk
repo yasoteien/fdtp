@@ -35,7 +35,7 @@ ICON_SIZES = 16 32 48 64 128
 # the public one (tools/make_public.sh). The manual's PDFs, when there are
 # any: manual/*.pdf into the doc directory; docs/manual/LANG/*.pdf (the
 # public tree) or public/manual/LANG/*.pdf (here) into its LANG/.
-DOC_NAMES = README.md README.ja.md NOTICE.md LICENSE
+DOC_NAMES = README.md README.en.md NOTICE.md LICENSE
 DOC_FILES = $(foreach n,$(DOC_NAMES),$(firstword $(wildcard $(APP_DIR)/public/$(n) $(APP_DIR)/$(n)))) \
 	$(sort $(wildcard $(APP_DIR)/manual/*.pdf $(APP_DIR)/public/manual/*.pdf))
 MANUAL_DIR ?= $(firstword $(wildcard $(APP_DIR)/docs/manual $(APP_DIR)/public/manual))

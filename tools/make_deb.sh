@@ -156,7 +156,7 @@ sed 's|^Exec=.*|Exec=/usr/bin/fdtp|' "$ICONS/fdtp.desktop" > "$STAGE/usr/share/a
 chmod 644 "$STAGE/usr/share/applications/fdtp.desktop"
 for s in 16 32 48 64 128; do inst 644 "$ICONS/fdtp-$s.png" "/usr/share/icons/hicolor/${s}x${s}/apps/fdtp.png"; done
 DOC=/usr/share/doc/fdtp
-for n in README.md README.ja.md NOTICE.md; do
+for n in README.md README.en.md NOTICE.md; do
 	f=$(first "$APP/public/$n" "$APP/$n")
 	[ -n "$f" ] && inst 644 "$f" "$DOC/$n"
 done

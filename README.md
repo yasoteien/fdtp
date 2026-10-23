@@ -1,193 +1,193 @@
-English | [日本語](README.ja.md)
+日本語 | [English](README.en.md)
 
 # FDTP — File & Directory Tool for Pomera
 
 <p align="center"><img src="docs/images/cover.jpg" alt="FDTP" width="640"></p>
 
 <p align="center">
-<b>✨ The stock Pomera software didn't have one, so I made a vertical &amp; horizontal novel editor with ruby! ✨</b><br>
-(Narou and Kakuyomu notation, publisher-style formatting included)<br><br>
-Oh, and while I was at it: a file manager that shows images, Excel, Word, PowerPoint and PDF too!<br>
-And while I was at that: merge, split and mark up PDFs too!<br>
-PowerPoint? Press F5 for a slide show!<br>
-And English screens, for Pomera DM250US folks! 🎉
+<b>✨ ポメラ純正ソフトにないから、ルビ振り対応の縦横表示エディタ作りました！ ✨</b><br>
+（なろう・カクヨム対応、出版社向け整形付き）<br><br>
+あ、ついでに画像・Excel・Word・PowerPoint・PDF も見えるファイラーもつけたよ！<br>
+ついでのついでに、PDF の結合・分割・書き込みもつけたよ！<br>
+パワポは F5 でスライドショーもできるよ！<br>
+英語の画面もつけたよ！（US 版ポメラの人へ）🎉
 </p>
 
-![FDTP on a Pomera DM250](docs/images/pomera-filer.jpg)
+![ポメラ DM250 で動く FDTP](docs/images/pomera-filer.jpg)
 
-FDTP is a file manager for the King Jim Pomera DM250 running Debian 13. Its screens and keys follow FD 3.13, the file manager many people used on the NEC PC-98. It runs on the DRM/KMS console and in an X11 window.
+FDTP は、キングジムのポメラ DM250 に Debian 13 を入れた環境で動くファイラーです。PC-98 で広く使われたファイラー FD 3.13 の画面と操作を手本にしています。DRM/KMS のコンソールでも、X11 のウィンドウでも動きます。
 
-The screens are in English or Japanese:
+画面の言語は日本語と英語です。
 
-- On the first start, FDTP asks which language to use and saves the answer in `~/.fdtprc`.
-- You can change it later in the customizer (`z`), or with `LANGUAGE=auto|ja|en` in `~/.fdtprc`.
-- With `auto`, FDTP follows `LANG`: Japanese for `ja_*`, English for everything else.
+- 初めて起動した時に、どちらを使うかを聞きます。答えは `~/.fdtprc` に書きます。
+- あとから設定（`z`）や、`~/.fdtprc` の `LANGUAGE=auto|ja|en` で変えられます。
+- `auto` のときは `LANG` に従います。`ja_*` なら日本語、それ以外は英語です。
 
-## Features
+## 主な機能
 
-**File manager**
-- The internal commands and keys of FD 3.13: copy, move, delete (directories too), rename, attributes, make directory, tree, find, and more. Press `h` or `?` for the list of keys.
-- The Pomera's Alt key works. The Alt commands can also be reached with Shift+F1 to F10 and Ctrl+letter.
-- Archives: browse, create and extract tar (gz, bz2, xz), zip and LHa.
-- Split a file into pieces (Alt+n, 10 MB each by default) and join them again (Alt+h).
-- System information (Alt+i): screen output, key devices, memory, disk, battery, the GPU power setting, and more.
+**ファイラー**
+- FD 3.13 の内部コマンドとキーを持っています。コピー・移動・削除（ディレクトリも）・名前の変更・属性・ディレクトリの作成・ツリー・検索などです。`h` か `?` でキーの一覧が出ます。
+- ポメラの Alt キーが使えます。Alt の操作は Shift+F1〜F10 と Ctrl+英字でもできます。
+- 書庫: tar（gz・bz2・xz）・zip・LHa の閲覧・作成・解凍ができます。
+- ファイルの分割（Alt+n。既定は 10 MB ごと）と結合（Alt+h）。
+- システム情報（Alt+i）: 画面の出力、キーの装置、メモリ、ディスク、電池、GPU の省電力の設定などを見られます。
 
-**Viewers and editors** (`v` or Enter)
-- Text, with a choice of encodings (Shift_JIS, EUC-JP, ISO-2022-JP, UTF-8, UTF-16) and line numbers. Hex view with `b`.
-- PDF: view pages, and mark them up with highlight, underline, strikethrough and sticky notes. The marks are saved as standard PDF annotations, so other PDF readers show them too.
-- The PDF menu (Alt+p): merge, split, extract, delete, reorder and rotate pages, add or remove a password, compress, PDF to JPEG, and JPEG/PNG to PDF. Everything runs on the Pomera; nothing is sent anywhere.
-- docx: edit paragraphs. xlsx and csv: edit cells, with recalculation of common functions. Undo and redo with Ctrl+z and Ctrl+y (100 steps by default).
-- pptx: edit the text on the slides, and show them full screen with F5 (Esc to return).
-- Images: JPEG, PNG, GIF, BMP, WebP, and the PC-98 formats MAG and Pi.
+**ビューワとエディタ**（`v` か Enter）
+- テキスト: 文字コード（Shift_JIS・EUC-JP・JIS・UTF-8・UTF-16）を選べます。行番号も出せます。`b` で 16 進表示です。
+- PDF: ページを見るほか、ハイライト・下線・取り消し線・付箋を書き込めます。PDF の標準の注釈として保存するので、ほかの PDF のソフトでも見えます。
+- PDF のメニュー（Alt+p）: 結合・分割・ページの抽出・削除・並べ替え・回転、パスワードの設定と解除、圧縮、PDF から JPEG、JPEG・PNG から PDF。どれもポメラの中だけで行い、外へは何も送りません。
+- docx は段落を直せます。xlsx と csv はセルを直せて、よく使う関数は計算し直します。Ctrl+z で取り消し、Ctrl+y でやり直しです（既定で 100 段）。
+- pptx: スライドの文字を直せます。F5 でスライドを画面いっぱいに出します（Esc で戻ります）。
+- 画像: JPEG・PNG・GIF・BMP・WebP と、PC-98 の MAG・Pi。
 
-**Novel editor** (`e` or F9)
-- A writing editor for Japanese manuscripts. It shows ruby (furigana) and emphasis dots from the notation used by Japanese web novel sites, and writes vertically or horizontally.
-- F2 formats the text to a publisher's style, switches between manuscript and web layout, and exports a vertical Word document (.docx).
-- Japanese input uses uim (Mozc).
-- The editor works the same with English screens; only the screen text changes.
+**小説用エディタ**（`e` か F9）
+- 日本語の原稿を書くためのエディタです。なろう・カクヨムのルビ記法（`｜漢字《かんじ》`、`《《傍点》》`）を、画面の上でルビと傍点にして見せます。縦書きでも横書きでも書けます。
+- F2 で、出版社の書式への整形、原稿形式と Web 形式の切り替え、Word の縦書きの文書（.docx）の書き出しができます。
+- 日本語入力は uim（Mozc）を使います。
+- 英語の画面でも同じように使えます。変わるのは画面の文言だけです。
 
-**Screen**
-- On the Pomera's 1024x600 screen, FDTP shows 85 columns by 25 rows. On larger screens, use `--size auto` or `--size 160x45`.
-- In an X11 window, Alt+Enter or F11 switches to full screen (or start with `--fullscreen`).
+**画面**
+- ポメラの 1024x600 の画面では、85 桁 25 行です。広い画面では `--size auto` や `--size 160x45` で桁と行を増やせます。
+- X11 のウィンドウでは、Alt+Enter か F11 で全画面になります（`--fullscreen` で始めから全画面）。
 
 ```
 fdtp [--kms|--x11] [--fullscreen] [--size auto|COLSxROWS] [DIRECTORY]
-fdtp -v      # print the version
+fdtp -v      # 版を出す
 ```
 
-## Screenshots
+## 画面
 
-The novel editor (ruby and emphasis dots) and the F2 conversion menu.
+小説用エディタ（ルビと傍点）と、F2 の変換の選択です。
 
-| Horizontal | Vertical | F2 conversion |
+| 横書き | 縦書き | F2 の変換 |
 |---|---|---|
-| ![Horizontal editor](docs/images/novel-horizontal.png) | ![Vertical editor](docs/images/novel-vertical.png) | ![Conversion menu](docs/images/novel-convert.png) |
+| ![横書きのエディタ](docs/images/novel-horizontal.png) | ![縦書きのエディタ](docs/images/novel-vertical.png) | ![変換の選択](docs/images/novel-convert.png) |
 
-## Install
+## 入れ方
 
-### From a release (.deb)
+### リリースの .deb から
 
-We are preparing an armhf `.deb` package for the Pomera on the Releases page. Once it is there:
+ポメラ向けの armhf の `.deb` を、Releases に置く準備をしています。置いた後は次のとおりです。
 
 ```sh
-sudo apt install ./fdtp_<version>_armhf.deb
-sudo fdtp-pomera-setup      # optional: the Pomera settings described below
+sudo apt install ./fdtp_<版>_armhf.deb
+sudo fdtp-pomera-setup      # 任意。下に書いたポメラの設定
 ```
 
-### From the source
+### ソースから
 
 ```sh
 ./configure
 make -j4
-sudo make install           # sudo make uninstall removes it
+sudo make install           # 消すときは sudo make uninstall
 ```
 
-`./configure` checks for the libraries the build needs. If something is missing, it stops and prints the `sudo apt install` line with the Debian package names. It then asks a few questions. Each question comes after a short explanation of what it does and how to undo it.
+`./configure` は、ビルドに要るライブラリがあるかを調べます。足りない物があれば止まり、Debian のパッケージ名を入れた `sudo apt install` の行を出します。続けて、いくつか質問をします。どの質問も、先に何をするかと戻し方を短く説明してから聞きます。
 
-1. **Language** of the screens: Japanese, English, or auto (follow `LANG`). You can change it later with `z`.
-2. **Only on a Pomera DM250**: stabilize Wi-Fi. On Debian 13 for the DM250, the SD card, the internal memory and Wi-Fi share one DMA controller, and a fault there can freeze all three at once. This step turns off Wi-Fi power saving, enables the hardware watchdog, and switches Wi-Fi from DMA to PIO.
-   - The PIO change rewrites 1 MiB on the SD card. It works only with the ekesete.net Debian 13 image for the D250. If the data on your card is different, it does nothing.
-   - Before writing, it saves the original 1 MiB. To undo: `sudo sh scripts/pomera/pomera_dma_pio.sh restore`.
-   - `sudo make install` asks once more before it writes to the card.
-   - Battery life gets slightly shorter, and Wi-Fi may be slower. A reboot is needed.
-3. **Only on a Pomera DM250**: mount the internal memory (where the Pomera's own editor keeps its documents) read-only at `/mnt/pomera-internal` on every boot. It never writes to the internal memory. To stop: `sudo sh scripts/pomera/pomera_mount_internal.sh unpersist`. If the area is not found, this question is skipped.
+1. **画面の言語**: 日本語・English・auto（`LANG` に従う）。あとから `z` でも変えられます。
+2. **ポメラ DM250 の時だけ**: Wi-Fi の安定化。DM250 の Debian 13 では、SD カード・内蔵メモリ・Wi-Fi が 1 つの DMA を共用しています。その不具合で、3 つが同時に止まる事があります。そこで、Wi-Fi の省電力を切り、ハードウェアの watchdog を使い、Wi-Fi だけ DMA をやめて PIO にします。
+   - PIO にするには、SD カードの 1 MiB を書き換えます。ekesete.net の Debian 13 イメージ（D250 用）で作った SD に限ります。中身が違えば何もしません。
+   - 書き換える前に、元の 1 MiB を保存します。戻すには `sudo sh scripts/pomera/pomera_dma_pio.sh restore` です。
+   - `sudo make install` は、SD に書く前にもう一度聞きます。
+   - 電池の持ちが少し悪くなり、Wi-Fi が遅くなる事があります。終わったら再起動が要ります。
+3. **ポメラ DM250 の時だけ**: 内蔵メモリ（ポメラの標準のエディタが文書を置く所）を、起動のたびに `/mnt/pomera-internal` へ読み取り専用でつなぎます。内蔵メモリには何も書きません。やめるには `sudo sh scripts/pomera/pomera_mount_internal.sh unpersist` です。その場所が見つからない時は、この質問を飛ばします。
 
-Options: `--yes` (take the defaults), `--lang=ja|en|auto`, `--prefix=DIR` (default `/usr/local`), `--no-pomera` (skip the Pomera questions). `sudo make uninstall` does not undo the Pomera settings; it prints how to undo them.
+オプション: `--yes`（既定の答えで進む）、`--lang=ja|en|auto`、`--prefix=DIR`（既定は `/usr/local`）、`--no-pomera`（ポメラの質問をしない）。`sudo make uninstall` はポメラの設定を戻しません。戻し方を表示します。
 
-#### Packages for the build
+#### ビルドに要る物
 
-C11 compiler (gcc or clang), GNU make, Python 3 (standard library only, for generated tables and tests), and pkg-config. Libraries (Debian package names):
+C11 のコンパイラ（gcc か clang）、GNU make、Python 3（表の生成と試験に使います。標準ライブラリだけです）、pkg-config。ライブラリ（Debian のパッケージ名）は次のとおりです。
 
-| For | Packages |
+| 用途 | パッケージ |
 |---|---|
-| Screen (DRM/KMS, EGL, GLES2) | libdrm-dev libgbm-dev libegl-dev libgles-dev |
-| X11 window (optional; without it, DRM/KMS only) | libxcb1-dev |
-| PDF and pptx | libmupdf-dev |
-| Images | libjpeg-dev libpng-dev libgif-dev libwebp-dev |
-| docx, xlsx, zip | zlib1g-dev libexpat1-dev |
-| Japanese input (optional) | libuim-dev |
+| 画面（DRM/KMS・EGL・GLES2） | libdrm-dev libgbm-dev libegl-dev libgles-dev |
+| X11 のウィンドウ（任意。無ければ DRM/KMS だけ） | libxcb1-dev |
+| PDF・pptx | libmupdf-dev |
+| 画像 | libjpeg-dev libpng-dev libgif-dev libwebp-dev |
+| docx・xlsx・zip | zlib1g-dev libexpat1-dev |
+| 日本語入力（任意） | libuim-dev |
 
-At run time, archives use the `zip`, `unzip`, `lhasa` and `tar` commands.
+動かす時、書庫には `zip`・`unzip`・`lhasa`・`tar` のコマンドを使います。
 
-#### Cross-building for the Pomera
+#### ポメラ用のクロスビルド
 
-Building on the Pomera works but is slow. On an amd64 Debian 13 machine:
+ポメラの上でもビルドできますが、時間がかかります。amd64 の Debian 13 では次のとおりです。
 
-1. Install `gcc-arm-linux-gnueabihf` and run `dpkg --add-architecture armhf` (needs root).
-2. Run `tools/make_sysroot.sh` to collect the armhf libraries into `~/work/sysroot-armhf` (no root needed).
-3. `make CROSS=arm-linux-gnueabihf-` builds `build-arm-linux-gnueabihf/fdtp`.
+1. `gcc-arm-linux-gnueabihf` を入れ、`dpkg --add-architecture armhf` を済ませます（ここだけ root が要ります）。
+2. `tools/make_sysroot.sh` を流すと、armhf のライブラリを `~/work/sysroot-armhf` に集めます（root は要りません）。
+3. `make CROSS=arm-linux-gnueabihf-` で `build-arm-linux-gnueabihf/fdtp` ができます。
 
-#### Tests
+#### 試験
 
-`make check` runs the tests without a screen (`--headless`). It also works on macOS, where `make preview DIR=~ OUT=preview.ppm` writes a screen to an image (Homebrew: `jpeg-turbo libpng giflib webp`). `tests/check_*.py --build build` are the tests for each feature. `check_novel_format.py` compares against manuscripts that are not in this repository and is skipped without them. `check_pdf.py` runs on a real Pomera over ssh.
+`make check` は、画面を使わずに（`--headless`）試験を流します。macOS でも流れます。macOS では `make preview DIR=~ OUT=preview.ppm` で画面を画像に書き出せます（Homebrew の `jpeg-turbo libpng giflib webp` が要ります）。機能ごとの試験は `tests/check_*.py --build build` です。`check_novel_format.py` は、このリポジトリに無い原稿と突き合わせる試験なので、原稿が無ければ飛ばします。`check_pdf.py` は、ssh でポメラの実機を使います。
 
-## Battery
+## 電池について
 
-FDTP draws with the GPU, so it uses more battery than King Jim's own editor (the Pomera mode). For long writing sessions, consider switching between the two.
+FDTP は GPU で画面を描くので、キングジムの標準のエディタ（ポメラのモード）より電池を多く使います。長い時間書く時は、使い分けをお勧めします。
 
-The Debian kernel lets the GPU sleep after 0.2 seconds of idle time, which makes the screen respond late after a pause. FDTP handles this in two ways:
+Debian のカーネルは、0.2 秒使わないと GPU を休ませます。このため、間を置いてからキーを押すと、画面の反応が遅れます。FDTP では次の 2 つで対処しています。
 
-- **AWAKE_MINUTES** (default 15, 0 to turn it off): for this many minutes after the last key, FDTP keeps the GPU and the screen awake on the DRM/KMS console. Set it in `~/.fdtprc` or with `z`.
-- **The GPU sleep delay** (optional, needs root): to change the 0.2 seconds to 15 minutes, put this line in `/etc/udev/rules.d/91-pomera-gpu.rules` and reboot:
+- **AWAKE_MINUTES**（既定 15。0 で使わない）: 最後のキーからこの分のあいだ、DRM/KMS の画面で GPU と画面を起こしたままにします。`~/.fdtprc` か `z` で変えられます。
+- **GPU が休むまでの時間**（任意。root が要ります）: 0.2 秒を 15 分にするには、次の 1 行を `/etc/udev/rules.d/91-pomera-gpu.rules` に書き、再起動します。
   ```
   ACTION=="add", SUBSYSTEM=="platform", KERNEL=="10090000.gpu", ATTR{power/autosuspend_delay_ms}="900000"
   ```
 
-Alt+i shows the current values of both.
+どちらも、今の値を Alt+i で見られます。
 
-## Launching other programs
+## ほかのソフトの起動
 
-FDTP can also serve as a launcher. When it starts another program that draws on DRM/KMS, such as rmp-jukebox (Retro MIDI Player), FDTP gives up the screen and takes it back when the program exits, so the two do not get in each other's way.
+FDTP はランチャーとしても使えます。rmp-jukebox（Retro MIDI Player）のように DRM/KMS で描くほかのソフトを起動する時は、FDTP が画面を明け渡し、そのソフトが終わると画面を取り戻します。互いに邪魔をしません。
 
-- Enter or `v` on `.mid`, `.rcp`, `.r36` and `.g36` files starts rmp-jukebox. Ctrl+p or Alt+r opens any file with it.
-- Add your own associations with `launch` lines in `~/.fdtprc`, for example `launch .ext "command %C"` (`%C` is the file).
+- `.mid`・`.rcp`・`.r36`・`.g36` のファイルで Enter か `v` を押すと、rmp-jukebox が起動します。Ctrl+p か Alt+r なら、どのファイルでも rmp-jukebox で開きます。
+- `~/.fdtprc` の `launch` の行で、拡張子とコマンドを結び付けられます。例: `launch .ext "command %C"`（`%C` がファイルです）。
 
-![rmp-jukebox started from FDTP](docs/images/rmp-jukebox.jpg)
+![FDTP から起動した rmp-jukebox](docs/images/rmp-jukebox.jpg)
 
-The iOS version is on the App Store as [Retro MIDI Player Mobile](https://apps.apple.com/us/app/retro-midi-player-mobile/id6802171148).
+iOS 版は [Retro MIDI Player Mobile](https://apps.apple.com/jp/app/retro-midi-player-mobile/id6802171148) として App Store にあります。
 
-## What has been tested
+## 動作を確かめた範囲
 
-FDTP has been tested only on the Japanese Pomera DM250 and on PCs.
+確かめたのは、日本語版のポメラ DM250 と PC だけです。
 
-- **Pomera DM250US** (US model): not tested. Its keyboard is a US layout and the arrow keys are arranged differently. We have not checked whether Alt and the right Shift come from the same device (gpio-keys), or whether the internal memory is in the same place.
-- **Pomera DM200**: not tested. It has the same SoC (Rockchip RK3128) and a 1024x600 screen, but we do not know whether a Debian 13 image for it gives DRM/KMS, and it has only 512 MB of memory. `./configure` asks the Pomera questions only on a DM250.
-- **Raspberry Pi and other machines** with Debian 13 and DRM/KMS: expected to work, but not tested on real hardware.
-- The Wi-Fi PIO change is limited to an SD card made from the ekesete.net Debian 13 image for the D250.
+- **ポメラ DM250US**（US 版）: 確かめていません。キーは US 配列で、矢印キーの並びも違います。Alt と右 Shift が同じ経路（gpio-keys）で来るか、内蔵メモリが同じ位置にあるかも分かっていません。
+- **ポメラ DM200**: 確かめていません。SoC（Rockchip RK3128）と 1024x600 の画面は同じですが、DM200 用の Debian 13 で DRM/KMS が使えるかは分かりません。メモリも 512MB です。`./configure` が Pomera の設定を聞くのは DM250 の時だけです。
+- **Raspberry Pi など**、DRM/KMS が使える Debian 13 の機械: 動くと見込んでいますが、実機では確かめていません。
+- Wi-Fi の PIO は、ekesete.net の Debian 13 イメージ（D250 用）で作った SD に限ります。
 
-FDTP comes with no warranty, as stated in sections 15 and 16 of the AGPL. If something does not work on your machine, you are welcome to fix it in your own copy.
+FDTP は無保証です（AGPL の 15 条・16 条）。お使いの機械で動かない所があれば、ご自分の手元で直していただいてかまいません。
 
-## Reporting problems
+## 不具合の報告
 
-Bug reports in Issues are welcome. Please include:
+不具合の報告は Issues で歓迎します。次の事を書いてください。
 
-- The machine (Japanese DM250, DM250US, PC, Raspberry Pi, ...) and the Debian version
-- The output of `fdtp -v`
-- The screen language, and whether you use DRM/KMS or X11
-- The steps to reproduce, what you expected, and what happened
-- A screenshot or photo, if you can
+- 機械（日本語版 DM250・DM250US・PC・Raspberry Pi など）と Debian の版
+- `fdtp -v` の出力
+- 画面の言語と、DRM/KMS か X11 か
+- 再現の手順、期待した事、実際に起きた事
+- できれば画面の写真
 
-**Pull requests are not accepted.** If you want to change FDTP, please fork it and make your own version under the AGPL. The same goes for the English text: if you would like it to read differently, your own version is welcome.
+**Pull request は受け付けていません。** FDTP を変えたい方は、AGPL の下でフォークして、ご自分の版を作ってください。英語の文言も同じです。言い回しを変えたい方は、ご自分の版を作っていただければと思います。
 
-## License
+## ライセンス
 
-FDTP is licensed under the **GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later)**. See [LICENSE](LICENSE) for the full text. FDTP uses MuPDF and jbig2dec, which are AGPL-3.0-or-later, so FDTP uses a license that can be combined with them.
+FDTP は **GNU Affero General Public License v3.0 以降（AGPL-3.0-or-later）** で配布します。全文は [LICENSE](LICENSE) にあります。PDF に使う MuPDF と jbig2dec が AGPL-3.0-or-later なので、これと組み合わせて配れるライセンスにしています。
 
-Third-party components and their licenses are listed in [NOTICE.md](NOTICE.md).
+使っている部品とそのライセンスは [NOTICE.md](NOTICE.md) にまとめています。
 
-## Name and look
+## 名前と見た目について
 
-FDTP is a separate work by a different author. It follows the keys and screens of FD (by A. Idei), the file manager for MS-DOS and the PC-98. It is not related to FD or FDclone. No text or messages are copied from FD; all text in FDTP is new.
+FDTP は、MS-DOS・PC-98 のファイラー FD（出射厚氏の作品）の操作と画面を手本にした、別の作者の作品です。FD とも FDclone とも関係はありません。FD の文章やメッセージは写していません。FDTP の文言は、すべて新しく書いた物です。
 
-"Pomera" is a trademark of King Jim Co., Ltd. FDTP is unofficial and is not affiliated with King Jim.
+「ポメラ」「pomera」は株式会社キングジムの商標です。FDTP は非公式の物で、キングジムとは関係ありません。
 
-## Acknowledgments
+## 謝辞
 
-- FD, by A. Idei, which FDTP follows. The FDclone manual page helped with the mapping of internal commands to keys.
-- The authors of the Shinonome fonts. Every character on the screen is drawn with them.
-- The authors of MuPDF (Artifex), expat, zlib, libjpeg-turbo, libpng, giflib, libwebp, uim, lhasa and Info-ZIP.
-- The people who opened the way to running Debian on the Pomera DM250.
+- 手本にした FD（出射厚氏）。内部コマンドとキーの対応は、FDclone の man も参考にしました。
+- 東雲フォントの作者の方々。画面の文字はすべて東雲フォントです。
+- MuPDF（Artifex）、expat、zlib、libjpeg-turbo、libpng、giflib、libwebp、uim、lhasa、Info-ZIP の作者の方々。
+- ポメラ DM250 に Debian を入れる道を開いた方々。
 
-## Author
+## 作者
 
 yasoteien
