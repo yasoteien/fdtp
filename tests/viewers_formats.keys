@@ -1,0 +1,23 @@
+C-s "f01.txt" ESC v
+SNAP # sjis
+q C-s "f02.txt" ESC v
+SNAP # euc
+q C-s "f03.txt" ESC v
+SNAP # empty
+q C-s "f06.txt" ESC v
+SNAP # cp932
+q C-s "f07.txt" ESC v
+SNAP # newlines
+ESC C-s "f08.txt" ESC v
+SNAP # wrapped
+w
+SNAP # unwrapped
+RIGHT
+SNAP # right
+LEFT
+SNAP # left
+w
+SNAP # rewrapped
+"#"
+SNAP # wrapped_plain
+q

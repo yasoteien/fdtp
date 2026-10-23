@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=FDTP
+GenericName=File Manager
+GenericName[ja]=ファイラー
+Comment=PC-98 FD style file manager
+Comment[ja]=PC-98 の FD 風のファイラー
+Exec=@HOME@/bin/fdtp
+Icon=fdtp
+Terminal=false
+StartupWMClass=FDTP
+Categories=System;FileManager;Utility;

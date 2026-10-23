@@ -1,0 +1,3 @@
+# Item 40: (S) saves and leaves.
+WAIT:0 e WAIT:0 RIGHT S-RIGHT u WAIT:0 e q SNAP   # 1 asks
+s SNAP                                            # 2 saved, back

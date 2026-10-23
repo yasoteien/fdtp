@@ -1,0 +1,30 @@
+# Stage 5: docx editing (tests/check_doc.py opens doc.docx through doc_harness).
+# Lines of the first screen: 1 heading, 2 body, 3 mixed, 4 bookmark, 5 field,
+# 6-13 table, 14 page break, 15 image, 16 break before, 17 heading 2,
+# 18 comment, 19 link, 20-23 long, 24 tracked, 25-26 tabs, 27 empty,
+# 28 section end, 29 its break, 30 last.
+SNAP                                        # 1 initial
+DOWN RET SNAP                               # 2 editing the body paragraph
+C-u "書き換えた本文です" RET SNAP           # 3 body edited
+DOWN RET END "!" RET SNAP                   # 4 mixed runs into the first (bold) run
+DOWN RET END " 直した" RET SNAP             # 5 bookmark kept around the new run
+C-k SNAP ESC                                # 6 bookmark: cannot delete (ESC closes the error box)
+DOWN RET SNAP ESC                           # 7 field: refused (ESC closes the error box)
+DOWN RET SNAP ESC                           # 8 table: refused (ESC closes the error box)
+C-k SNAP ESC                                # 9 table: cannot delete (ESC closes the error box)
+DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN RET C-u "図１：" RET SNAP   # 10 image run kept
+DOWN DOWN o "第三節" RET SNAP               # 11 o after heading 2: its style, no page break
+DOWN RET END "（直）" RET SNAP              # 12 comment range and reference kept
+DOWN RET SNAP ESC                           # 13 link: refused (ESC closes the error box)
+DOWN RET END SNAP                           # 14 long paragraph: row 23 scrolled to the end
+"追記" RET SNAP                             # 15 long paragraph edited
+DOWN DOWN DOWN DOWN RET SNAP ESC            # 16 tracked change: refused (ESC closes the error box)
+DOWN C-k SNAP                               # 17 delete: asks
+n SNAP                                      # 18 kept
+C-k y SNAP                                  # 19 tabs paragraph deleted
+RET "空だった段落" RET SNAP                 # 20 the empty <w:p/> gets a run
+END C-k SNAP ESC                            # 21 last paragraph: cannot delete (ESC closes the error box)
+o "消える" ESC SNAP                         # 22 o then Esc: nothing added
+o M-SPC "nihon" SPC RET M-SPC "go" RET SNAP # 23 Japanese through the input method
+C-s SNAP                                    # 24 saved, .bak made
+ESC SNAP                                    # 25 nothing unsaved: closes

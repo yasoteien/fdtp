@@ -1,0 +1,14 @@
+# Revision 1 §3 14 (pdf_harness: ticks, and so renders, only at WAIT).
+# ↑↓ scroll a page taller than the view and turn the page at its edges or
+# when the page fits; ↑ lands on the previous page's bottom.
+WAIT:0 SNAP                                          # 1 page 1 fitted
+DOWN WAIT:0 SNAP                                     # 2 it fits: DOWN is the next page (2/3)
+UP WAIT:0 SNAP                                       # 3 UP: page 1 again
+UP WAIT:0 SNAP                                       # 4 nothing before page 1: still 1/3
+w WAIT:0 SNAP                                        # 5 fit width: page 1 is taller, at its top
+DOWN WAIT:0 SNAP                                     # 6 scrolled down, still 1/3
+UP WAIT:0 SNAP                                       # 7 scrolled back to the top, still 1/3
+DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN WAIT:0 SNAP  # 8 13 steps reach the bottom (the framed view, 0.06), still 1/3
+DOWN WAIT:0 SNAP                                     # 9 at the bottom DOWN is page 2, at its top
+UP WAIT:0 SNAP                                       # 10 at the top UP is page 1, shown from its bottom
+q SNAP                                               # 11 back

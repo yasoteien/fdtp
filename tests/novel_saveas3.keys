@@ -1,0 +1,15 @@
+# 1: an existing name asks before overwriting.
+"1" C-S-s C-u "exist.txt" RET SNAP
+# 2: N goes back to the name box with that name.
+"n" SNAP
+# 3: another name instead.
+C-u "other.txt" RET SNAP
+# 4: the existing name again, Y overwrites it.
+C-S-s C-u "exist.txt" RET "y" SNAP
+# 5: the name of the file being edited saves without asking.
+"2" C-S-s C-u "exist.txt" RET SNAP
+# 6-7: another existing name, Esc leaves the question and the editor as it was.
+C-S-s C-u "a.txt" RET SNAP ESC SNAP
+# 8: Esc in the name box.
+C-S-s "q" ESC SNAP
+ESC

@@ -1,0 +1,19 @@
+Package: fdtp
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: @MAINTAINER@
+Installed-Size: @INSTALLED_SIZE@
+Depends: @DEPENDS@
+Recommends: zip, unzip, lhasa
+Suggests: uim-mozc | uim-anthy, python3
+Section: utils
+Priority: optional
+Description: file manager in the style of FD 3.13, for the Pomera DM250
+ FDTP follows the screens and keys of FD 3.13, the file manager many
+ people used on the NEC PC-98. It runs on the DRM/KMS console and in an
+ X11 window. It has viewers for text, hex, PDF, docx, xlsx, csv, pptx and
+ images, a PDF menu, tar, zip and LHa archives, and a novel editor for
+ Japanese manuscripts.
+ .
+ fdtp-pomera-setup makes the optional settings for the King Jim Pomera
+ DM250 (Wi-Fi stabilization and a read-only mount of the internal memory).

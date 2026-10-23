@@ -1,0 +1,12 @@
+# Stage 3 (pdf_harness: ticks, and so renders, only at WAIT)
+SNAP WAIT:0 SNAP                # 1 描画中, 2 page 1 fitted
+w WAIT:0 SNAP                   # 3 fit width
+f WAIT:0 SNAP                   # 4 whole page again
+SPC SNAP WAIT:0 SNAP            # 5 描画中 over page 1, 6 page 2 (landscape)
+PGDN WAIT:0 SNAP                # 7 page 3 (small)
+BS PGUP WAIT:0 SNAP             # 8 back to page 1, one render for two keys
+g "3" RET WAIT:0 SNAP           # 9 page 3 by number
+g "9" RET WAIT:0 SNAP ESC       # 10 bad number (an error box since revision 1 A; ESC closes it), still page 3
++ WAIT:0 SNAP                   # 11 zoomed 125%
++ + RIGHT DOWN WAIT:0 SNAP      # 12 zoomed and moved
+q SNAP                          # 13 back (depth 0)

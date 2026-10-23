@@ -1,0 +1,26 @@
+# Revision 1 item 41: editing the text of a pptx (tests/check_slide.py check_edit).
+# Slide 1: 1 title, 2 two runs, 3 with a:br, 4 empty with endParaRPr, 5 field,
+# 6 link, 7 <a:p/>. Slide 2: a table (1 見出し, the merged-over cell left out,
+# 2 行2, 3 数値) and a picture. Slide 3: 1 its text, 2 inside mc:Fallback.
+SNAP                                        # 1 viewing
+e SNAP                                      # 2 choosing: paragraph 1, framed on the slide
+RET SNAP                                    # 3 the input line with the title
+C-u "新しい題" RET SNAP                     # 4 the title edited
+DOWN RET END "!" RET SNAP                   # 5 two runs made one, the first's format
+DOWN RET SNAP                               # 6 the a:br shown as ↓ on the input line
+END "三" RET SNAP                           # 7 edited: the a:br kept
+DOWN RET "空に足した" RET SNAP              # 8 the empty paragraph gets a run (the endParaRPr's format)
+DOWN RET SNAP ESC                           # 9 field: refused (ESC closes the error box)
+DOWN RET SNAP ESC                           # 10 link: refused
+DOWN RET "要素" RET SNAP                    # 11 <a:p/> gets a run
+C-z SNAP                                    # 12 undone
+C-y SNAP                                    # 13 redone
+PGDN SNAP                                   # 14 slide 2 while choosing: the table's first cell
+DOWN RET C-u "行を直した" RET SNAP          # 15 a table cell edited
+ESC SNAP                                    # 16 viewing again
+C-s SNAP                                    # 17 saved, .bak made
+C-z SNAP                                    # 18 the cell undone after saving: on slide 2, choosing
+ESC C-s SNAP                                # 19 saved again: slide 2 as it was
+PGDN e SNAP                                 # 20 slide 3
+DOWN RET SNAP ESC                           # 21 inside mc:Fallback: refused
+ESC q SNAP                                  # 22 not changed: q leaves

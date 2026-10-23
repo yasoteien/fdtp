@@ -1,0 +1,8 @@
+# Revision 1 §3 14: ↑↓ are the previous and next slide.
+C-s "deck.pptx" ESC RET SNAP # slide1
+DOWN SNAP # slide2
+DOWN SNAP # slide3
+DOWN SNAP # slide3_end
+UP SNAP # slide2_up
+UP UP SNAP # slide1_top
+q SNAP # back

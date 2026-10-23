@@ -1,0 +1,596 @@
+#!/usr/bin/env python3
+# This file is part of FDTP (File & Directory Tool for Pomera).
+# SPDX-FileCopyrightText: 2026 yasoteien
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""Tests of ./configure, mk/install.mk and pomera/ (with pomera_setup.sh, the .deb's
+fdtp-pomera-setup; docs/FDTP_CONFIGURE.md).
+
+    python3 -B tests/check_configure.py
+
+Runs on macOS and Linux without root and without touching the machine:
+configure's view of the machine (uname, /proc/device-tree, id -u, the
+internal memory probe, pkg-config, the compiler) is replaced through its
+FDTP_CONFIGURE_* variables, config.mk goes to a temporary directory, and
+make install runs with DESTDIR (which also skips the Pomera part).
+pomera/make_pio.py is tried on a small device tree made here; the real
+sha256 values can only be checked on a DM250's SD.
+"""
+import hashlib
+import os
+import re
+import shutil
+import struct
+import subprocess
+import sys
+import tempfile
+
+APP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CONFIGURE = os.path.join(APP, "configure")
+# pomera/ here, scripts/pomera/ in the public copy (tools/make_public.sh).
+POMERA = next((d for d in (os.path.join(APP, "scripts", "pomera"), os.path.join(APP, "pomera")) if os.path.isdir(d)),
+              os.path.join(APP, "pomera"))
+SHELLS = [s for s in ("sh", "dash") if shutil.which(s)]
+FAILS = []
+
+
+def check(cond, what):
+    if not cond:
+        FAILS.append(what)
+        print("  NG:", what)
+    return cond
+
+
+def run(args, env=None, stdin="", cwd=APP):
+    p = subprocess.run(args, input=stdin, capture_output=True, text=True, encoding="utf-8", errors="replace", env=env, cwd=cwd)
+    return p.returncode, p.stdout + p.stderr
+
+
+def base_env(**extra):
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith(("LC_", "FDTP_", "POMERA_")) and k not in ("LANG", "LANGUAGE", "TERM", "PKG_CONFIG", "CC",
+                                                                          "MAKEFLAGS", "MFLAGS", "MAKELEVEL", "PREFIX", "DESTDIR")}
+    env.update(extra)
+    return env
+
+
+def read_mk(path):
+    out = {}
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            m = re.match(r"^([A-Z_]+) = (.*)$", line.rstrip("\n"))
+            if m:
+                out[m.group(1)] = m.group(2)
+    return out
+
+
+class Machine:
+    """A fake machine in a temporary directory: device tree, pkg-config, cc."""
+
+    def __init__(self, root):
+        self.root = root
+        self.dt = os.path.join(root, "dt")
+        os.makedirs(self.dt, exist_ok=True)
+        self.bin = os.path.join(root, "bin")
+        os.makedirs(self.bin, exist_ok=True)
+        self.pkg_config = os.path.join(self.bin, "fake-pkg-config")
+        self.cc = os.path.join(self.bin, "fake-cc")
+        with open(self.pkg_config, "w") as f:
+            f.write('#!/bin/sh\n[ "$1" = --exists ] || exit 1\n'
+                    'for m in $FAKE_PC; do [ "$m" = "$2" ] && exit 0; done\nexit 1\n')
+        with open(self.cc, "w") as f:
+            f.write('#!/bin/sh\nfor a; do case $a in -l*) case " $FAKE_LIBS " in *" ${a#-l} "*) ;; *) exit 1 ;; esac ;; esac; done\nexit 0\n')
+        os.chmod(self.pkg_config, 0o755)
+        os.chmod(self.cc, 0o755)
+        self.out = os.path.join(root, "config.mk")
+
+    def device(self, compatible=None, model=None):
+        for name, value in (("compatible", compatible), ("model", model)):
+            path = os.path.join(self.dt, name)
+            if value is None:
+                if os.path.exists(path):
+                    os.remove(path)
+            else:
+                with open(path, "wb") as f:
+                    f.write(value)
+
+    def configure(self, *args, uname="Linux", uid="1000", probe=None, tty=None, stdin="", lang=None, term=None,
+                  pc="libdrm gbm egl glesv2 xcb libjpeg libpng libwebp zlib expat",
+                  libs="gif mupdf uim uim-scm", shell="sh"):
+        if os.path.exists(self.out):
+            os.remove(self.out)
+        env = base_env(FDTP_CONFIG_MK=self.out, FDTP_CONFIGURE_UNAME=uname, FDTP_CONFIGURE_DT=self.dt,
+                       FDTP_CONFIGURE_UID=uid, PKG_CONFIG=self.pkg_config, CC=self.cc, FAKE_PC=pc, FAKE_LIBS=libs,
+                       FDTP_CONFIGURE_PROBE=probe if probe is not None else "echo should-not-run; exit 1")
+        if uname == "Darwin":
+            env["CC"] = "cc"
+        if tty:
+            env["FDTP_CONFIGURE_TTY"] = tty
+        if lang:
+            env["LANG"] = lang
+        if term:
+            env["TERM"] = term
+        code, text = run([shell, CONFIGURE] + list(args), env=env, stdin=stdin)
+        mk = read_mk(self.out) if os.path.exists(self.out) else None
+        return code, text, mk
+
+
+POMERA_DT = b"kingjim,pomera-dm250\0rockchip,rk3128\0"
+
+
+def test_syntax():
+    print("== shell syntax")
+    files = [CONFIGURE] + sorted(os.path.join(POMERA, f) for f in os.listdir(POMERA) if f.endswith(".sh"))
+    for sh in SHELLS:
+        for f in files:
+            code, text = run([sh, "-n", f])
+            check(code == 0, "%s -n %s: %s" % (sh, os.path.relpath(f, APP), text.strip()))
+    check(os.access(CONFIGURE, os.X_OK), "configure is not executable")
+
+
+def test_deps_cover_makefiles():
+    """Every library the Makefiles use is in configure's list."""
+    print("== configure's library list against Makefile, mk/*.mk and sources.mk")
+    code, text = run(["sh", CONFIGURE, "--list-deps"])
+    check(code == 0, "--list-deps failed")
+    listed = set()
+    for line in text.splitlines():
+        kind, name = line.split()[:2]
+        listed.add(name.split(":")[0] if kind == "lib" else name)
+    files = [os.path.join(APP, "Makefile")] + [os.path.join(APP, "mk", f) for f in sorted(os.listdir(os.path.join(APP, "mk")))]
+    # The platform layer: lib/rmp-platform in the public copy, port/app/platform beside fdtp/ here.
+    sources = [s for s in (os.path.join(APP, "lib", "rmp-platform", "sources.mk"),
+                           os.path.join(APP, "..", "port", "app", "platform", "sources.mk")) if os.path.exists(s)]
+    check(sources, "the platform layer's sources.mk not found")
+    files += sources[:1]
+    used = set()
+    for path in files:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        for m in re.finditer(r"--(?:cflags|libs|exists)((?:\s+[a-z][\w.+-]*)+)", text):
+            used.update(m.group(1).split())
+        for m in re.finditer(r"PLATFORM_PKGS\s*:?\+?=([^\n]*)", text):
+            used.update(m.group(1).split())
+        for m in re.finditer(r"(?<![\w-])-l([a-z](?:[\w-]*\w)?)(?=[\s)]|$)", text):
+            used.add("-l" + m.group(1))
+    # -lNAME that a pkg-config module stands for (the Mac branches name the
+    # libraries directly); libm is libc's.
+    alias = {"-ljpeg": "libjpeg", "-lpng": "libpng", "-lwebp": "libwebp", "-lz": "zlib", "-lexpat": "expat"}
+    for u in sorted(used):
+        if u in ("-lm",) or u.startswith("$"):
+            continue
+        name = alias.get(u, u[2:] if u.startswith("-l") else u)
+        check(name in listed, "%s (from the Makefiles) is not in configure's list" % u)
+
+
+def test_darwin(m):
+    print("== macOS")
+    code, text, mk = m.configure("--yes", "--no-pomera", "--prefix=/opt/fdtp/", uname="Darwin")
+    check(code == 0, "Darwin --yes failed: " + text)
+    check(mk == {"FDTP_CONFIGURED": "yes", "PREFIX": "/opt/fdtp", "FDTP_LANGUAGE": "auto", "POMERA_STABILITY": "no",
+                 "POMERA_INTERNAL_RO": "no", "HAVE_XCB": "no", "HAVE_UIM": "no"}, "Darwin config.mk: %s" % mk)
+    check("Wi-Fi" not in text and "pkg-config" not in text, "Darwin asked about the Pomera or pkg-config")
+    check("make install is for Linux" in text, "Darwin: no note that make install is for Linux")
+    # The Pomera questions never come on the Mac, even with a DM250 tree.
+    m.device(POMERA_DT)
+    code, text, mk = m.configure("--yes", uname="Darwin")
+    check(code == 0 and mk and mk["POMERA_STABILITY"] == "no" and "Wi-Fi" not in text, "Darwin with a DM250 tree")
+    m.device()
+    env = base_env(FDTP_CONFIG_MK=m.out, FDTP_CONFIGURE_UNAME="Darwin", CC="no-such-cc-fdtp")
+    os.path.exists(m.out) and os.remove(m.out)
+    code, text = run(["sh", CONFIGURE, "--yes"], env=env)
+    check(code == 1 and "no-such-cc-fdtp" in text and not os.path.exists(m.out), "Darwin without a compiler: %s" % text)
+
+
+def test_linux_deps(m):
+    print("== Linux: dependencies")
+    m.device(b"raspberrypi,4-model-b\0brcm,bcm2711\0", b"Raspberry Pi 4 Model B Rev 1.4\0")
+    code, text, mk = m.configure("--yes", "--prefix=/usr")
+    check(code == 0, "all found: " + text)
+    check(mk and mk["HAVE_XCB"] == "yes" and mk["HAVE_UIM"] == "yes" and "NOVEL_IME" not in mk and mk["PREFIX"] == "/usr",
+          "all found: config.mk %s" % mk)
+    check("Wi-Fi" not in text, "not a DM250 but the Pomera questions came")
+    code, text, mk = m.configure("--yes", pc="gbm egl glesv2 xcb libjpeg libpng libwebp zlib expat", libs="gif uim uim-scm")
+    check(code == 1 and mk is None, "missing libdrm and libmupdf did not stop: %s" % text)
+    check("sudo apt install libdrm-dev libmupdf-dev" in text, "missing: apt line wrong: " + text)
+    code, text, mk = m.configure("--yes", libs="gif mupdf", pc="libdrm gbm egl glesv2 libjpeg libpng libwebp zlib expat")
+    check(code == 0 and mk and mk["HAVE_UIM"] == "no" and mk.get("NOVEL_IME") == "ime_none" and mk["HAVE_XCB"] == "no",
+          "optional uim and xcb missing: %s %s" % (mk, text))
+    check("libuim-dev" in text and "libxcb1-dev" in text, "optional ones missing: no warning")
+    code, text, mk = m.configure("--yes", libs="gif mupdf uim")
+    check(mk and mk["HAVE_UIM"] == "no" and mk.get("NOVEL_IME") == "ime_none", "uim without uim-scm counted as found")
+    code, text, mk = m.configure("--yes", pc="libdrm gbm egl glesv2 libjpeg libpng libwebp zlib expat")
+    check(code == 0, "without xcb: " + text)
+    env = base_env(FDTP_CONFIG_MK=m.out, FDTP_CONFIGURE_UNAME="Linux", FDTP_CONFIGURE_DT=m.dt, CC=m.cc,
+                   PKG_CONFIG="no-such-pkg-config-fdtp")
+    os.path.exists(m.out) and os.remove(m.out)
+    code, text = run(["sh", CONFIGURE, "--yes"], env=env)
+    check(code == 1 and "sudo apt install pkg-config" in text and not os.path.exists(m.out), "without pkg-config: " + text)
+
+
+def test_options(m):
+    print("== options")
+    for args in (["--lang=fr"], ["--prefix=usr/local"], ["--prefix=/opt/my fdtp"], ["--prefix=/opt/$x"], ["--bogus"], ["--lang"]):
+        code, text, mk = m.configure(*args)
+        check(code == 2 and mk is None, "%s accepted: %s" % (args, text))
+    code, text, mk = m.configure("--yes", "--lang", "en", "--prefix", "/opt/f")
+    check(mk and mk["FDTP_LANGUAGE"] == "en" and mk["PREFIX"] == "/opt/f" and "Choose a number" not in text,
+          "--lang en --prefix /opt/f: %s" % mk)
+    code, text = run(["sh", CONFIGURE, "--help"])
+    check(code == 0 and "--prefix" in text, "--help")
+
+
+def test_pomera(m):
+    print("== Pomera DM250")
+    m.device(POMERA_DT, b"King Jim Pomera DM250\0")
+    code, text, mk = m.configure("--yes")
+    check(code == 0 and mk and mk["POMERA_STABILITY"] == "yes" and mk["POMERA_INTERNAL_RO"] == "no", "DM250 --yes: %s" % mk)
+    check("Finding the internal memory needs root" in text and "should-not-run" not in text, "not root: probe not skipped")
+    i_notes, i_ask = text.find("Notes:"), text.find("Make the Wi-Fi stable? [Y/n]")
+    check(0 <= i_notes < i_ask, "Wi-Fi: the notes are not before [Y/n]")
+    check("pomera/pomera_dma_pio.sh restore" in text and "24 MiB" in text, "Wi-Fi: undo or what is rewritten not told")
+    # Only the model, upper case.
+    m.device(None, b"KING JIM POMERA DM250\0")
+    code, text, mk = m.configure("--yes")
+    check(mk and mk["POMERA_STABILITY"] == "yes", "DM250 from the model only")
+    m.device(POMERA_DT)
+    code, text, mk = m.configure("--yes", "--no-pomera")
+    check(mk and mk["POMERA_STABILITY"] == "no" and "Wi-Fi" not in text, "--no-pomera asked")
+    # Root: the probe finds the FAT.
+    code, text, mk = m.configure("--yes", uid="0", probe="echo vfat")
+    check(mk and mk["POMERA_INTERNAL_RO"] == "yes", "root, vfat found: %s" % mk)
+    i_notes, i_ask = text.rfind("Notes:"), text.find("Mount the internal memory read-only? [Y/n]")
+    check(0 <= i_notes < i_ask and "unpersist" in text and "/etc/fstab" in text, "internal: notes not before [Y/n]")
+    code, text, mk = m.configure("--yes", uid="0", probe="echo ext4")
+    check(mk and mk["POMERA_INTERNAL_RO"] == "no" and "Mount the internal memory" not in text and "skipped" in text,
+          "root, no FAT: %s" % text)
+    code, text, mk = m.configure("--yes", uid="0", probe="exit 1")
+    check(mk and mk["POMERA_INTERNAL_RO"] == "no" and "skipped" in text, "root, probe failed")
+    # Interactive, in Japanese: language 1 (after a wrong answer), Wi-Fi no, internal default.
+    code, text, mk = m.configure(uid="0", probe="echo exfat", tty="yes", stdin="9\n1\nn\n\n", lang="ja_JP.UTF-8")
+    check(code == 0 and mk and mk["FDTP_LANGUAGE"] == "ja" and mk["POMERA_STABILITY"] == "no" and mk["POMERA_INTERNAL_RO"] == "yes",
+          "interactive ja: %s %s" % (mk, text))
+    check("== Wi-Fi の安定化（Pomera DM250 だけ） ==" in text and "1・2・3 のどれかで" in text, "ja messages")
+    i_notes, i_ask = text.find("注意:"), text.find("Wi-Fi を安定させますか [Y/n]")
+    check(0 <= i_notes < i_ask, "ja: notes not before [Y/n]")
+    check(text.find("やめるには:") < text.find("内蔵メモリを読み取り専用でマウントしますか [Y/n]"), "ja internal: notes after [Y/n]")
+    # y/n: a wrong answer is asked again; EOF takes the default.
+    code, text, mk = m.configure(tty="yes", stdin="2\nmaybe\nn\n")
+    check(mk and mk["FDTP_LANGUAGE"] == "en" and mk["POMERA_STABILITY"] == "no" and "Please answer y or n." in text,
+          "interactive en: %s" % mk)
+    code, text, mk = m.configure(tty="yes", stdin="")
+    check(mk and mk["FDTP_LANGUAGE"] == "auto" and mk["POMERA_STABILITY"] == "yes", "interactive EOF: %s" % mk)
+    # Not a terminal: the defaults, said so.
+    code, text, mk = m.configure(tty="no", lang="ja_JP.UTF-8")
+    check(mk and mk["POMERA_STABILITY"] == "yes" and "端末ではない" in text, "not a terminal")
+    # The Linux console cannot show Japanese.
+    code, text, mk = m.configure("--yes", lang="ja_JP.UTF-8", term="linux")
+    check("Make the Wi-Fi stable?" in text and "cannot show Japanese" in text, "TERM=linux not in English")
+    for sh in SHELLS:
+        code, text, mk = m.configure("--yes", uid="0", probe="echo vfat", lang="ja_JP.UTF-8", shell=sh)
+        check(code == 0 and mk and mk["POMERA_INTERNAL_RO"] == "yes", "%s: %s" % (sh, text))
+    m.device()
+
+
+def make(args, env):
+    return run(["make", "-s", "-C", APP] + args, env=env)
+
+
+def test_install(m):
+    print("== make install / uninstall (DESTDIR)")
+    m.device()
+    code, text, mk = m.configure("--yes", "--lang=ja", "--prefix=/opt/fdtp", "--no-pomera")
+    check(code == 0, "configure for install: " + text)
+    root = os.path.join(m.root, "dest")
+    fake = os.path.join(m.root, "fake-fdtp")
+    with open(fake, "w") as f:
+        f.write("#!/bin/sh\necho fake\n")
+    env = base_env()
+    common = ["FDTP_CONFIG_MK=" + m.out, "INSTALL_EXE=" + fake, "DESTDIR=" + root]
+    code, text = run(["make", "-n", "-C", APP, "install"] + common, env=env)
+    for want in ("/opt/fdtp/bin/fdtp", "/opt/fdtp/share/applications/fdtp.desktop", "Exec=/opt/fdtp/bin/fdtp",
+                 "/opt/fdtp/share/icons/hicolor/${s}x${s}/apps/fdtp.png", "/opt/fdtp/share/doc/fdtp/", "LANGUAGE=ja",
+                 "/etc/fdtprc", "LICENSE", "README.md"):
+        check(want in text, "make -n install lacks %s" % want)
+    code, text = make(["install"] + common, env)
+    check(code == 0, "make install: " + text)
+    p = lambda *a: os.path.join(root, *a)
+    check(os.access(p("opt/fdtp/bin/fdtp"), os.X_OK), "bin/fdtp")
+    with open(p("opt/fdtp/share/applications/fdtp.desktop")) as f:
+        desktop = f.read()
+    check("Exec=/opt/fdtp/bin/fdtp\n" in desktop and "@HOME@" not in desktop, "desktop Exec")
+    for s in (16, 32, 48, 64, 128):
+        check(os.path.isfile(p("opt/fdtp/share/icons/hicolor/%dx%d/apps/fdtp.png" % (s, s))), "icon %d" % s)
+    check(os.path.isfile(p("opt/fdtp/share/doc/fdtp/LICENSE")) and os.path.isfile(p("opt/fdtp/share/doc/fdtp/README.md")), "docs")
+    rc = p("etc/fdtprc")
+    with open(rc) as f:
+        first = f.read()
+    check(first.splitlines()[1:] == ["LANGUAGE=ja"] and first.startswith("# "), "new fdtprc: %r" % first)
+    # An existing fdtprc keeps its other lines; only LANGUAGE changes.
+    with open(rc, "w") as f:
+        f.write("# mine\nSORTTYPE=2\n  LANGUAGE = en\nAWAKE=5")
+    code, text = make(["install"] + common + ["FDTP_LANGUAGE=auto"], env)
+    with open(rc) as f:
+        check(f.read() == "# mine\nSORTTYPE=2\nLANGUAGE=auto\nAWAKE=5", "fdtprc with LANGUAGE: only that line")
+    with open(rc, "w") as f:
+        f.write("SORTTYPE=2")
+    make(["install"] + common, env)
+    with open(rc) as f:
+        check(f.read() == "SORTTYPE=2\nLANGUAGE=ja\n", "fdtprc without LANGUAGE: appended")
+    code, text = make(["install"] + common + ["FDTP_LANGUAGE=fr"], env)
+    check(code != 0, "FDTP_LANGUAGE=fr installed")
+    # Uninstall: the files go, an fdtprc with settings of its own stays.
+    code, text = make(["uninstall"] + common, env)
+    check(code == 0 and not os.path.exists(p("opt/fdtp/bin/fdtp")) and not os.path.exists(p("opt/fdtp/share/doc/fdtp"))
+          and not os.path.exists(p("opt/fdtp/share/applications/fdtp.desktop"))
+          and not os.path.exists(p("opt/fdtp/share/icons/hicolor/16x16/apps/fdtp.png")), "uninstall: " + text)
+    check(os.path.exists(rc) and "kept" in text, "uninstall removed a user's fdtprc")
+    os.remove(rc)
+    make(["install"] + common, env)
+    code, text = make(["uninstall"] + common, env)
+    check(not os.path.exists(rc), "uninstall kept the fdtprc it made")
+    # Without ./configure: no fdtprc.
+    code, text = make(["install", "FDTP_CONFIG_MK=" + os.path.join(m.root, "none.mk"), "INSTALL_EXE=" + fake, "DESTDIR=" + root], env)
+    check(code == 0 and not os.path.exists(rc), "install without config.mk wrote fdtprc")
+    # Pomera answers: uninstall tells how to undo them.
+    with open(m.out, "a") as f:
+        f.write("POMERA_STABILITY = yes\nPOMERA_INTERNAL_RO = yes\n")
+    code, text = make(["uninstall"] + common, env)
+    check("pomera_stability.sh remove" in text and "pomera_dma_pio.sh restore" in text and "unpersist" in text,
+          "uninstall: how to undo the Pomera settings")
+    code, text = run(["make", "-n", "-C", APP, "install"] + common, env=env)
+    check("install_pomera.sh" in text, "make -n install: no Pomera part")
+    if sys.platform == "darwin":
+        code, text = make(["install", "FDTP_CONFIG_MK=" + m.out, "DESTDIR=" + root], env)
+        check(code != 0 and "for Linux" in text, "make install on macOS not refused")
+    shutil.rmtree(root, ignore_errors=True)
+
+
+def test_make_reads_config(m):
+    print("== Makefile with config.mk")
+    # A makefile that includes ours and shows the variables (make 3.81, as
+    # on macOS, has no --eval).
+    show = os.path.join(m.root, "show-vars.mk")
+    with open(show, "w") as f:
+        f.write("include %s\nfdtp-show:\n\t@echo NOVEL_IME=$(NOVEL_IME) MODULES=$(MODULES) PREFIX=$(PREFIX)\n"
+                % os.path.join(APP, "Makefile"))
+    mk = os.path.join(m.root, "show.mk")
+    with open(mk, "w") as f:
+        f.write("PREFIX = /opt/q\nNOVEL_IME = ime_none\nFDTP_CONFIGURED = yes\n")
+    env = base_env()
+    vars_ = lambda *a: run(["make", "-s", "-f", show, "fdtp-show", "UNAME=Linux"] + list(a), env=env)[1]
+    text = vars_("FDTP_CONFIG_MK=" + mk)
+    check("NOVEL_IME=ime_none" in text and " ime_none" in text and "ime_uim" not in text and "PREFIX=/opt/q" in text,
+          "config.mk not read: " + text)
+    text = vars_("FDTP_CONFIG_MK=" + mk, "CROSS=arm-linux-gnueabihf-")
+    check("NOVEL_IME=ime_uim" in text and "PREFIX=/usr/local" in text, "cross build read config.mk: " + text)
+    text = vars_("FDTP_CONFIG_MK=" + os.path.join(m.root, "none.mk"))
+    check("NOVEL_IME=ime_uim" in text and " ime_uim" in text, "without config.mk the build changed: " + text)
+    code, text = make(["-n", "FDTP_CONFIG_MK=" + mk], env)
+    check(code == 0, "make -n (all) with config.mk: " + text[-300:])
+
+
+# ---- make_pio.py on a small device tree ----------------------------------------------
+
+def fdt(nodes, nop=()):
+    """A flattened device tree: nodes is [(path, [(name, value)])] in
+    order (one level under /); properties (path, name) in nop are written
+    as FDT_NOP words of the same size."""
+    strings, offsets, struct_ = b"", {}, b""
+
+    def name_off(n):
+        nonlocal strings
+        if n not in offsets:
+            offsets[n] = len(strings)
+            strings += n.encode() + b"\0"
+        return offsets[n]
+
+    def pad(b):
+        return b + b"\0" * (-len(b) % 4)
+
+    def prop(path, n, v):
+        word = struct.pack(">III", 3, len(v), name_off(n)) + pad(v)
+        return struct.pack(">I", 4) * (len(word) // 4) if (path, n) in nop else word
+
+    root_props = nodes[0][1]
+    struct_ += struct.pack(">I", 1) + pad(b"\0")
+    for n, v in root_props:
+        struct_ += prop("/", n, v)
+    for path, props in nodes[1:]:
+        struct_ += struct.pack(">I", 1) + pad(path[1:].encode() + b"\0")
+        for n, v in props:
+            struct_ += prop(path, n, v)
+        struct_ += struct.pack(">I", 2)
+    struct_ += struct.pack(">II", 2, 9)
+    rsv = b"\0" * 16
+    off_rsv = 40
+    off_struct = off_rsv + len(rsv)
+    off_strings = off_struct + len(struct_)
+    total = off_strings + len(strings)
+    head = struct.pack(">10I", 0xD00DFEED, total, off_struct, off_strings, off_rsv, 17, 16, 0, len(strings), len(struct_))
+    return head + rsv + struct_ + strings
+
+
+def region(dtb):
+    r = bytearray(1 << 20)
+    r[0:4] = b"RSCE"
+    r[0x400:0x400 + len(dtb)] = dtb
+    r[0x400 + len(dtb) + 64:0x400 + len(dtb) + 72] = b"trailing"
+    return bytes(r)
+
+
+def tree():
+    return [("/", [("compatible", b"kingjim,pomera-dm250\0rockchip,rk3128\0"), ("#address-cells", b"\0\0\0\1")]),
+            ("/mmc@10214000", [("compatible", b"rockchip,rk3128-dw-mshc\0"), ("dmas", b"\0\0\0\x0d\0\0\0\1"),
+                               ("dma-names", b"rx-tx\0")]),
+            ("/mmc@10218000", [("compatible", b"rockchip,rk3128-dw-mshc\0"), ("dmas", b"\0\0\0\x0d\0\0\0\2"),
+                               ("dma-names", b"rx-tx\0"), ("status", b"okay\0")]),
+            ("/serial@20064000", [("dmas", b"\0\0\0\x0d\0\0\0\3\0\0\0\x0d\0\0\0\4"), ("dma-names", b"tx\0rx\0")])]
+
+
+def sha(b):
+    return hashlib.sha256(b).hexdigest()
+
+
+def test_make_pio(tmp):
+    print("== make_pio.py on a small device tree")
+    sys.path.insert(0, POMERA)
+    try:
+        import make_pio
+    finally:
+        sys.path.pop(0)
+    src = region(fdt(tree()))
+    want = region(fdt(tree(), nop={("/mmc@10218000", "dmas"), ("/mmc@10218000", "dma-names")}))
+    check(len(src) == len(want) == 1 << 20, "test regions")
+    got = make_pio.wifi_pio(src)
+    check(got == want, "wifi_pio: not exactly the two properties as NOP")
+    diff = [i for i in range(len(src)) if src[i] != got[i]]
+    check(diff and 0x400 <= diff[0] and diff[-1] < 0x400 + len(fdt(tree())), "changes outside the device tree")
+    left = {(n, p) for t, _, _, n, p in make_pio.walk(make_pio.dtb_of(got)) if t == make_pio.PROP}
+    check(("/mmc@10218000", "dmas") not in left and ("/mmc@10218000", "dma-names") not in left
+          and ("/mmc@10214000", "dmas") in left and ("/serial@20064000", "dma-names") in left
+          and ("/mmc@10218000", "status") in left, "properties left: %s" % sorted(left))
+    # The command: only with the expected input and result.
+    i, o = os.path.join(tmp, "in.bin"), os.path.join(tmp, "out.bin")
+    with open(i, "wb") as f:
+        f.write(src)
+    script = os.path.join(POMERA, "make_pio.py")
+    code, text = run([sys.executable, "-B", script, i, o, "--expect-in", sha(src), "--expect-out", sha(want)])
+    check(code == 0 and open(o, "rb").read() == want, "make_pio.py with the test sha256s: " + text)
+    os.remove(o)
+    code, text = run([sys.executable, "-B", script, i, o])
+    check(code == 3 and not os.path.exists(o) and "not the known original" in text, "ORIG differs: did not stop: " + text)
+    code, text = run([sys.executable, "-B", script, i, o, "--expect-in", sha(src), "--expect-out", "0" * 64])
+    check(code == 4 and not os.path.exists(o) and not os.path.exists(o + ".tmp"), "WIFI differs: did not stop: " + text)
+    with open(i, "wb") as f:
+        f.write(src[:-1])
+    code, text = run([sys.executable, "-B", script, i, o, "--expect-in", sha(src[:-1])])
+    check(code == 3 and not os.path.exists(o), "short input accepted")
+    t = tree()
+    t[2] = ("/mmc@10218000", [p for p in t[2][1] if p[0] != "dma-names"])
+    bad = region(fdt(t))
+    with open(i, "wb") as f:
+        f.write(bad)
+    code, text = run([sys.executable, "-B", script, i, o, "--expect-in", sha(bad)])
+    check(code == 5 and not os.path.exists(o), "only dmas: did not stop: " + text)
+    nofdt = bytes(1 << 20)
+    with open(i, "wb") as f:
+        f.write(nofdt)
+    code, text = run([sys.executable, "-B", script, i, o, "--expect-in", sha(nofdt)])
+    check(code == 5 and not os.path.exists(o), "no device tree: did not stop: " + text)
+    # The same ORIG and WIFI everywhere.
+    for name in ("pomera_dma_pio.sh", "rescue_rsce.sh"):
+        with open(os.path.join(POMERA, name)) as f:
+            text = f.read()
+        check("ORIG=" + make_pio.ORIG in text and "WIFI=" + make_pio.WIFI in text, "%s: ORIG/WIFI differ from make_pio.py" % name)
+
+
+def test_install_pomera(m):
+    print("== pomera/install_pomera.sh (without root)")
+    script = os.path.join(POMERA, "install_pomera.sh")
+    m.device(b"raspberrypi,4-model-b\0")
+    env = base_env(FDTP_CONFIGURE_DT=m.dt, POMERA_STABILITY="yes", POMERA_INTERNAL_RO="yes", FDTP_MSG_LANG="en")
+    code, text = run(["sh", script], env=env)
+    check(code == 0 and "Not a Pomera DM250" in text, "not a DM250: " + text)
+    code, text = run(["sh", script], env=base_env(FDTP_CONFIGURE_DT=m.dt))
+    check(code == 0 and text == "", "both no: did something: " + text)
+    if os.geteuid() != 0:   # never run the real thing
+        m.device(POMERA_DT)
+        code, text = run(["sh", script], env=env)
+        check(code == 1 and "need root" in text, "DM250 without root: " + text)
+    m.device()
+
+
+def test_setup(m):
+    """pomera/pomera_setup.sh (the .deb's fdtp-pomera-setup) without root:
+    the machine is replaced as for configure; nothing is set up."""
+    print("== pomera/pomera_setup.sh (fdtp-pomera-setup; without root)")
+    script = os.path.join(POMERA, "pomera_setup.sh")
+
+    def setup(*args, uid="1000", probe="echo should-not-run; exit 1", tty="no", stdin="", lang=None):
+        env = base_env(FDTP_CONFIGURE_DT=m.dt, FDTP_CONFIGURE_UID=uid, FDTP_CONFIGURE_PROBE=probe, FDTP_CONFIGURE_TTY=tty)
+        if lang:
+            env["LANG"] = lang
+        return run(["sh", script] + list(args), env=env, stdin=stdin)
+
+    code, text = setup("--help")
+    check(code == 0 and "--undo" in text and "--status" in text, "setup --help: " + text)
+    code, text = setup("--bogus")
+    check(code == 2 and "unknown option" in text, "setup --bogus: " + text)
+    m.device(b"raspberrypi,4-model-b\0")
+    code, text = setup()
+    check(code == 1 and "Not a Pomera DM250" in text, "setup, not a DM250: " + text)
+    code, text = setup("--status")
+    check(code == 1 and text == "", "setup --status, not a DM250: %r" % text)
+    m.device(POMERA_DT)
+    code, text = setup()
+    check(code == 1 and "needs root" in text and "Wi-Fi" not in text, "setup, DM250 without root: " + text)
+    # (Fake) root, both answered no: the notes before each [Y/n], nothing run.
+    code, text = setup(uid="0", probe="echo vfat", tty="yes", stdin="n\nn\n")
+    check(code == 0 and "Nothing was changed." in text, "setup n n: " + text)
+    i_notes, i_ask = text.find("Notes:"), text.find("Make the Wi-Fi stable? [Y/n]")
+    check(0 <= i_notes < i_ask and "pomera_dma_pio.sh restore" in text and "fdtp-pomera-setup --undo" in text
+          and "asked once more" in text and "sudo make install" not in text, "setup: Wi-Fi notes: " + text)
+    check(text.rfind("Notes:") < text.find("Mount the internal memory read-only? [Y/n]") and "unpersist" in text,
+          "setup: internal notes not before [Y/n]")
+    code, text = setup(uid="0", probe="echo vfat", tty="yes", stdin="n\nn\n", lang="ja_JP.UTF-8")
+    check(code == 0 and "何も変えませんでした。" in text and "書き換える直前にもう一度聞きます" in text, "setup ja: " + text)
+    # The backup directory: beside the scripts here, /var/lib/fdtp under /usr.
+    code, text = run(["sh", os.path.join(POMERA, "pomera_dma_pio.sh"), "backup-dir"], env=base_env())
+    check(code == 0 and text.strip() in (POMERA, os.path.realpath(POMERA)), "backup-dir: " + text)
+    code, text = run(["sh", os.path.join(POMERA, "pomera_dma_pio.sh"), "backup-dir"], env=base_env(FDTP_POMERA_BACKUP_DIR="/x/y"))
+    check(code == 0 and text.strip() == "/x/y", "backup-dir with FDTP_POMERA_BACKUP_DIR: " + text)
+    m.device()
+
+
+def test_private(tmp):
+    """The checks of tools/make_public.sh on these files (when it is there:
+    it is not in the public copy)."""
+    print("== no private names")
+    public = os.path.join(APP, "tools", "make_public.sh")
+    if not os.path.exists(public):
+        print("  (tools/make_public.sh not here: skipped)")
+        return
+    with open(public, encoding="utf-8") as f:
+        m = re.search(r"^PRIVATE='([^']*)'", f.read(), re.M)
+    check(m, "PRIVATE= not found in make_public.sh")
+    if not m:
+        return
+    pattern = re.compile(m.group(1), re.I)
+    files = [CONFIGURE, os.path.join(APP, "mk", "install.mk"), os.path.abspath(__file__),
+             os.path.join(APP, "tools", "make_deb.sh"), os.path.join(APP, "tools", "make_sysroot.sh")]
+    debian = os.path.join(APP, "packaging", "debian")
+    if os.path.isdir(debian):
+        files += [os.path.join(debian, f) for f in sorted(os.listdir(debian))]
+    files += [os.path.join(POMERA, f) for f in sorted(os.listdir(POMERA)) if not f.startswith(".") and f != "__pycache__"]
+    for path in files:
+        if os.path.isdir(path):
+            continue
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for n, line in enumerate(f, 1):
+                check(not pattern.search(line) and not pattern.search(os.path.basename(path)),
+                      "%s:%d private: %s" % (os.path.relpath(path, APP), n, line.strip()[:80]))
+
+
+def main():
+    tmp = tempfile.mkdtemp(prefix="fdtp-configure-")
+    try:
+        m = Machine(tmp)
+        for test, args in ((test_syntax, ()), (test_deps_cover_makefiles, ()), (test_darwin, (m,)),
+                           (test_linux_deps, (m,)), (test_options, (m,)), (test_pomera, (m,)), (test_install, (m,)),
+                           (test_make_reads_config, (m,)), (test_make_pio, (tmp,)), (test_install_pomera, (m,)),
+                           (test_setup, (m,)), (test_private, (tmp,))):
+            try:
+                test(*args)
+            except Exception as e:  # a broken step is a failure, the others still run
+                check(False, "%s: %s: %s" % (test.__name__, type(e).__name__, e))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    if FAILS:
+        print("check_configure: %d failure(s)" % len(FAILS))
+        return 1
+    print("check_configure: ok")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

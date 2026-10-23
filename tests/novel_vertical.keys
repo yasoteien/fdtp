@@ -1,0 +1,8 @@
+# 1: vertical, 2: horizontal again, 3: vertical, then close (state kept).
+C-t SNAP C-t SNAP C-t SNAP
+# Columns: LEFT goes to the next column, DOWN to the next character. UP UP
+# first: the caret out of 本気《マジ》, line 1 is one column again (with
+# the caret in it the span is written out and, 21 characters a column since
+# revision 1 item 29, the line takes a second column).
+DOWN DOWN SNAP UP UP LEFT SNAP RIGHT SNAP
+ESC

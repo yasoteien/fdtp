@@ -1,0 +1,4 @@
+# Revision 1 §12, first run: answers go to the history file ($FDTP_HISTORY).
+l "alpha" RET l ".." RET l "beta" RET l ".." RET
+DOWN DOWN DOWN c "alpha" RET WAIT:0 WAIT:0 WAIT:0 WAIT:0 WAIT:0 WAIT:0 WAIT:0 WAIT:0
+SNAP # done

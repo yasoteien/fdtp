@@ -1,0 +1,7 @@
+# Stage 4: csv/tsv editing; the same script runs on each csv fixture.
+SNAP                                        # 1 initial
+RIGHT DOWN RET C-u "250" RET SNAP           # 2 B2
+UP RIGHT "new" RET SNAP                     # 3 C1 beyond the row's fields
+DOWN DOWN DOWN DOWN SNAP                    # 4 C5 (a quoted cell with a line break above)
+C-s SNAP                                    # 5 saved
+ESC SNAP                                    # 6 closed

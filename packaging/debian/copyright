@@ -1,0 +1,37 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: FDTP (File & Directory Tool for Pomera)
+Upstream-Contact: yasoteien
+Comment: The fonts below are built into /usr/bin/fdtp (its glyph tables are
+ made from them at build time). The libraries FDTP uses at run time come
+ from Debian's own packages; their copyright files are in
+ /usr/share/doc/<package>/copyright.
+
+Files: *
+Copyright: 2026 yasoteien
+License: AGPL-3.0-or-later
+
+Files: data/fonts/*
+Copyright: Yasuyuki Furukawa <yasu@on.cs.keio.ac.jp>
+           2001-2004 /efont/ Project.
+License: public-domain
+ The Shinonome fonts (shnm8x16a, shnm8x16r, shnmk16, shnmk12, shnm6x12a),
+ http://openlab.ring.gr.jp/efont/shinonome/, as packaged by Debian
+ (xfonts-shinonome). Their notice:
+ .
+ このアーカイブに含まれるすべてのフォントデータ、ドキュメント、スクリプ
+ ト類はすべて Public Domain で提供されています 。
+ .
+ 但し、日本に於いては現時点で著作権を放棄することは法律上不可能であり、
+ AUTHORS に列挙されている作者がその権利を行使しないと宣言することで実質
+ 的な Public Domain であるとします。
+ .
+ 自由な改造、他フォーマットへの変換、組込み、再配布を行うことができます。
+ 同時に、これらはすべて完全に無保証です。
+ .
+ (All the font data, documents and scripts are in the public domain. As
+ copyright cannot be abandoned under Japanese law, the authors declare that
+ they will not exercise it. Modification, conversion, embedding and
+ redistribution are free; there is no warranty.)
+
+License: AGPL-3.0-or-later
+@AGPL_TEXT@

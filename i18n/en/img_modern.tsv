@@ -1,0 +1,20 @@
+JPEG: メモリが足りません	JPEG: out of memory
+JPEG: 壊れています	JPEG: corrupt
+JPEG: 開けません	JPEG: cannot open
+JPEG: 大きすぎます	JPEG: too large
+PNG: メモリが足りません	PNG: out of memory
+PNG: 開けません	PNG: cannot open
+PNG: 壊れています	PNG: corrupt
+PNG: 大きすぎます	PNG: too large
+WebP: 開けません	WebP: cannot open
+WebP: ライブラリの版が合いません	WebP: library version mismatch
+WebP: 動く WebP は未対応です	WebP: animation unsupported
+WebP: 壊れています	WebP: corrupt
+WebP: 大きすぎます	WebP: too large
+WebP: メモリが足りません	WebP: out of memory
+GIF: 開けません	GIF: cannot open
+GIF: 大きすぎます	GIF: too large
+GIF: メモリが足りません	GIF: out of memory
+GIF: 壊れています	GIF: corrupt
+画像: 開けません	Image: cannot open
+画像: 未知の形式です	Image: unknown format

@@ -1,0 +1,6 @@
+# 1c the written file read again gives the same state.
+SNAP # start
+z SNAP # after_variables
+RIGHT END SNAP # after_keys
+RIGHT SNAP # after_launch
+ESC y SNAP # written_again

@@ -1,0 +1,246 @@
+#!/bin/sh
+# FDTP's ./configure (for those who build it from the source). Not autoconf.
+#
+#   ./configure [--yes] [--lang=ja|en|auto] [--prefix=DIR] [--no-pomera]
+#   make
+#   sudo make install       (sudo make uninstall to remove it)
+#
+# 1. Checks what the build needs (pkg-config and the compiler) and stops
+#    with the Debian packages to install when something is missing. The
+#    list follows Makefile, mk/*.mk and the platform layer's sources.mk
+#    (port/app/platform here, lib/rmp-platform in the public copy)
+#    (tests/check_configure.py checks that it does).
+# 2. Asks, each question after what it does and how to undo it: the
+#    language of the screens; on a Pomera DM250 only, the Wi-Fi stability
+#    settings and the read-only mount of the internal memory. Enter takes
+#    the default; --yes, or no terminal, takes every default.
+# 3. Writes the answers to config.mk, which mk/install.mk reads.
+# Messages are in Japanese when LC_ALL, LC_MESSAGES or LANG (the first one
+# set) is ja* (not on the Linux console, which cannot show Japanese).
+#
+# For the tests (tests/check_configure.py) these replace the machine:
+#   FDTP_CONFIG_MK          the file written (default config.mk here)
+#   FDTP_CONFIGURE_UNAME    uname -s
+#   FDTP_CONFIGURE_DT       /proc/device-tree (its compatible and model)
+#   FDTP_CONFIGURE_UID      id -u
+#   FDTP_CONFIGURE_PROBE    the internal memory probe (a command printing
+#                           vfat or exfat when found)
+#   FDTP_CONFIGURE_TTY      yes|no: whether to ask (default: stdin is a terminal)
+#   PKG_CONFIG, CC          as usual
+# This file is part of FDTP (File & Directory Tool for Pomera).
+# SPDX-FileCopyrightText: 2026 yasoteien
+# SPDX-License-Identifier: AGPL-3.0-or-later
+set -u
+LC_COLLATE=C; export LC_COLLATE
+
+SELF=$(cd "$(dirname "$0")" && pwd)
+if [ -f "$SELF/mk/install.mk" ]; then SRC=$SELF
+elif [ -f "$SELF/fdtp/mk/install.mk" ]; then SRC=$SELF/fdtp
+else echo "configure: mk/install.mk not found next to $0" >&2; exit 1
+fi
+# The Pomera scripts: pomera/ here, scripts/pomera/ in the public copy.
+if [ -d "$SRC/scripts/pomera" ]; then PDIR=$SRC/scripts/pomera; else PDIR=$SRC/pomera; fi
+OUT=${FDTP_CONFIG_MK:-$SRC/config.mk}
+UNAME=${FDTP_CONFIGURE_UNAME:-$(uname -s)}
+DT=${FDTP_CONFIGURE_DT:-/proc/device-tree}
+UID_NOW=${FDTP_CONFIGURE_UID:-$(id -u)}
+PKG_CONFIG=${PKG_CONFIG:-pkg-config}
+CC=${CC:-cc}
+
+# ---- the libraries (kind name Debian package need/opt feature) -------------
+# pc: a pkg-config module. lib: -lNAME with the header after the colon.
+DEPS='pc libdrm libdrm-dev need screen
+pc gbm libgbm-dev need screen
+pc egl libegl-dev need screen
+pc glesv2 libgles-dev need screen
+pc xcb libxcb1-dev opt x11
+pc libjpeg libjpeg-dev need images
+pc libpng libpng-dev need images
+pc libwebp libwebp-dev need images
+lib gif:gif_lib.h libgif-dev need images
+pc zlib zlib1g-dev need office
+pc expat libexpat1-dev need office
+lib mupdf:mupdf/fitz.h libmupdf-dev need pdf
+lib uim:uim/uim.h libuim-dev opt ime
+lib uim-scm:uim/uim.h libuim-dev opt ime'
+# Commands FDTP runs (archives): missing ones only warn.
+RUNTIME='zip zip
+unzip unzip
+lhasa lhasa
+tar tar'
+
+# ---- options ------------------------------------------------------------------
+YES=0 NOPOMERA=0 LANG_ANSWER= PREFIX=/usr/local
+usage() { sed -n '2,6p' "$0"; }
+while [ $# -gt 0 ]; do
+	case $1 in
+	-y|--yes) YES=1 ;;
+	--no-pomera) NOPOMERA=1 ;;
+	--lang=*) LANG_ANSWER=${1#*=} ;;
+	--lang) [ $# -gt 1 ] || { usage >&2; exit 2; }; LANG_ANSWER=$2; shift ;;
+	--prefix=*) PREFIX=${1#*=} ;;
+	--prefix) [ $# -gt 1 ] || { usage >&2; exit 2; }; PREFIX=$2; shift ;;
+	--list-deps) printf '%s\n' "$DEPS"; exit 0 ;;
+	-h|--help) usage; exit 0 ;;
+	*) echo "configure: unknown option $1" >&2; usage >&2; exit 2 ;;
+	esac
+	shift
+done
+case $LANG_ANSWER in ''|ja|en|auto) ;; *) echo "configure: --lang is ja, en or auto" >&2; exit 2 ;; esac
+case $PREFIX in /*) ;; *) echo "configure: --prefix must be an absolute path" >&2; exit 2 ;; esac
+case $PREFIX in *[!A-Za-z0-9/._+-]*) echo "configure: --prefix may only have letters, digits and / . _ + -" >&2; exit 2 ;; esac
+while :; do case $PREFIX in /?*/) PREFIX=${PREFIX%/} ;; *) break ;; esac; done
+
+# ---- messages ----------------------------------------------------------------
+# msg_init, pick, say, warn, tty_init, ask_yn and the Pomera questions are
+# shared with pomera_setup.sh (fdtp-pomera-setup of the .deb).
+PQ_AGAIN=make-install
+. "$PDIR/pomera_questions.sh"
+msg_init
+tty_init "$YES"
+
+if [ -n "$CONSOLE_NOTE" ]; then
+	echo "(LANG is ja*, but the Linux console cannot show Japanese: the messages are in English.)"
+fi
+say "FDTP の ./configure（${SRC}）" "FDTP's ./configure ($SRC)"
+
+# ---- 1. what the build needs ------------------------------------------------------
+TMPD=$(mktemp -d "${TMPDIR:-/tmp}/fdtp-configure.XXXXXX") || exit 1
+trap 'rm -rf "$TMPD"' EXIT INT TERM
+MISSING= HAVE_XCB=no HAVE_UIM=no
+add_missing() { case " $MISSING " in *" $1 "*) ;; *) MISSING="$MISSING $1" ;; esac; }
+found() { printf '  %-28s %s\n' "$1" "$(pick "あり" "found")"; }
+lacking() { printf '  %-28s %s\n' "$1" "$(pick "無し（$2）" "missing ($2)")"; }
+have_cmd() { command -v "$1" >/dev/null 2>&1; }
+
+say "== 作るのに要る物 ==" "== What the build needs =="
+if [ "$UNAME" = Darwin ]; then
+	# The Mac builds fdtp-preview only (screen checks and tests); Makefile
+	# takes the image libraries from Homebrew and the rest from the SDK.
+	for t in "$CC" make python3; do
+		if have_cmd "$t"; then found "$t"; else lacking "$t" "xcode-select --install / python3"; add_missing "$t"; fi
+	done
+	for p in jpeg-turbo libpng giflib webp; do
+		if [ -d "/opt/homebrew/opt/$p" ]; then found "$p (Homebrew)"
+		else lacking "$p (Homebrew)" "brew install $p"; warn "Homebrew の $p がありません: brew install jpeg-turbo libpng giflib webp" \
+			"Homebrew's $p is missing: brew install jpeg-turbo libpng giflib webp"; fi
+	done
+	if [ -n "$MISSING" ]; then
+		say "足りない物があります:$MISSING" "Missing:$MISSING"
+		exit 1
+	fi
+else
+	for t in "$CC:build-essential" make:build-essential python3:python3 "$PKG_CONFIG:pkg-config"; do
+		cmd=${t%:*} pkg=${t##*:}
+		set -- $cmd
+		if have_cmd "$1"; then found "$cmd"; else lacking "$cmd" "apt: $pkg"; add_missing "$pkg"; fi
+	done
+	if [ -z "$MISSING" ]; then
+		printf 'int main(void) { return 0; }\n' > "$TMPD/t.c"
+		printf '%s\n' "$DEPS" | while read -r kind name pkg need feature; do
+			case $kind in
+			pc) $PKG_CONFIG --exists "$name" 2>/dev/null && echo "ok $kind $name $pkg $need $feature" || echo "no $kind $name $pkg $need $feature" ;;
+			lib)
+				lib=${name%%:*} header=${name#*:}
+				printf '#include <%s>\nint main(void) { return 0; }\n' "$header" > "$TMPD/t.c"
+				if $CC ${CPPFLAGS:-} ${CFLAGS:-} -o "$TMPD/t" "$TMPD/t.c" ${LDFLAGS:-} "-l$lib" >/dev/null 2>&1; then echo "ok $kind $lib $pkg $need $feature"
+				else echo "no $kind $lib $pkg $need $feature"; fi ;;
+			esac
+		done > "$TMPD/deps"
+		while read -r ok kind name pkg need feature; do
+			label="$name ($pkg)"
+			if [ "$ok" = ok ]; then
+				found "$label"
+				case $feature in x11) HAVE_XCB=yes ;; ime) [ "$name" = uim ] && HAVE_UIM=yes ;; esac
+			elif [ "$need" = need ]; then lacking "$label" "apt: $pkg"; add_missing "$pkg"
+			else lacking "$label" "$(pick "任意" "optional")"
+			fi
+		done < "$TMPD/deps"
+		# Both halves of libuim must be there.
+		grep -q '^no lib uim-scm ' "$TMPD/deps" && HAVE_UIM=no
+	fi
+	if [ -n "$MISSING" ]; then
+		say "足りない物があります。次で入れてから、もう一度 ./configure を流してください:" \
+			"Some packages are missing. Install them, then run ./configure again:"
+		echo "  sudo apt install$MISSING"
+		exit 1
+	fi
+	[ "$HAVE_XCB" = yes ] || warn "libxcb1-dev が無いので、X のウィンドウ無し（DRM/KMS だけ）で作ります。" \
+		"no libxcb1-dev: FDTP is built without the X window (DRM/KMS only)."
+	[ "$HAVE_UIM" = yes ] || warn "libuim-dev が無いので、日本語入力無し（NOVEL_IME=ime_none）で作ります。" \
+		"no libuim-dev: FDTP is built without Japanese input (NOVEL_IME=ime_none)."
+	runtime_missing=
+	while read -r cmd pkg; do have_cmd "$cmd" || runtime_missing="$runtime_missing $pkg"; done <<EOF
+$RUNTIME
+EOF
+	[ -z "$runtime_missing" ] || warn "書庫に使うコマンドがありません。使うなら: sudo apt install$runtime_missing" \
+		"commands for archives are missing; to use them: sudo apt install$runtime_missing"
+fi
+
+# ---- 2. questions -----------------------------------------------------------------
+case $locale_now in ja*) lang_auto=$(pick "日本語" "Japanese") ;; *) lang_auto=English ;; esac
+echo
+if [ -n "$LANG_ANSWER" ]; then
+	say "== 画面の言語: ${LANG_ANSWER}（--lang） ==" "== Language: $LANG_ANSWER (--lang) =="
+else
+	say "== 画面の言語 ==" "== Language =="
+	say "FDTP の画面の言語です。あとで設定（z）でも変えられます。" \
+		"The language of FDTP's screens. It can be changed later in the settings (z)."
+	say "  1) 日本語" "  1) 日本語 (Japanese)"
+	echo "  2) English"
+	say "  3) auto（LANG に従う。今は ${lang_auto}）" "  3) auto (follows LANG; now $lang_auto)"
+	if [ "$TTY" != yes ]; then
+		LANG_ANSWER=auto
+		say "番号を選んでください [3] → 3（既定の答え、${why}）" "Choose a number [3] -> 3 (the default, $why)"
+	else
+		while [ -z "$LANG_ANSWER" ]; do
+			printf '%s ' "$(pick "番号を選んでください [3]" "Choose a number [3]")"
+			if ! read -r a; then a=; echo; fi
+			case $a in
+			1|ja) LANG_ANSWER=ja ;; 2|en) LANG_ANSWER=en ;; ''|3|auto) LANG_ANSWER=auto ;;
+			*) say "1・2・3 のどれかで答えてください。" "Please answer 1, 2 or 3." ;;
+			esac
+		done
+	fi
+fi
+
+STABILITY=no INTERNAL=no POMERA=no
+if [ "$UNAME" = Linux ] && [ "$NOPOMERA" = 0 ] && is_dm250 "$DT"; then POMERA=yes; fi
+if [ "$POMERA" = yes ]; then
+	echo
+	ask_wifi
+	echo
+	ask_internal
+fi
+
+# ---- 3. config.mk -------------------------------------------------------------------
+tmp=$OUT.tmp.$$
+{
+	echo "# Made by ./configure on $(date '+%Y-%m-%d %H:%M'). Run ./configure again to change it."
+	echo "# mk/install.mk reads it (not in cross builds)."
+	echo "FDTP_CONFIGURED = yes"
+	echo "PREFIX = $PREFIX"
+	echo "FDTP_LANGUAGE = $LANG_ANSWER"
+	echo "POMERA_STABILITY = $STABILITY"
+	echo "POMERA_INTERNAL_RO = $INTERNAL"
+	echo "HAVE_XCB = $HAVE_XCB"
+	echo "HAVE_UIM = $HAVE_UIM"
+	if [ "$UNAME" != Darwin ] && [ "$HAVE_UIM" = no ]; then echo "NOVEL_IME = ime_none"; fi
+} > "$tmp" && mv -f "$tmp" "$OUT" || { rm -f "$tmp"; echo "configure: cannot write $OUT" >&2; exit 1; }
+
+echo
+say "== 設定（$OUT に書きました） ==" "== Settings (written to $OUT) =="
+printf '  %s: %s\n' "PREFIX" "$PREFIX"
+printf '  %s: %s\n' "$(pick "言語" "language")" "$LANG_ANSWER"
+if [ "$POMERA" = yes ]; then
+	printf '  %s: %s\n' "$(pick "Wi-Fi の安定化" "Wi-Fi stability")" "$STABILITY"
+	printf '  %s: %s\n' "$(pick "内蔵メモリのマウント" "internal memory mount")" "$INTERNAL"
+fi
+say "次に:" "Next:"
+if [ "$UNAME" = Darwin ]; then
+	say "  make        （macOS では画面の確認用の fdtp-preview だけができます。make install は Linux 用です）" \
+		"  make        (on macOS only fdtp-preview, for checking the screens, is built; make install is for Linux)"
+else
+	echo "  make -j4"
+	echo "  sudo make install"
+fi

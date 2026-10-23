@@ -1,0 +1,28 @@
+# All sort criteria, stack capacity, display symbols, failed and cancelled paths.
+1 s RIGHT RET RET <
+SNAP # extension_order
+s RIGHT RIGHT RIGHT RET RET <
+SNAP # date_order
+s RIGHT RIGHT RIGHT RIGHT RET RET <
+SNAP # length_order
+s RIGHT RIGHT RIGHT RIGHT RET RIGHT RET <
+SNAP # length_descending
+s RET RET C-s "f00" ESC DEL DEL DEL DEL DEL DEL
+SNAP # stack_full
+DOWN
+SNAP # stack_names
+INS INS INS INS INS
+SNAP # stack_empty
+C-s "run" ESC T
+SNAP # executable_symbol
+C-s "long" ESC
+SNAP # clipped_symbol
+l "missing-directory" RET
+SNAP # missing_directory
+ESC # closes the error box
+l "aardir" ESC
+SNAP # cancelled_path
+l "aardir" RET f "nothing*" RET BS
+SNAP # parent_filter_reset
+WAIT:0.125
+SNAP # waited

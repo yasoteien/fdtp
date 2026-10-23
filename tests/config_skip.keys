@@ -1,0 +1,5 @@
+# 1c lines FDTP does not read are counted; continued lines still work.
+SNAP # start
+d SNAP # continued_bind
+z SNAP # upper_e   # revision 1 §2: E is gone (Shift+letter jumps); z only
+ESC ESC SNAP # back_to_customizer

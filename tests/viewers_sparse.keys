@@ -1,0 +1,13 @@
+# Revision 1 §1 2: NULs on both sides of the byte pairs read as binary, so v
+# asks first; T (テキスト表示) opens the text view.
+C-s "f04.txt" ESC v T
+SNAP # text_sparse
+q b
+SNAP # hex_sparse
+> 
+SNAP # hex_last
+< g "3b9ac9f0" RET
+SNAP # hex_goto_last
+g "ffffffff" RET
+SNAP # bad_goto
+q

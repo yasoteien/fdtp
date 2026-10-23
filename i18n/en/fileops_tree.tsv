@@ -1,0 +1,26 @@
+%.24s ここへ移動しますか？	%.24s: Change to this directory?
+%llu バイト	%llu bytes
+%llu バイト（利用可能 %llu）	%llu bytes (available %llu)
+%lu バイト / 割当単位 %llu	%lu bytes / Allocation unit %llu
+%sのツリー	%s tree
+i ノード	Inodes
+コピー先のツリー	Copy destination tree
+ディレクトリのツリー	Directory tree
+ディレクトリのパターン	Directory pattern
+ディレクトリ検索が終わりました	Directory search finished
+パス	Path
+パターン	Pattern
+ファイルシステムの情報を読めません	Cannot read filesystem info
+ブロック	Block
+マウント先	Mount point
+使用容量	Used space
+情報を調べるパス	Path for filesystem info
+検索の起点	Search root
+検索中  Esc で打ち切り	Searching  Esc: stop
+移動先のツリー	Move destination tree
+空き容量	Free space
+総容量	Total space
+総数 %llu / 空き %llu	Total %llu / Free %llu
+装置名	Device
+見つかった物	Found
+閉じる/親	Close/parent

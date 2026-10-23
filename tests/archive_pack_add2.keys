@@ -1,0 +1,10 @@
+# Revision 1 D, adding (2 of 2): after the files changed. 「無条件で上書き」
+# into all.*, 「日付が新しい時だけ」 into new.* (UTF-8 names for LHa).
+C-s "box" ESC p C-u "all.lzh" TAB TAB TAB RIGHT RET SNAP # all_lzh_ask
+y SNAP # all_lzh
+C-s "box" ESC p C-u "all.zip" RET y SNAP # all_zip
+C-s "box" ESC p C-u "all.tgz" RET y SNAP # all_tgz
+C-s "box" ESC p C-u "new.lzh" TAB TAB TAB TAB DOWN SNAP # newer_chosen
+RET y SNAP # new_lzh
+C-s "box" ESC p C-u "new.zip" RET y SNAP # new_zip
+C-s "box" ESC p C-u "new.tgz" RET y SNAP # new_tgz

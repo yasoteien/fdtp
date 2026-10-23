@@ -1,0 +1,3 @@
+%s で書けない文字があります	Some characters cannot be written in %s
+UTF-16 の表には対応していません	UTF-16 tables are not supported
+文字コードを正しく読めない所があるため保存できません	Encoding errors; cannot save

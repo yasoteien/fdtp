@@ -1,0 +1,18 @@
+DOWN RET
+SNAP # child
+BS
+SNAP # parent_cursor
+l "." RET
+SNAP # dot_path
+l "aardir" RET l "-" RET
+SNAP # previous_path
+l "?" RET
+SNAP # directory_history
+ESC F1 "aard" TAB
+SNAP # completion
+RET
+SNAP # completed_child
+\
+SNAP # filesystem_root
+F1 "@FIXTURE@" RET C-l
+SNAP # returned

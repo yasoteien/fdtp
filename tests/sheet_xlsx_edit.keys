@@ -1,0 +1,19 @@
+# Stage 4: xlsx editing (tests/check_sheet.py opens book.xlsx through sheet_harness).
+SNAP                                        # 1 initial, A1
+RIGHT RIGHT RIGHT DOWN SNAP                 # 2 D2 shows its formula
+LEFT LEFT RET C-u "30" RET SNAP             # 3 B2 10 -> 30, dependants recalculated
+RIGHT RIGHT DOWN RET C-u "=B3*C3+1" RET SNAP    # 4 D3 is the shared-formula master
+UP "7" RET SNAP                             # 5 D2 formula -> number (calcChain entry goes)
+C-g "B9" RET "=sum(b2:B4)" RET SNAP         # 6 new cell between A9 and C9 (row with spans)
+DOWN "hello" RET                            # B10 into the empty <row r="10"/>
+C-g "A12" RET "end" RET C-g "A5" RET "ins" RET SNAP   # 7 new rows at the end and in the middle
+C-g "E6" RET RET C-u "=VLOOKUP(A2,A2:D4,4)" RET SNAP ESC # 8 unsupported function -> kept as text; ESC closes the error box
+C-g "C8" RET DEL SNAP                       # 9 cleared, style kept
+C-g "E2" RET RET C-u "2024/03/15" RET SNAP  # 10 date input in a date cell
+C-g "F1" RET "x" RET SNAP                   # 11 inside a merge: refused
+C-s SNAP                                    # 12 saved, .bak made
+TAB C-g "B2" RET "5" RET SNAP               # 13 sheet 2: B3 = B2+1 recalculated
+TAB C-g "B2" RET "1" RET SNAP               # 14 sheet 3: into <sheetData/>
+S-TAB SNAP                                  # 15 back to sheet 2
+C-s SNAP                                    # 16 second save, no new .bak
+ESC SNAP                                    # 17 nothing unsaved: closes

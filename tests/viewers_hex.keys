@@ -1,0 +1,29 @@
+C-s "f05.txt" ESC b
+SNAP # initial
+"41" TAB "Zｱ"
+SNAP # edited
+C-s
+SNAP # save_prompt
+n
+SNAP # save_cancel
+C-s y
+SNAP # saved
+g "0" RET / "\"AB\"" RET
+SNAP # text_match
+n
+SNAP # next_match
+g "0" RET / "41 42" RET
+SNAP # hex_match
+/ "123" RET
+SNAP # bad_search
+g "10" RET TAB "ff"
+SNAP # discard_edit
+q
+SNAP # discard_prompt
+n
+SNAP # discard_cancel
+ESC y
+SNAP # returned
+b
+SNAP # reopened
+q

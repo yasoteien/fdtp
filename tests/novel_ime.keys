@@ -1,0 +1,7 @@
+# tests/ime_fake.c. 1: on. 2: preedit. 3: candidates. 4: next. 5: committed.
+M-SPC SNAP "nihon" SNAP SPC SNAP SPC SNAP RET SNAP
+# 6: search typed through the input method.
+C-f "neko" RET RET SNAP
+# 7: off again: plain letters.
+M-SPC END "ab" SNAP
+C-s ESC

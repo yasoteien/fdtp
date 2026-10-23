@@ -1,0 +1,30 @@
+f "f0?.txt" RET
+SNAP # filter
+F7 C-u RET
+SNAP # filter_cleared
+s
+SNAP # sort_prompt
+RIGHT RIGHT RET
+SNAP # order_prompt
+RIGHT RET < DOWN DOWN DOWN
+SNAP # size_descending
+F6 RIGHT RIGHT RIGHT RIGHT RIGHT RET
+SNAP # unsorted
+s
+SNAP # unsorted_menu
+ESC s RET RET C-s "sym" ESC S T
+SNAP # link_target
+C-h <
+SNAP # toggles
+O
+SNAP # unavailable
+DOWN
+SNAP # error_box_takes_key
+v
+SNAP # plain_notice
+DOWN
+SNAP # notice_passes
+C-r "f0" C-s C-r
+SNAP # incremental_search
+ESC
+SNAP # search_closed

@@ -1,0 +1,9 @@
+# Revision 1 D: the LHa job shows its progress in the box ($FDTP_PACK_SLICE
+# bytes per tick); Esc stops it and leaves nothing.
+# A name Shift_JIS cannot hold: refused in the box; UTF-8 takes it.
+C-s "face" ESC p C-u "face.lzh" RET SNAP # sjis_refused
+ESC TAB TAB TAB RIGHT RET SNAP # utf8_made
+C-s "big" ESC p C-u "big.lzh" TAB TAB TAB LEFT RET SNAP # run_first
+DOWN SNAP # run_second
+ESC SNAP # run_stopped
+C-s "big" ESC p C-u "big.lzh" RET DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN SNAP # run_done

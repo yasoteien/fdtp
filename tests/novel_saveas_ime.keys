@@ -1,0 +1,4 @@
+# tests/ime_fake.c. 1: a Japanese name in the box (preedit at its cursor).
+"q" C-S-s C-u M-SPC "neko" SNAP
+# 2: committed, then ".txt" with the input off, saved as ねこ.txt.
+RET M-SPC ".txt" RET SNAP

@@ -1,0 +1,6 @@
+# Item 40: leaving with changes asks to save; (N) leaves the file as it was.
+WAIT:0 e WAIT:0 RIGHT S-RIGHT h WAIT:0 SNAP    # 1 変更あり
+q q SNAP                                       # 2 out of the mode, then q asks
+ESC SNAP                                       # 3 Esc: still here, still 変更あり
+ESC SNAP                                       # 4 Esc (not in the mode) asks too
+N SNAP                                         # 5 (N): back without saving

@@ -1,0 +1,5 @@
+# New file. 1: C-r after kanji. 2: C-r on a selection. 3: C-r with nothing.
+SNAP "漢字" C-r "かんじ" SNAP
+END RET "abc" S-LEFT S-LEFT C-r "x" SNAP
+END RET C-r "p" SNAP
+C-s ESC

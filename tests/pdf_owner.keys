@@ -1,0 +1,4 @@
+# Item 40: with the owner password the encrypted file takes annotations.
+"owner" RET WAIT:0 e WAIT:0 RIGHT S-RIGHT S-RIGHT h WAIT:0 SNAP   # 1 highlight
+C-s SNAP                                       # 2 saved (appended, still encrypted)
+e q SNAP                                       # 3 back

@@ -1,0 +1,17 @@
+# 1c customizer: change, write (with .bak), then the result on the filer.
+z SNAP # opened
+DOWN DOWN DOWN DOWN RET C-u "3" RET SNAP # displaymode
+DOWN RET C-u "1" RET SNAP # dotfile
+DOWN DOWN RET C-u "7" RET SNAP # invalid_filetype
+ESC SNAP # invalid_closed
+RIGHT END RET "@B \"ls -l %P\" :list" RET HOME DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN SNAP # added_alt_b
+END RET "d DELETE_FILE" RET SNAP # replaced_d
+RIGHT END RET ".xyz \"xyz-open\"" RET SNAP # added_launch
+ESC SNAP # confirm
+ESC SNAP # confirm_cancelled
+ESC y SNAP # written
+M-b SNAP # alt_b_shell
+z SNAP # after_variables
+RIGHT END SNAP # after_keys
+RIGHT SNAP # after_launch
+ESC n SNAP # closed

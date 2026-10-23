@@ -1,0 +1,12 @@
+# Revision 1 §2: F8 inside a destination/path input chooses in the tree.
+C-s "plain.dat" ESC c SNAP # copy_prompt
+"typed" F8 SNAP # copy_tree
+ESC SNAP # copy_back
+C-u F8 RIGHT DOWN SNAP # copy_tree_moved
+RET SNAP # copy_filled
+RET SNAP # copied
+l F8 SNAP # path_tree
+RIGHT DOWN RET SNAP # path_filled
+RET SNAP # path_moved
+BS k F8 SNAP # name_no_tree
+ESC

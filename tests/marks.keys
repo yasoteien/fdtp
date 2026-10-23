@@ -1,0 +1,18 @@
+TAB
+SNAP # directory_unmarked
+DOWN DOWN DOWN DOWN TAB
+SNAP # one_mark
+SPC
+SNAP # space_unmark_move
+C-SPC
+SNAP # control_space
+HOME
+SNAP # all_marked
+END
+SNAP # inverted
++ - * "*.txt" RET
+SNAP # wildcard
+C-s "f29" ESC C-SPC
+SNAP # control_space_boundary
+SPC
+SNAP # space_next_page

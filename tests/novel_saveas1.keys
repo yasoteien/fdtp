@@ -1,0 +1,7 @@
+# Save as (revision 1 3.18) on a Shift_JIS CRLF file, vertical with numbers.
+# 1: Ctrl+Shift+s opens the name box with the file's name.
+C-t C-l "x" C-S-s SNAP
+# 2: a new name in the same directory: saved there, edited from now on.
+C-u "out.txt" RET SNAP
+# 3: the next change goes to the autosave copy of the new name (no close).
+"y" WAIT:31 SNAP

@@ -1,0 +1,18 @@
+書き出しに失敗しました（%s）	Write failed (%s)
+分割後の名前の頭	Split filename prefix
+結合先の名前	Joined filename
+分割中 0%	Split: 0%
+結合中 0%	Join: 0%
+結合用のシェルスクリプトを作りますか？	Create a shell script to join the parts?
+%zu 個に分割しました	Parts created: %zu
+%zu 個を結合しました（%llu バイト）	Joined: %zu; bytes: %llu
+分ける必要がありません	No split needed
+%zu 個に分けます（%.70s.%0*d〜%.70s.%0*zu）。よろしいですか？	Create %zu parts (%.70s.%0*d-%.70s.%0*zu)?
+分割元と同じ名前にはできません	Name matches split source
+結合元と同じ名前にはできません	Name matches join source
+%.180s は既にあります。上書きしますか？	%.180s exists. Overwrite?
+%s中 %llu/%llu バイト	%s: %llu/%llu bytes
+分割の大きさ（1K〜1023M）	Part size (1K-1023M)
+結合するファイルをマークしてください	Mark files to join
+ディレクトリは結合できません	Cannot join directories
+PDF とそれ以外が混ざっています。バイトのままつなぎますか？	Mixed PDF and other files. Join as raw bytes?

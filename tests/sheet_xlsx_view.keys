@@ -1,0 +1,10 @@
+# Stage 4: the saved book read back, widths, paging, quitting with changes.
+SNAP                                        # 1 sheet 1 after the edits
+> > > SNAP                                  # 2 column A widened by 3
+< < < < < < < < < < < < < SNAP              # 3 down to the minimum
+PGDN SNAP                                   # 4 next page
+END SNAP                                    # 5 last used cell
+HOME TAB SNAP                               # 6 sheet 2
+RET C-u "changed" RET ESC SNAP              # 7 unsaved change: asks
+n SNAP                                      # 8 stays
+ESC y SNAP                                  # 9 discarded and closed

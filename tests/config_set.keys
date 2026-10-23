@@ -1,0 +1,6 @@
+# 1c set / NAME=value: system file then user file.
+SNAP # start
+DOWN DOWN DOWN C-e SNAP # editor   # revision 1 §2: C-e, not M-e
+S-F6 RET SNAP # shell   # revision 1 §2: Shift+F6, h is help
+/ SNAP # split
+z SNAP # variables

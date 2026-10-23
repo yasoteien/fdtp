@@ -1,0 +1,8 @@
+壊れた BMP です	Corrupt BMP
+BMP を読めません	Cannot read BMP
+未対応の BMP ビットフィールドです	Unsupported BMP bitfields
+未対応の BMP ヘッダーです	Unsupported BMP header
+未対応の BMP 色深度です	Unsupported BMP color depth
+未対応の BMP 圧縮です	Unsupported BMP compression
+BMP が大きすぎます	BMP too large
+BMP 用のメモリが足りません	Out of memory for BMP

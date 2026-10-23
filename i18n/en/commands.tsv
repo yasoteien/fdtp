@@ -1,0 +1,100 @@
+.mid .rcp .r36 .g36 は Enter v でも	Enter / v also opens .mid .rcp .r36 .g36
+1 列表示	1 column
+16 進表示	Hex view
+2 列表示	2 columns
+3 列表示	3 columns
+5 列表示	5 columns
+Attr    属性	Attr    Attributes
+Backup  圧縮（p と同じ）	Backup  Pack (same as p)
+F1（エディタ）	F1 (editor)
+F2（エディタ）	F2 (editor)
+F8（入力の中）	F8 (input)
+Info    ファイルシステムの情報	Info    Filesystem info
+Move    移動	Move    Move
+Pack    圧縮	Pack    Compress
+Retro MIDI Player で開く	Open in Retro MIDI Player
+Shift を押している間の帯（Shift+F1〜F10）	Shift key band (Shift+F1-F10)
+Shift+英字	Shift+letter
+View    表示	View    View
+Write   ディレクトリの書き込み	Write   Directory listing
+\\ ￥	\\ Yen
+mKdir   ディレクトリ作成	mKdir   Make directory
+rmDir   ディレクトリ削除	rmDir   Remove directory
+sHell   シェル	sHell   Shell
+↓（入力の中）	Down (input)
+その他（設定・終了・ヘルプ・エディタの中）	Other / Editor keys
+その字で始まる次の名前へ（続けて押すと次へ）	Next name starting with letter (repeat for next)
+カーソルの移動	Move cursor
+スライドショー（pptx の画面）	Slideshow (pptx viewer)
+ツリー	Tree
+ツリーでコピー	Copy in tree
+ツリーで移る	Logdir in tree
+ツリーで移動	Move in tree
+ツリーで解凍	Unpack in tree
+ディレクトリの書き込み	Write directory listing
+ディレクトリ作成	Mkdir
+ディレクトリ削除	Remove directory
+パスを入れて移る	Logdir (enter path)
+ファイルの印	File flags
+ファイル操作	File operations
+ヘルプ	Help
+ベル	Bell
+マークして下へ	Mark and move down
+マークして下へ（ページの中だけ）	Mark down (within page)
+マークして下へ（ページの中）	Mark down (within page)
+マークの反転	Invert marks
+リンク先の表示	Show link targets
+ルートへ	Root directory
+上へ	Up
+下の階層の属性	Recursive attributes
+下へ	Down
+何もしない	No operation
+先頭・最後へ	Top / bottom
+全部をマーク	Mark all
+全部をマーク・マークの反転	Mark all / invert marks
+内蔵エディタ	Built-in editor
+分割・結合・PDF のメニュー	Split / Join / PDF menus
+前に使った物の一覧（履歴）	Previous entries (history)
+前・次のページ	Previous / next page
+右へ	Right
+名前で絞って表示（検索表示）	Filter names (find results)
+名前の変更	Rename
+名前の検索（上へ）	Find name backward
+名前の検索（下へ・上へ）	Find name (forward / backward)
+名前の検索（下へ）	Find name forward
+名前を外して積む	Push name
+名前を外して積む・カーソルの所に戻す（5 個まで）	Push / pop name at cursor (up to 5)
+圧縮（書庫の作成）	Pack (create archive)
+変換（書式の整形・原稿と Web の形式・Word 書き出し）	Convert (format / manuscript / Web / Word)
+外部のエディタ	External editor
+外部のエディタ（$VISUAL・$EDITOR・vi）	External editor ($VISUAL / $EDITOR / vi)
+小説用エディタのキーの一覧	Novel editor key list
+小説用エディタ（どのファイルも）	Novel editor (any file)
+左へ	Left
+最後へ	Bottom
+条件でマーク	Mark by pattern
+次の窓へ	Next window
+知らない形式でバイナリなら表示の仕方を聞く	Ask viewer for unknown binary format
+移動・マーク	Move / Mark
+種類の記号	Type indicators
+積んだ名前を戻す	Pop name
+窓の分割	Split window
+窓を広げる	Widen window
+窓を広げる・狭める	Widen / narrow window
+窓を狭める	Narrow window
+窓を閉じる	Close window
+窓・表示の切り替え	Windows / Display
+終了（確認あり）	Quit (with confirmation)
+行先・パスをツリーで選ぶ	Select destination / path in tree
+表示の列数	Number of columns
+親のディレクトリへ	Parent directory
+解凍	Unpack
+設定（カスタマイザ）	Settings (customizer)
+読み直す	Reload
+長い名前の表示をずらす・戻す	Scroll / restore long names
+長い名前をずらす	Scroll long names
+長い名前を戻す	Restore long names
+開く・表示	Open / View
+開く（ディレクトリなら入る）	Open (enter directory)
+隠しファイルの表示	Show dotfiles
+隠しファイルの表示・非表示	Show / hide dotfiles

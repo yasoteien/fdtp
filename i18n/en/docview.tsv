@@ -1,0 +1,8 @@
+行 %zu/%zu	Line %zu/%zu
+表	Table
+  見出し	  Heading
+記録が文書と合いません	History does not match document
+%s（%ld 段落目）	%s (paragraph %ld)
+新しい段落	New paragraph
+この段落を消しますか？	Delete this paragraph?
+文書を開けません: %s	Cannot open document: %s

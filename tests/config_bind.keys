@@ -1,0 +1,11 @@
+# 1c bind: run by check_config.py with its own ~/.fdtprc (FDTP_RC_USER).
+SNAP # start
+d SNAP # rebound_down
+o SNAP # second_command_dir
+BS d d SNAP # on_file
+o SNAP # second_command_file
+TAB d TAB SNAP # marked
+M-a SNAP # alt_a_shell
+M-b SNAP # alt_b_empty
+z RIGHT HOME DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN SNAP # customizer_alt_a
+ESC n SNAP # left_unwritten

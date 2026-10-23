@@ -1,0 +1,42 @@
+FDTP の設定	FDTP settings
+変更あり	Modified
+英字	Letters
+Alt+英字	Alt+letters
+Ctrl+英字	Ctrl+letters
+ファンクションキー	Function keys
+Shift+ファンクションキー	Shift+function keys
+数字・記号	Digits/symbols
+そのほかのキー	Other keys
+ほかの bind	Other bindings
+%s（Reserved）	%s (Reserved)
+（未設定）	(Unset)
+（追加）	(Add)
+一覧に無いキーの割り当てを足します	Add a binding for an unlisted key
+FDTP の即時終了（Reserved）	Quit FDTP immediately (Reserved)
+（空き）	(Free)
+拡張子と起動するものを足します	Add an extension and launcher
+「キー 割り当て」の形で入れます（例: @B "ls -l %s" :一覧）	Enter key binding (e.g. @B "ls -l %s" :List)
+左の Ctrl+c は FDTP の即時終了で、変えられません	Left Ctrl+c quits FDTP immediately; cannot be changed
+組み込み: bind %s %s（RET で上書き）	Built-in: bind %s %s (RET to override)
+~/.fdtprc: bind %s …（RET で直す。空で消すと組み込みか空きに戻る）	~/.fdtprc: bind %s ... (RET edits; empty restores default)
+空き。~/.fdtprc では bind %s 命令 か bind %s "コマンド"	Free: ~/.fdtprc: bind %s ID or bind %s "command"
+内部の表示名（textview pdfview …）か "コマンド %s"	Internal viewer (textview pdfview ...) or "command %s"
+変数	Variables
+キー	Keys
+ランチャ	Launchers
+値	Value
+割り当て（組み込みは（Reserved）、~/.fdtprc の bind、（空き））	Binding: (Reserved), user bind, or (Free)
+起動するもの（内部の表示名か "コマンド"）	Launcher (internal viewer or "command")
+書き込み先: %s%s	Save to: %s%s
+（なし）	(None)
+項目	Items
+直す（空で取り消し）	Edit (empty clears)
+終わる	Close
+%s の割り当て（bind %s の右側）	Binding for %s (right side of bind %s)
+追加（キー 割り当て）	Add (key binding)
+Ctrl+c は FDTP の即時終了です（変えられません）	Ctrl+c quits FDTP immediately (cannot be changed)
+%s は %sです。割り当てを変えますか？	%s is %s. Change binding?
+追加（拡張子 起動するもの）	Add (extension launcher)
+.%s の起動	Launcher for .%s
+指定が正しくありません	Invalid setting
+%s に書き込みますか？	Save to %s?

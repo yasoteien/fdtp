@@ -1,0 +1,20 @@
+# 1b: hostile and broken archives. Nothing may be written outside dst, and
+# nothing may crash. Root of bad.tar: .. ../evil.txt /abs/evil2.txt ok.txt
+# Refusals are error boxes (revision 1 §7): the ESC at the start of the next
+# line closes the box (bad_u_browser: the second ESC leaves the browser).
+C-s "bad.tar" ESC RET SNAP # bad_browse
+ESC SNAP # bad_root
+DOWN RET SNAP # bad_open_evil
+ESC DOWN DOWN RET SNAP # bad_open_ok
+q u C-u "@CASE@/dst" RET SNAP # bad_u_browser
+ESC ESC C-s "bad.tar" ESC u C-u "@CASE@/dst" RET SNAP # bad_u
+ESC C-s "esc.tar" ESC u C-u "@CASE@/dst" RET SNAP # esc_u
+ESC C-s "bad.zip" ESC u C-u "@CASE@/dst" RET SNAP # badzip_u
+ESC C-s "broken.tgz" ESC RET SNAP # broken_tgz
+ESC C-s "broken.tgz" ESC u C-u "@CASE@/dst" RET SNAP # broken_u
+ESC C-s "broken.zip" ESC RET SNAP # broken_zip
+ESC C-s "cd.zip" ESC RET SNAP # broken_cd
+ESC C-s "empty.zip" ESC RET SNAP # empty_zip
+ESC C-s "x.7z" ESC RET SNAP # sevenz
+ESC C-s "x.7z" ESC u SNAP # sevenz_u
+ESC C-s "l.lzh" ESC RET SNAP # no_lhasa

@@ -1,0 +1,27 @@
+C-s "u1-" ESC b
+SNAP # byte
+w
+SNAP # word
+s
+SNAP # word_swap
+w
+SNAP # dword_swap
+s
+SNAP # dword
+w
+SNAP # byte_again
+s
+SNAP # swap_refused
+q C-s "u2-" ESC b
+SNAP # straddle
+c RIGHT RET
+SNAP # straddle_sjis
+q C-s "u3-" ESC b
+w s
+"AB" "CD"
+SNAP # swap_edit
+RIGHT RIGHT LEFT
+SNAP # swap_move
+C-s y
+SNAP # swap_saved
+q

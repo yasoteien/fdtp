@@ -1,0 +1,9 @@
+# Revision 1 §12, second run: the list comes from the file of the first run.
+l SNAP # opened
+DOWN SNAP # list
+DOWN RET SNAP # chosen
+RET SNAP # moved
+BS l "a" DOWN SNAP # filtered
+ESC ESC SNAP # cancelled
+DOWN DOWN DOWN c DOWN SNAP # destinations
+ESC ESC SNAP # done

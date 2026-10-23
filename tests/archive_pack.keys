@@ -1,0 +1,64 @@
+# Revision 1 D: p is the 「書庫の作成」 box (name with history, format,
+# level, LHa name code, same-name rule); each format is made and checked.
+C-s "box" ESC p SNAP # p_box
+TAB SNAP # fmt_focus
+UP SNAP # fmt_tar
+UP SNAP # fmt_zip
+UP SNAP # fmt_lha
+UP SNAP # fmt_top
+DOWN DOWN DOWN DOWN DOWN SNAP # fmt_txz
+DOWN SNAP # fmt_bottom
+TAB LEFT LEFT SNAP # level_4
+RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT SNAP # level_9
+"3" SNAP # level_3
+TAB SNAP # same_focus
+DOWN SNAP # same_newer
+TAB SNAP # name_focus
+S-TAB SNAP # back_tab
+TAB ESC SNAP # p_cancel
+C-s "box" ESC p SNAP # p_remembered
+TAB UP UP UP SNAP # fmt_tar_level
+TAB SNAP # tar_tab
+TAB C-u "abc.zip" SNAP # name_typed
+ESC SNAP # p_cancel2
+# Each format, chosen by the typed extension.
+C-s "box" ESC p C-u "out.zip" RET SNAP # p_zip
+C-s "box" ESC p C-u "out.tar" RET SNAP # p_tar
+C-s "box" ESC p C-u "out.tar.bz2" RET SNAP # p_bz2
+C-s "box" ESC p C-u "out.tar.xz" RET SNAP # p_xz
+C-s "box" ESC p C-u "out.tgz" RET SNAP # p_tgz
+# LHA chosen in the list (the extension follows), Shift_JIS names.
+C-s "box" ESC p TAB UP UP UP UP UP UP SNAP # lha_chosen
+RET SNAP # p_lha
+# No extension typed: the format's is added; UTF-8 names.
+C-s "box" ESC p C-u "utf" TAB TAB TAB RIGHT SNAP # code_utf8
+RET SNAP # p_lha_utf8
+# Levels: the same data at 1 and 9.
+C-s "rep.txt" ESC p C-u "g1.tar.gz" TAB TAB "1" RET SNAP # p_g1
+C-s "rep.txt" ESC p C-u "g9.tar.gz" TAB TAB "9" RET SNAP # p_g9
+C-s "rep.txt" ESC p C-u "z1.zip" TAB TAB "1" RET SNAP # p_z1
+C-s "rep.txt" ESC p C-u "z9.zip" TAB TAB "9" RET SNAP # p_z9
+C-s "rep.txt" ESC p C-u "l1.lzh" TAB TAB "1" RET SNAP # p_l1
+C-s "rep.txt" ESC p C-u "l9.lzh" TAB TAB "9" RET SNAP # p_l9
+C-s "box" ESC p C-u "plain" RET SNAP # p_noext
+# Refusals keep the box (the error box closes with a key).
+C-s "box" ESC p C-u "out.7z" RET SNAP # p_7z
+ESC SNAP # p_7z_closed
+C-u RET SNAP # p_empty
+ESC C-u "nodir/x.zip" RET SNAP # p_no_dir
+ESC ESC SNAP # p_refused_left
+# An existing archive: add to it (y) or go back to the box (n).
+C-s "box" ESC p C-u "out.tgz" RET SNAP # p_exists
+n SNAP # p_exists_no
+ESC
+# Marks: the directory's name; then the history list.
+C-s "a.txt" ESC TAB C-s "b.txt" ESC TAB p SNAP # p_marked_prompt
+C-u "marked.tar" RET SNAP # p_marked
+# An archive made by p in the browser (lhasa from ~/.fdtp/bin).
+C-s "utf.lzh" ESC RET SNAP # browse_made
+DOWN RET DOWN DOWN RET SNAP # browse_sub
+ESC SNAP # browse_left
+C-s "box" ESC p DOWN SNAP # p_history
+DOWN RET SNAP # p_history_pick
+DOWN ESC SNAP # p_list_closed
+ESC SNAP # done

@@ -1,0 +1,6 @@
+取り出せません: %.120s	Cannot extract: %.120s
+<< 解凍先のツリー >>	<< Unpack destination tree >>
+解凍しました %zu 件 → %.100s	Extracted: %zu -> %.100s
+解凍しました %zu 個 → %.100s	Unpacked: %zu -> %.100s
+解凍中 → %.100s	Unpacking -> %.100s
+解凍先	Unpack destination

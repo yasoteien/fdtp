@@ -1,0 +1,38 @@
+%.1f 秒	%.1f sec
+%d 分	%d min
+%d 分（X のウィンドウでは使わない）	%d min (disabled in X window)
+%d 分（残り %s）	%d min (%s left)
+%dx%d（絵 %dx%d）・%s	%dx%d (pixels %dx%d) / %s
+%ld ms（%s）	%ld ms (%s)
+%ld 分	%ld min
+%ld 分 %ld 秒	%ld min %ld sec
+%ld 日 %ld 時間 %ld 分	%ld d %ld h %ld min
+%ld 時間 %ld 分	%ld h %ld min
+%s／全体 %s	%s / total %s
+0（使わない）	0 (disabled)
+15 分より短い。変え方: 運用マニュアル §8（sudo）	Under 15 min. See operations manual section 8 (sudo)
+GPU の休むまで	GPU idle delay
+ありません	Not found
+カーネル	Kernel
+キーの装置	Input devices
+ディスクの空き	Disk free
+メモリ	Memory
+・	 / 
+休まない	Never
+何かキー	Any key
+使える %s／全体 %s	Available %s / total %s
+充電していない	Not charging
+充電中	Charging
+全体 %s	Total %s
+放電中	Discharging
+有り	Present
+有り（読めません）	Present (unreadable)
+有り（読める）	Present (readable)
+満充電	Full
+無し	None
+画面	Display
+画面なし（ヘッドレス）	Headless
+読めません（%s）	Cannot read (%s)
+読めません（権限）	Cannot read (permission denied)
+起動してから	Uptime
+電池	Battery

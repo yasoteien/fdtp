@@ -1,0 +1,3 @@
+ファイルの読み込みに失敗しました	Failed to read file
+%s%s  行 %zu/%s	%s%s  Line %zu/%s
+ファイルを読み込めません	Cannot load file

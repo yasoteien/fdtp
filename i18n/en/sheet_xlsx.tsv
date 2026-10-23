@@ -1,0 +1,16 @@
+%s の XML が壊れています	Invalid XML in %s
+ZIP64 の xlsx の保存には対応していません	Cannot save ZIP64 xlsx
+calcChain の XML が壊れています	Invalid calcChain XML
+この xlsx の文字コード（UTF-8 以外）には対応していません	Unsupported xlsx encoding (requires UTF-8)
+シートの XML に sheetData がありません	No sheetData in sheet XML
+セルの番地が正しくないため保存できません	Invalid cell address; cannot save
+セルの順が正しくないため保存できません	Invalid cell order; cannot save
+数式の中に知らない要素があります	Unknown elements in formula
+書き換える場所が重なっています	Overlapping edit ranges
+番地の無いセルがあるため保存できません	Cell without address; cannot save
+行の順が正しくないため保存できません	Invalid row order; cannot save
+行番号の無い行があるため保存できません	Row without number; cannot save
+%s の XML が壊れています（%llu 行）	Invalid XML in %s (line %llu)
+%s を読めません	Cannot read %s
+xlsx ではありません（ブックがありません）	Not an xlsx file (no workbook)
+このシートは表示できません（グラフなど）	Cannot view this sheet (chart, etc.)

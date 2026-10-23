@@ -1,0 +1,5 @@
+# Stage 6 keys: BS at the first slide, END, PGDN at the last, PGUP, HOME,
+# g with a number, a wrong number (its error box closed with ESC), g cancelled,
+# q back to the list.
+BS SNAP END SNAP PGDN SNAP PGUP SNAP HOME SNAP
+g "4" RET SNAP g "99" RET SNAP ESC g ESC SNAP q SNAP

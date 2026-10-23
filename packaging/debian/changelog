@@ -1,0 +1,20 @@
+fdtp (1.00-1) trixie; urgency=medium
+
+  * The first public release: English screens, pptx slide show (F5),
+    ./configure and make install, fdtp-pomera-setup, user manual (ja/en).
+
+ -- yasoteien <263659156+yasoteien@users.noreply.github.com>  Sat, 24 Oct 2026 00:30:00 +0900
+
+fdtp (0.10-1) trixie; urgency=medium
+
+  * Built-in default Word template (A4 portrait, title 12 pt, body 10.5 pt).
+  * The title of the filer is no longer crossed by the row 1 dividers.
+
+ -- yasoteien <263659156+yasoteien@users.noreply.github.com>  Fri, 23 Oct 2026 23:50:00 +0900
+
+fdtp (0.09-1) trixie; urgency=medium
+
+  * The first .deb: /usr/bin/fdtp, the menu entry and its icons, the
+    documents, and fdtp-pomera-setup for the Pomera DM250 settings.
+
+ -- yasoteien <263659156+yasoteien@users.noreply.github.com>  Fri, 23 Oct 2026 23:30:00 +0900

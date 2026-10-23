@@ -1,0 +1,25 @@
+SPC: x/X/!/-/*  X:条件付き実行  !:反転	SPC: x/X/!/-/*  X:Conditional exec  !:Invert
+SPC:切替  数字:日時  m:*（元のまま）  o/g→SPC:名前入力	SPC:Toggle  Digits:Date/time  m:Keep  o/g+SPC:Enter name
+a モード	a Mode
+d 日付	d Date
+g グループ	g Group
+o 持ち主	o Owner
+t 時刻	t Time
+←→↑↓:移動  a/d/t/o/g:行頭  RET:反映  Esc:取消	Arrows:Move  a/d/t/o/g:Field  RET:Apply  Esc:Cancel
+グループ（名前または番号）	Group (name or ID)
+ディレクトリを選んでください	Select a directory
+モード	Mode
+下の階層も属性変更（モードのみ）	Recursive attributes (mode only)
+変更 %zu / 失敗 %zu: %.150s	Changed %zu / failed %zu: %.150s
+属性を変更しました: %zu 個（リンク %zu 個は対象外）	Attributes changed: %zu (links skipped: %zu)
+属性を読み込めませんでした	Cannot read attributes
+属性変更	Change attributes
+属性変更を中断しました: 変更 %zu / 失敗 %zu	Attributes canceled: changed %zu / failed %zu
+属性変更中 %zu/%zu  %.160s  Esc:中断	Changing attributes %zu/%zu  %.160s  Esc:Cancel
+属性変更中 0/%zu  Esc:中断	Changing attributes 0/%zu  Esc:Cancel
+持ち主またはグループが見つかりません	Owner or group not found
+持ち主・グループは表示のみ（root 以外）	Owner/group read-only (non-root)
+持ち主・グループを変更できます	Owner and group can be changed
+持ち主（名前または番号）	Owner (name or ID)
+日時	Date/time
+日時が正しくありません	Invalid date or time

@@ -1,0 +1,2 @@
+# One 300 KB line: end, type, back to the start.
+SNAP C-END "末" SNAP C-HOME "頭" SNAP C-z C-z ESC

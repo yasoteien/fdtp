@@ -1,0 +1,8 @@
+# 1: a directory that does not exist: an error box, still editing.
+"z" C-S-s C-u "nodir/b.txt" RET SNAP
+# 2: the box closed by a key.
+ESC SNAP
+# 3: a directory as the name.
+C-S-s C-u "." RET SNAP ESC
+# 4: F1 lists the keys (Ctrl+Shift+s among them) in a help box. 5: Esc closes it.
+F1 SNAP ESC SNAP

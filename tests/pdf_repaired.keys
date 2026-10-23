@@ -1,0 +1,5 @@
+# Item 40: a file mupdf repaired is written whole (beside it, then renamed).
+WAIT:0 SNAP e WAIT:0 SNAP                      # 1 the page, 2 the mode
+RIGHT S-RIGHT h WAIT:0 SNAP                    # 3 highlight
+C-s SNAP                                       # 4 保存しました（全体を書き直しました）
+e q SNAP                                       # 5 back

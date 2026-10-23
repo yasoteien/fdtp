@@ -1,0 +1,77 @@
+未実装です	Not implemented
+ページを描けません	Cannot render page
+先頭から検索しました	Search wrapped to top
+ページの文字を読めません	Cannot read page text
+付箋	Note
+ハイライト	Highlight
+下線	Underline
+取り消し線	Strikeout
+波線	Squiggly
+注釈	Annotation
+PDF ではないので書き込めません	Only PDFs can be edited
+この PDF は注釈の書き込みが許されていません	This PDF does not allow annotations
+開き直せなかったので、書き込めません	Cannot edit: reload failed
+範囲を選んでください（Shift+矢印）	Select text (Shift+Arrow)
+選んだ字に大きさがありません	Selected text has no area
+注釈を付けられません	Cannot add annotation
+付箋を直す	Edit note
+付箋を貼れません	Cannot add note
+カーソルの所に注釈はありません	No annotation at cursor
+この種類の注釈は消せません	Cannot delete this annotation type
+この%sを消しますか？	Delete this %s?
+注釈を消せません	Cannot delete annotation
+この注釈に文はありません	This annotation has no text
+このページに注釈はありません	No annotations on this page
+保存できません: 開き直せなかったファイルです	Cannot save: reload failed
+保存できません: 書き込めません	Cannot save: file is not writable
+保存できません: 書き込みに失敗しました	Cannot save: write failed
+保存できません: 名前が長すぎます	Cannot save: name too long
+保存できません: 作業用の名前が使われています	Cannot save: temporary name in use
+保存しましたが、開き直せません	Saved, but cannot reload
+保存しました（全体を書き直しました）	Saved (rewrote entire file)
+パスワードが違います。もう一度	Wrong password. Try again
+PDF を開けません	Cannot open PDF
+見る	View
+最初・最後のページ	First/last page
+上下に動かす（端で前・次のページ）	Scroll up/down (change page at edge)
+左右に動かす	Scroll left/right
+ページ番号で移る	Go to page number
+幅に合わせる・全体を出す	Fit width/page
+拡大・縮小	Zoom in/out
+検索・次を検索	Find/find next
+戻る（変更があれば保存を聞く）	Back (ask to save changes)
+書き込み（e で入る・出る）	Edit (e to enter/leave)
+矢印	Arrows
+文字のカーソルを動かす	Move text cursor
+範囲を選ぶ（行をまたげる）	Select text (across lines)
+行の頭・行の終わり	Start/end of line
+付箋を貼る・直す（日本語はAlt+Space）	Add/edit note (IME: Alt+Space)
+カーソルの所の注釈を消す	Delete annotation at cursor
+付箋の文を読む	Read note text
+次の注釈へ	Next annotation
+選んだ範囲をやめる・書き込みを出る	Clear selection/leave edit mode
+保存（元のファイルに追記）	Save (append to original file)
+ページ番号が違います	Invalid page number
+書き込みを保存してから PDF のメニューを開きますか？	Save edits before opening PDF menu?
+保存して開く(S)	Save and open (S)
+保存せずに開く(N)	Open without saving (N)
+PDF のキー	PDF keys
+書き込みを保存しますか？	Save edits?
+保存して戻る(S)	Save and return (S)
+保存せずに戻る(N)	Return without saving (N)
+ページ番号	Page number
+書き込み: このページに文字はありません（付箋は貼れます）	Edit: No text on this page (notes allowed)
+書き込み: %d 字を選んでいます	Edit: Selected characters: %d
+書き込み: 字 %d/%d	Edit: Character %d/%d
+幅	Width
+パスワード	Password
+%s%s%.0f%%  ページ %d/%d	%s%s%.0f%%  Page %d/%d
+貼る	Post
+日本語	IME
+S+矢印	S+Arrow
+取消線	Strike
+消す	Delete
+ページ	Page
+拡縮	Zoom
+書込	Edit
+描画中	Render

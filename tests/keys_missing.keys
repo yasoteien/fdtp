@@ -1,0 +1,4 @@
+# rmp-jukebox not on $PATH: an error box (it takes the key that closes it).
+C-s "song.mid" ESC RET SNAP # missing_ret
+DOWN SNAP # missing_closed
+C-s "plain.dat" ESC C-p SNAP # missing_ctrl_p

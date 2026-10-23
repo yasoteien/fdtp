@@ -1,0 +1,20 @@
+FDTP を終了しますか？	Quit FDTP?
+移動先がありません	No destination
+ディレクトリを開けません	Cannot open directory
+ディレクトリを読み直せません	Cannot reload directory
+FDTP キー一覧  Version %s	FDTP keys  Version %s
+エディタの指定が正しくありません	Invalid editor command
+移動履歴	Directory history
+ディレクトリなので開けません	Cannot open a directory
+昇順	Ascending
+降順	Descending
+並び順	Order
+スタックは5個までです	Stack limit is 5
+積んだ項目はもうありません	Stacked item is gone
+日付	Date
+長さ	Length
+並べない	Unsorted
+この OS では使えません	Not available on this OS
+窓は5個までです	Window limit is 5
+窓を開けません	Cannot open window
+新しいファイル名	New file name

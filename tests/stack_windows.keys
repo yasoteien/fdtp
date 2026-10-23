@@ -1,0 +1,26 @@
+DOWN DOWN DOWN DOWN DEL
+SNAP # pushed
+INS
+SNAP # popped
+] DOWN [
+SNAP # popped_at_cursor
+/ 
+SNAP # two_windows
+C-w
+SNAP # widened
+C-n
+SNAP # narrowed
+^ DOWN RET
+SNAP # other_window_directory
+^
+SNAP # first_window_directory
+/ / /
+SNAP # five_windows
+/
+SNAP # window_limit
+C-k C-k C-k C-k
+SNAP # one_window
+?
+SNAP # help
+ESC
+SNAP # help_closed

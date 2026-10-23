@@ -1,0 +1,3 @@
+# Stage 4: opening a broken or read-only table; nothing may be written.
+# Each refusal is an error box (revision 1 §7); ESC closes it.
+SNAP RET ESC "a" ESC RET ESC C-s SNAP ESC ESC SNAP

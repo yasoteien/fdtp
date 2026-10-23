@@ -1,0 +1,23 @@
+# 1b: browse tar.gz and zip like directories, open members, v, leave with BS/Esc.
+# Root order: .. empty sub 日本語.txt (directories first, then names).
+C-s "t.tgz" ESC RET SNAP # tgz_root
+DOWN DOWN RET SNAP # tgz_sub
+DOWN RET SNAP # tgz_deep
+BS SNAP # tgz_up
+BS SNAP # tgz_top
+DOWN RET SNAP # tgz_open
+q SNAP # tgz_back
+BS SNAP # tgz_left
+C-s "z.zip" ESC RET DOWN DOWN RET DOWN RET DOWN RET SNAP # zip_open
+q BS DOWN SNAP # zip_link_cursor
+RET SNAP # zip_link_open
+q ESC SNAP # zip_left
+C-s "t.tar" ESC RET DOWN DOWN DOWN TAB SNAP # tar_marked
+ESC C-s "t.tgz" ESC v SNAP # v_archive
+ESC C-s "note.txt" ESC v SNAP # v_text
+# An archive inside: opened from the cache, listed on the following tick.
+q C-s "nest.zip" ESC RET DOWN RET WAIT:0 SNAP # nested
+DOWN DOWN DOWN RET SNAP # nested_open
+q ESC ESC SNAP # nested_left
+C-s "sjis.zip" ESC RET DOWN SNAP # sjis_name
+ESC SNAP # done

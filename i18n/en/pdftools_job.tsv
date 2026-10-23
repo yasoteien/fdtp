@@ -1,0 +1,26 @@
+書き込めません: %.120s（%s）	Cannot write: %.120s (%s)
+名前を変えられません: %.120s（%s）	Cannot rename: %.120s (%s)
+書き出し中 %s	Writing %s
+確かめ中 %s	Checking %s
+パスワードが付いていません	Password not set
+パスワードが残っています	Password still set
+書き出した PDF がパスワードで開けません	Cannot open output PDF with password
+書き出した PDF が壊れています	Output PDF is damaged
+書き出した PDF のページの数が合いません（%d ではなく %d）	Output page count mismatch (expected %d, got %d)
+書き出した PDF を開けません: %.120s	Cannot open output PDF: %.120s
+画像を読めません: %.120s	Cannot read image: %.120s
+%zu/%zu ページ  %s	Page %zu/%zu  %s
+%d ページ目が大きすぎます（解像度を下げてください）	Page %d too large (lower resolution)
+JPEG を書き出せません: %.120s	Cannot write JPEG: %.120s
+画像を作り直し中 %s	Resampling images: %s
+%s  %zu/%d ページ	%s  Page %zu/%d
+%s  %zu/%zu ページ	%s  Page %zu/%zu
+ページを並べ中 %s	Reordering pages: %s
+回転中 %zu/%zu ページ	Rotating page %zu/%zu
+%zu/%zu 枚  %s	Image %zu/%zu  %s
+小さくなりませんでした	Size did not decrease
+仕上げ中	Finishing
+書き出せませんでした（%.100s）	Write failed (%.100s)
+PDF を開けません: %.120s	Cannot open PDF: %.120s
+ページの範囲が違います	Invalid page range
+書き出せませんでした	Write failed

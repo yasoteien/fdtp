@@ -1,0 +1,21 @@
+# Revision 1 item 38: Ctrl+z / Ctrl+y in the xlsx view (tests/check_sheet.py check_undo).
+# "LEFT RIGHT SNAP" after a notice: the same cell, row 23 showing it again.
+SNAP                                        # 1 initial
+C-z SNAP                                    # 2 nothing to undo
+C-g "B2" RET "30" RET SNAP                  # 3 B2 10 -> 30, its dependants recalculated
+C-g "A1" RET C-z SNAP                       # 4 undone, all of them: on B2 again, not changed
+C-y SNAP                                    # 5 redone
+C-g "D3" RET RET C-u "=B3*C3+1" RET SNAP    # 6 the shared formula's master: D4 rewritten too
+C-z SNAP LEFT RIGHT SNAP                    # 7, 8 undone: the shared formula again
+C-s SNAP                                    # 9 saved (B2 30), .bak made
+C-z SNAP                                    # 10 undone after the save: differs from the file
+C-s SNAP                                    # 11 saved: B2 10 again
+C-y SNAP                                    # 12 redone: differs
+C-z SNAP                                    # 13 back to what the file holds: not changed
+TAB C-g "B2" RET "5" RET SNAP               # 14 sheet 2 edited: B3 recalculated
+S-TAB SNAP                                  # 15 back to sheet 1
+C-z SNAP                                    # 16 the step on sheet 2: goes there
+C-g "Z1" RET "a" RET C-g "Z2" RET "b" RET C-z SNAP LEFT RIGHT SNAP   # 17, 18 a new cell, undone: gone
+C-y SNAP LEFT RIGHT SNAP                    # 19, 20 redone
+C-z C-z SNAP LEFT RIGHT SNAP                # 21, 22 both undone: as the file
+ESC SNAP                                    # 23 not changed: closes without asking

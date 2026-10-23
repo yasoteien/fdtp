@@ -1,0 +1,10 @@
+# Revision 1 §2: Ctrl+d f a h w n k (left Ctrl+C stays FDTP's quit).
+C-s "beta" ESC C-d SNAP # ctrl_d
+n C-f SNAP # ctrl_f
+ESC C-s "beta" ESC C-a SNAP # ctrl_a
+ESC C-h SNAP # ctrl_h
+C-h SNAP # ctrl_h_again
+/ SNAP # split
+C-w SNAP # widened
+C-n C-n SNAP # narrowed
+C-k SNAP # killed

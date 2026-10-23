@@ -1,0 +1,39 @@
+ 高  %d	 Hi  %d
+%.100s はあります。書庫に追加しますか？	%.100s exists. Add to archive?
+%3d%%  Esc で中止	%3d%%  Esc:Cancel
+TAB 欄を移る  ↑↓←→ 選ぶ  RET 作成  Esc 取り消し	TAB:Field  Arrows:Select  RET:Pack  Esc:Cancel
+zip がありません	zip not found
+zip を起動できません	Cannot start zip
+、入れられない種類 %zu 個	, unsupported: %zu
+、古いので入れなかった物 %zu 個	, older skipped: %zu
+ありません: %.100s	Not found: %.100s
+コピーできません: %.100s（%s）	Cannot copy: %.100s (%s)
+ディレクトリを読めません: %.100s	Cannot read directory: %.100s
+リンクを読めません: %.100s	Cannot read link: %.100s
+低 	Lo 
+作業用のディレクトリを読めません	Cannot read working directory
+作業用のファイルを作れません	Cannot create working file
+危険な名前があるので追加しません: %.60s	Unsafe name; not added: %.60s
+同じ名前のディレクトリがあります	Directory with same name exists
+同名のファイル（書庫に追加する時）	Same name (adding to archive)
+圧縮しました: %.100s	Packed: %.100s
+圧縮しました: %.100s（%zu 個	Packed: %.100s (items: %zu
+圧縮する物と同じ名前です	Same name as an input
+圧縮できません	Cannot compress
+圧縮できません: %.120s	Cannot compress: %.120s
+圧縮を中止しました	Packing canceled
+圧縮中 %s	Packing %s
+圧縮中 %zu / %zu 個  	Packing %zu / %zu:  
+圧縮率	Compression level
+形式	Format
+日付が新しい時だけ	Only if newer
+書庫に追加しました: %.100s	Added to archive: %.100s
+書庫に追加しました: %.100s（入れた物 %zu 個	Added to archive: %.100s (added: %zu
+書庫に追加しました: %.100s（古いので入れなかった物 %zu 個）	Added to archive: %.100s (older skipped: %zu)
+書庫の作成	Pack archive
+書庫を作れません: %.80s	Cannot create archive: %.80s
+書庫を置けません: %.80s	Cannot place archive: %.80s
+書庫名	Archive name
+無条件で上書き	Always overwrite
+（LHA の時）	(LHA only)
+（TAR は圧縮しません）	(TAR is uncompressed)

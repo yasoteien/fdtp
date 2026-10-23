@@ -1,0 +1,2 @@
+# Safe cancellation smoke script, also run by the T1 glob.
+x ESC S-F6 ESC S-F2 ESC t ESC l F8 ESC ESC C-f ESC w ESC

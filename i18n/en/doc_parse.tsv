@@ -1,0 +1,19 @@
+変更履歴を含むため、この段落は直せません	Cannot edit paragraph containing tracked changes
+タグやコンテンツコントロールを含むため、この段落は直せません	Cannot edit paragraph containing tags or content controls
+数式を含むため、この段落は直せません	Cannot edit paragraph containing equations
+ルビを含むため、この段落は直せません	Cannot edit paragraph containing ruby
+記号やタブ位置の要素を含むため、この段落は直せません	Cannot edit paragraph containing symbols or tab positions
+画像や注が文の途中にあるため、この段落は直せません	Cannot edit paragraph with images or notes within text
+画像や注と文字が同じ部分にあるため、この段落は直せません	Cannot edit paragraph with images or notes in a text run
+段組みの区切りを含むため、この段落は直せません	Cannot edit paragraph containing column breaks
+表の中は直せません	Cannot edit table contents
+セクションの区切りを含むため、この段落は消せません	Cannot delete paragraph containing section breaks
+ブックマークやコメントの範囲を含むため、この段落は消せません	Cannot delete paragraph containing bookmark or comment ranges
+注やコメントを含むため、この段落は消せません	Cannot delete paragraph containing notes or comments
+フィールドを含むため、この段落は消せません	Cannot delete paragraph containing fields
+変更履歴を含むため、この段落は消せません	Cannot delete paragraph containing tracked changes
+入れ子が深すぎます	Nesting too deep
+Word の文書ではありません	Not a Word document
+文書が大きすぎます	Document too large
+XML が正しくありません（%llu 行目）	Invalid XML (line %llu)
+文書の文字コードが UTF-8 でないため保存できません	Cannot save document with non-UTF-8 encoding

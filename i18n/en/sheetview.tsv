@@ -1,0 +1,15 @@
+%s（%s!%s）	%s (%s!%s)
+.bak を作れないため保存しません: %s	Cannot create .bak; not saved: %s
+「%s」を開けません: %s	Cannot open "%s": %s
+この共有数式の元のセルは直せません	Cannot edit shared formula source cell
+この数式は計算できません	Cannot calculate this formula
+この関数は計算できません	Cannot calculate this function
+ほかのシートを開けません	Cannot open other sheets
+メモリが足りないため計算できない所があります	Out of memory; some cells not calculated
+循環する参照があります	Circular reference
+数式が正しくありません	Invalid formula
+番地が正しくありません	Invalid address
+結合されたセルは左上だけ直せます	Edit merged cells at top left only
+表を開けません: %s	Cannot open table: %s
+配列数式のセルは直せません	Cannot edit array formula cells
+長すぎて直せません	Too long to edit

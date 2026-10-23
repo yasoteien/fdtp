@@ -1,0 +1,7 @@
+# Revision 1 D, adding (1 of 2): the archives to add to (LHa with UTF-8 names).
+C-s "box" ESC p C-u "all.lzh" TAB TAB TAB RIGHT RET SNAP # made_lzh
+C-s "box" ESC p C-u "all.zip" RET SNAP # made_zip
+C-s "box" ESC p C-u "all.tgz" RET SNAP # made_tgz
+C-s "box" ESC p C-u "new.lzh" RET SNAP # made_new_lzh
+C-s "box" ESC p C-u "new.zip" RET SNAP # made_new_zip
+C-s "box" ESC p C-u "new.tgz" RET SNAP # made_new_tgz

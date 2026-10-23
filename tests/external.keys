@@ -1,0 +1,8 @@
+# Revision 1 §2: the external editor is C-e (M-e is gone: the Pomera has no Alt).
+DOWN DOWN DOWN DOWN
+C-e
+SNAP # editor
+C-e
+SNAP # alt_editor
+C-e
+SNAP # function_editor

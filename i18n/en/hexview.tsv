@@ -1,0 +1,20 @@
+書き込み用に開けません	Cannot open for writing
+ファイルが入れ替わったか長さが変わりました	File replaced or resized
+書き込みに失敗しました（未保存の差分を保持）	Write failed (unsaved changes kept)
+書き込みました	Written
+検索する値を指定してください	Enter search value
+検索中に読めませんでした	Read failed during search
+検索値は引用した文字列か偶数桁の16進数で入力してください	Use quoted text or pairs of hex digits
+番地がファイルの範囲外です	Address outside file
+書き込まずに戻りますか？	Return without writing?
+書き換えはありません	No changes to write
+書き込みますか？	Write changes?
+番地（16進）	Address (hex)
+検索（"文字" / 16進）	Find ("text" / hex)
+入れ替えはワードかダブルワードの時に使えます（w で切り替え）	Swap needs word or dword mode (w)
+バイト	Byte
+ワード	Word
+ダブルワード	Dword
+16進 %s%s  %s%s  行 %jd/%jd	Hex %s%s  %s%s  Line %jd/%jd
+ 入替	 Swap
+通常のファイルを選んでください	Select a regular file

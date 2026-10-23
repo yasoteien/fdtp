@@ -1,0 +1,65 @@
+%.100s は行先にあります	%.100s exists at destination
+%.120s は書き込み禁止です。削除しますか？	%.120s is read-only. Delete?
+%llu バイト（%.1f KB）	%llu bytes (%.1f KB)
+%s中 %zu/%zu %.150s	%s %zu/%zu %.150s
+%s（拡張子 %s／中身 %s）	%s (extension %s / content %s)
+%zu 個のファイルを削除しますか？	Delete files: %zu?
+BMP 画像	BMP image
+ELF 実行形式	ELF executable
+GIF 画像	GIF image
+JPEG 画像	JPEG image
+LHa 書庫	LHa archive
+Linux では使えません	Not available on Linux
+PNG 画像	PNG image
+RCP（レコンポーザ）	RCP (Recomposer)
+RIFF（WebP・WAV など）	RIFF (WebP, WAV, etc.)
+ZIP（Office の文書を含む）	ZIP (including Office documents)
+なし	None
+アクセス日時	Accessed
+キャラクタ装置	Character device
+コピーしない	Skip copy
+コピー先	Copy destination
+シンボリックリンク → %s	Symbolic link -> %s
+スクリプト	Script
+スライド（PowerPoint）	Slides (PowerPoint)
+ソケット	Socket
+ディレクトリ	Directory
+ディレクトリ %.100s（%zu 個のファイル）を削除しますか？	Delete directory %.100s (files: %zu)?
+ディレクトリ %zu 個（中のファイル %zu 個）を削除しますか？	Delete directories: %zu (files inside: %zu)?
+ディレクトリではありません	Not a directory
+ディレクトリ名	Directory name
+バイナリ	Binary
+ファイル %zu 個とディレクトリ %zu 個（中のファイル %zu 個）を削除しますか？	Delete files: %zu, directories: %zu (files inside: %zu)?
+ファイルの情報を読めません	Cannot read file info
+ブロック装置	Block device
+リンク %.100s を削除しますか？（指し先は残します）	Delete link %.100s (keep target)?
+リンク先	Link target
+リンク切れ	Broken link
+・リンク	 / Link
+・実行	 / Executable
+・書き込み禁止	 / Read-only
+・隠し	 / Hidden
+作成日時	Created
+全部上書き	Overwrite all
+別の場所へ	Relocate
+古い方の移動先	Relocate old file to
+名前を変える	Rename
+名前付きパイプ	Named pipe
+場所	Location
+外部コマンド	External command
+外部コマンドで開く形式	External viewer format
+完了 %zu 件	Done: %zu
+小説	Novel
+持ち主とグループ	Owner and group
+操作できません: %.100s (%s)	Cannot operate: %.100s (%s)
+文書（Word）	Document (Word)
+新しい名前	New name
+新しければ上書き	Overwrite if newer
+更新日時	Modified
+書庫	Archive
+標準 MIDI	Standard MIDI
+画像	Image
+空	Empty
+表計算	Spreadsheet
+（リンクではありません）	(Not a link)
+MIDI（Retro MIDI Player）	MIDI (Retro MIDI Player)

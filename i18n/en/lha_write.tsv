@@ -1,0 +1,16 @@
+# lha_write UI messages
+4 GB 以上のファイルは LHa に入れられません: %.80s	Cannot add files of 4 GB or more to LHa: %.80s
+Shift_JIS にできない名前です（名前を UTF-8 にしてください）: %.80s	Cannot convert name to Shift_JIS (use UTF-8): %.80s
+ありません: %.80s	Not found: %.80s
+この LHa の形式（レベル %d）には追加できません	Cannot add to this LHa format (level %d)
+ディレクトリを読めません: %.80s	Cannot read directory: %.80s
+リンクを読めません: %.80s	Cannot read link: %.80s
+名前が長すぎます: %.80s	Name too long: %.80s
+書き込めません: %s	Cannot write: %s
+書庫がありません	Archive not found
+書庫の作成が始まっていません	Archive creation has not started
+書庫を作れません: %s	Cannot create archive: %s
+書庫を置けません: %s	Cannot install archive: %s
+書庫を読めません	Cannot read archive
+書庫を読めません（LHa が壊れています）	Cannot read archive (corrupt LHa)
+書庫を開けません	Cannot open archive

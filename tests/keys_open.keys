@@ -1,0 +1,30 @@
+# Revision 1 §1 1 2 9 18: e F9 C-e, v RET and the binary question, MIDI, C-p.
+# Item 27: Alt+e and Alt+r as C-e and C-p; another Alt+letter does nothing.
+# The editor's own notice on undecodable bytes (a box) and its save question.
+C-s "binary.dat" ESC e SNAP # e_binary
+ESC ESC n C-s "plain.dat" ESC F9 SNAP # f9_plain
+ESC C-s "alpha" ESC e SNAP # e_directory
+"new.txt" RET SNAP # e_new_file
+ESC < e "notes.txt" RET SNAP # e_existing
+ESC < e ESC SNAP # e_cancelled
+C-s "plain.dat" ESC C-e SNAP # ctrl_e
+C-s "plain.dat" ESC M-e SNAP # alt_e
+C-s "binary.dat" ESC v SNAP # v_binary
+t SNAP # v_binary_text
+q v B SNAP # v_binary_hex
+q RET SNAP # ret_binary
+ESC SNAP # ret_cancelled
+RET RIGHT RIGHT RET SNAP # ret_cancel_option
+RET RIGHT RET SNAP # ret_hex_by_arrows
+q C-s "ctrl.dat" ESC RET SNAP # ret_control
+ESC C-s "plain.dat" ESC v SNAP # v_plain
+q C-s "utf16.txt" ESC v SNAP # v_utf16
+q C-s "image.png" ESC RET SNAP # ret_image
+q C-s "song.mid" ESC RET SNAP # ret_mid
+C-s "SONG.RCP" ESC v SNAP # v_rcp
+C-s "a.r36" ESC RET SNAP # ret_r36
+C-s "b.G36" ESC RET SNAP # ret_g36
+C-s "plain.dat" ESC C-p SNAP # ctrl_p
+C-s "alpha" ESC C-p SNAP # ctrl_p_directory
+C-s "plain.dat" ESC M-r SNAP # alt_r
+C-s "plain.dat" ESC M-q SNAP # alt_q_free

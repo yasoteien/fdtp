@@ -1,0 +1,26 @@
+# zipfile UI messages
+%s が大きすぎます	%s is too large
+%s が大きすぎます（ZIP64 の書き込みには対応していません）	%s is too large (ZIP64 writing is not supported)
+%s の書き込みに失敗しました	Failed to write %s
+ZIP64 の zip の書き込みには対応していません	Writing ZIP64 archives is not supported
+zip が壊れています（%s が途中で切れています）	Corrupt zip (%s is truncated)
+zip が壊れています（%s の CRC が合いません）	Corrupt zip (CRC mismatch for %s)
+zip が壊れています（%s の大きさ）	Corrupt zip (size of %s)
+zip が壊れています（%s の見出し）	Corrupt zip (header for %s)
+zip が壊れています（%s の記述子）	Corrupt zip (descriptor for %s)
+zip が壊れています（%s を展開できません）	Corrupt zip (cannot decompress %s)
+zip が壊れています（ZIP64 の終わりの記録）	Corrupt zip (ZIP64 end record)
+zip が壊れています（ZIP64 の記録がありません）	Corrupt zip (missing ZIP64 record)
+zip が壊れています（ZIP64 の項目）	Corrupt zip (ZIP64 entry)
+zip が壊れています（中身の位置）	Corrupt zip (entry offset)
+zip が壊れています（目次の位置）	Corrupt zip (directory offset)
+zip が壊れています（目次）	Corrupt zip (directory)
+zip の形式ではありません	Not a zip file
+zip の目次が大きすぎます	Zip directory too large
+中身がありません	No entries
+分割された zip には対応していません	Split zip files are not supported
+圧縮を始められません	Cannot start compression
+大きすぎます（ZIP64 の書き込みには対応していません）	Too large (ZIP64 writing is not supported)
+対応していない圧縮方式です（%u）	Unsupported compression method (%u)
+展開を始められません	Cannot start decompression
+暗号化された zip は読めません	Cannot read encrypted zip

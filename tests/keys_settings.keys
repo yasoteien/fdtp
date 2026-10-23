@@ -1,0 +1,2 @@
+# S and T have no keys now; ~/.fdtprc's SYMLINK and FILETYPE still work.
+C-s "link" ESC SNAP # link_target

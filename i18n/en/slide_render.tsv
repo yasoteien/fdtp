@@ -1,0 +1,10 @@
+pptx を開けません（%s）	Cannot open pptx (%s)
+pptx ではありません（%s がありません）	Not a pptx (%s missing)
+%s が壊れています	%s is corrupt
+スライドがありません	No slides
+表示できない画像があります	Some images cannot be displayed
+[音声]	[Audio]
+[動画]	[Video]
+スライド %s を読めません	Cannot read slide %s
+図形が多すぎるため一部を省きました	Too many shapes; some omitted
+pptx を読み直せていないため保存しません	pptx not reloaded; not saved

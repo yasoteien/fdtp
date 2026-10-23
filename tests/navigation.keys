@@ -1,0 +1,31 @@
+SNAP # initial
+DOWN
+SNAP # directory
+UP RIGHT
+SNAP # right
+LEFT PGDN
+SNAP # page2
+PGUP
+SNAP # page1
+>
+SNAP # last
+< 1
+SNAP # onecol
+2
+SNAP # twocol
+3
+SNAP # threecol
+5
+SNAP # fivecol
+2 C-s "long" ESC
+SNAP # longname
+(
+SNAP # shifted
+)
+SNAP # unshifted
+q
+SNAP # quit_prompt
+n
+SNAP # cancelled
+ESC y
+SNAP # quit

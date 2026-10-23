@@ -1,0 +1,7 @@
+# Item 40: a page without text (page 3) has a point cursor for notes.
+WAIT:0 END WAIT:0 e WAIT:0 SNAP                # 1 このページに文字はありません
+h SNAP                                         # 2 nothing to select
+RIGHT RIGHT DOWN t "abc" RET WAIT:0 SNAP       # 3 a note at the point
+RIGHT RIGHT RIGHT t "zz" RET WAIT:0 SNAP       # 4 a second note beside it
+d SNAP y WAIT:0 SNAP                           # 5 asks, 6 the second note deleted (with its popup)
+C-s SNAP e q SNAP                              # 7 saved, 8 back

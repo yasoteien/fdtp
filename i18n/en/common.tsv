@@ -1,0 +1,120 @@
+# 複数のファイルで共有する訳。各ファイルの担当はここにある日本語を自分の tsv に重ねて書かない
+  （直せない段落）	  (read-only paragraph)
+%s がありません	%s not found
+%s を起動できません	Cannot start %s
+%s（%s）	%s (%s)
+.bak を書けません	Cannot write .bak
+JIS（ISO-2022-JP）	JIS (ISO-2022-JP)
+PDF のメニュー	PDF menu
+Shift+矢印	Shift+Arrow
+[図]	[Figure]
+[画像]	[Image]
+[表]	[Table]
+lhasa がありません	lhasa not found
+↓ 履歴	Down: history
+このヘルプ	This help
+この環境では使えません	Not available on this system
+その他	Other
+ほか	Other
+やめる	Cancel
+やり直しました	Redone
+やり直す物はありません	Nothing to redo
+やり直せません	Cannot redo
+アーカイブではありません	Not an archive
+キャンセル	Cancel
+コピー	Copy
+サイズ	Size
+シェル	Shell
+システム情報	System info
+シートがありません	No sheets
+テキスト	Text
+ディレクトリです	Is a directory
+ディレクトリを読めません	Cannot read directory
+ディレクトリ検索	Find directory
+ファイル	File
+ファイルが外で書き換えられたため保存しません	File changed externally; not saved
+ファイルの情報	File info
+ファイルを読めません	Cannot read file
+ファイルを選んでください	Select a file
+ファイルを開けません	Cannot open file
+ファイルシステムの情報	Filesystem info
+フィールドを含むため、この段落は直せません	Cannot edit paragraph containing fields
+マーク	Mark
+メモリが足りないため、取り消しの記録を消しました	Out of memory; undo history cleared
+メモリが足りません	Out of memory
+リンクを含むため、この段落は直せません	Cannot edit paragraph containing links
+一時ファイルを作れません	Cannot create temporary file
+不明	Unknown
+並べ替え	Sort
+作業用のディレクトリを作れません	Cannot create working directory
+保存	Save
+保存しました	Saved
+保存しましたが、読み直せません（%s）	Saved, but cannot reload (%s)
+保存しました（元のファイルは .bak に残しました）	Saved (original kept in .bak)
+保存せずに戻りますか？	Return without saving?
+保存できません: %s	Cannot save: %s
+値が正しくありません	Invalid value
+元のファイルを読めません	Cannot read original file
+先頭へ	Top
+全体	Fit
+分割	Split
+切	Off
+削除	Delete
+前	Prev
+前のページ	Previous page
+危険な名前があるので取り出しません: %.60s	Unsafe name; not extracted: %.60s
+取り消しました	Undone
+取り消す物はありません	Nothing to undo
+取り消せません	Cannot undo
+取消	Cancel
+名前	Name
+名前が正しくありません	Invalid name
+名前が空です	Empty name
+名前が長すぎます	Name too long
+圧縮	Compress
+変更あり	Modified
+変更はありません	No changes
+外部コマンドを準備できません	Cannot prepare external command
+外部コマンドを起動できません	Cannot start external command
+大きすぎて開けません	Too large to open
+実行	Exec
+対象がありません	No target
+属性	Attr
+形式が違います	Wrong format
+戻る	Back
+拡張子	Extension
+操作を中止しました	Operation canceled
+文字コード	Encoding
+書き込めません	Cannot write
+検索	Find
+検索文字を入力してください	Enter search text
+検索表示	Find results
+次	Next
+次のページ	Next page
+段落	Paragraph
+決定	OK
+画像を開けません	Cannot open image
+画面を開けません	Cannot open screen
+番号	Number
+知らない要素を含むため、この段落は直せません	Cannot edit paragraph containing unknown elements
+移動	Move
+移動先	Destination
+種類	Type
+終了	Quit
+結合	Join
+置き換えられません（%s）	Cannot replace (%s)
+自動	Auto
+行先のディレクトリがありません	Destination directory not found
+表は消せません	Cannot delete table
+表示	View
+見つかりません	Not found
+見出し	Heading
+読めません	Cannot read
+連結するファイルと連結の順番	Files to join and their order
+選択	Select
+開く	Open
+（	(
+（一致する履歴はありません）	(No matching history)
+（履歴はありません）	(No history)
+（自動）	(Auto)
+）	)

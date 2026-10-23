@@ -1,0 +1,13 @@
+# 1b: u (row 23), u F8 (tree; revision 1 §2 dropped U), u in the browser with marks and without.
+# The tree's RET puts the directory in the field; a second RET unpacks.
+C-s "t.tgz" ESC u SNAP # u_prompt
+C-u "@CASE@/dst1" RET SNAP # u_tgz
+C-s "z.zip" ESC u C-u "@CASE@/dst2" RET SNAP # u_zip
+C-s "t.tgz" ESC u F8 SNAP # tree_start
+LEFT LEFT DOWN DOWN DOWN DOWN SNAP # tree_dst3
+RET RET SNAP # tree_tgz
+C-s "t.tgz" ESC RET DOWN DOWN TAB u C-u "@CASE@/dst4" RET SNAP # u_marked
+ESC C-s "z.zip" ESC RET u F8 LEFT LEFT DOWN DOWN DOWN DOWN DOWN DOWN RET RET SNAP # tree_all_dst5
+ESC C-s "t.tgz" ESC u C-u "@CASE@/nowhere" RET SNAP # u_missing
+ESC C-s "note.txt" ESC u SNAP # u_not_archive
+ESC C-s "t.tgz" ESC u ESC SNAP # u_cancel

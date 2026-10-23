@@ -1,0 +1,13 @@
+# Revision 1 §1 8 10: i is the cursor's file, Shift+F2 the file system; h ? help.
+C-s "plain.dat" ESC i SNAP # info_plain
+DOWN SNAP # info_closed
+C-s "link" ESC i SNAP # info_link
+ESC C-s "alpha" ESC i SNAP # info_directory
+ESC C-s "binary.dat" ESC i SNAP # info_binary
+ESC C-s "song.mid" ESC i SNAP # info_mid
+ESC S-F2 SNAP # fs_prompt
+RET SNAP # fs_box
+ESC h SNAP # help_h
+END SNAP # help_end
+ESC ? SNAP # help_question
+ESC SNAP # help_closed

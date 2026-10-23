@@ -1,0 +1,3 @@
+# 1 MB. Open, end, type, pages, top, save.
+SNAP C-END "末尾" SNAP PGUP PGUP PGUP SNAP C-HOME "先頭" PGDN PGDN SNAP
+C-f "目印" RET SNAP C-s SNAP ESC

@@ -1,0 +1,4 @@
+# Item 40: annot.pdf opened again after pdf_annot.keys saved it.
+WAIT:0 SNAP                                    # 1 the annotations drawn from the file
+e WAIT:0 TAB SNAP TAB SNAP TAB SNAP            # 2 3 4 Tab: highlight, underline, note 日本めも
+e q SNAP                                       # 5 back

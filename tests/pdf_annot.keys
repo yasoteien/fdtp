@@ -1,0 +1,24 @@
+# Revision 1 item 40: the writing mode on a copy of sample.pdf (annot.pdf).
+# pdf_harness: ticks (renders, the mode's text) only at WAIT. Page 1's
+# characters: "Hello FDTP search target" 1-24, 日本語の明朝体 25-31,
+# ゴシック体の文字 32-39.
+WAIT:0 SNAP                                    # 1 page 1, the band shows e 書込
+e WAIT:0 SNAP                                  # 2 writing: 字 1/39 and its band
+RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT SNAP       # 3 on F: 字 7/39, the cursor's frame
+S-RIGHT S-RIGHT S-RIGHT SNAP                   # 4 FDTP selected (4 字), tinted
+h WAIT:0 SNAP                                  # 5 highlight: 変更あり, row 23 ハイライト
+C-s SNAP                                       # 6 保存しました (appended, opened again)
+RIGHT RIGHT S-RIGHT S-RIGHT S-RIGHT S-RIGHT S-RIGHT s WAIT:0 SNAP   # 7 "search" struck out (keys straight after the save)
+RIGHT RIGHT S-DOWN SNAP                        # 8 "target" and 日本語の明朝 (12 字, two lines)
+u WAIT:0 SNAP                                  # 9 underline: two quads
+DOWN t M-SPC "nihon" SPC SNAP                  # 10 the note's line, the candidates over the page
+RET M-SPC "memo" RET WAIT:0 SNAP               # 11 a note 日本memo on の (37); row 23 shows it
+RET SNAP ESC                                   # 12 RET: the note in a box
+UP UP d SNAP                                   # 13 on h of search: asks to delete the strike-out
+n SNAP                                         # 14 n keeps it
+d y WAIT:0 SNAP                                # 15 y deletes it: row 23 back to 字 17/39
+TAB SNAP TAB SNAP TAB SNAP                     # 16 17 18 Tab: highlight, underline, note
+t BS BS BS BS M-SPC "memo" SPC RET M-SPC RET WAIT:0 SNAP   # 19 the note rewritten: 日本めも
+? SNAP ESC                                     # 20 the keys in a help box
+C-s SNAP                                       # 21 saved again
+e SNAP q SNAP                                  # 22 out of the mode, 23 back (nothing to save)

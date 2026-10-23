@@ -1,0 +1,21 @@
+#!/bin/sh
+# The .deb's prerm: when FDTP is removed, says which Pomera settings of
+# fdtp-pomera-setup are left and how to undo them. It never undoes them
+# itself (the SD's PIO change is asked about and needs a reboot), and it
+# never stops the removal.
+set -e
+Q=/usr/share/fdtp/pomera/pomera_questions.sh
+if [ "$1" = remove ] && [ -f "$Q" ] && [ -x /usr/sbin/fdtp-pomera-setup ]; then
+	if left=$(/usr/sbin/fdtp-pomera-setup --status 2>/dev/null); then
+		. "$Q"
+		msg_init
+		say "FDTP の Pomera の設定が残っています。FDTP を消しても、そのままです:" \
+			"FDTP's Pomera settings are left; removing FDTP does not undo them:"
+		printf '%s\n' "$left" | sed 's/^/  /'
+		say "戻すには、.deb を入れ直してから sudo fdtp-pomera-setup --undo を流してください。" \
+			"To undo them, install the .deb again and run: sudo fdtp-pomera-setup --undo"
+		say "（PIO の元の 1 MiB は /var/lib/fdtp に残します。）" \
+			"(The original 1 MiB of the PIO change stays in /var/lib/fdtp.)"
+	fi
+fi
+exit 0

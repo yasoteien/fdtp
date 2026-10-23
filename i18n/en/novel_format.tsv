@@ -1,0 +1,27 @@
+の半角を全角に修正	Changed half-width characters to full-width
+の半角の空白を除きました	Removed half-width spaces
+の・・・を……に修正	Changed three middle dots to two ellipses
+の・・・を…に修正	Changed three middle dots to an ellipsis
+の！を！　に修正	Added a space after exclamation marks
+の？を？　に修正	Added a space after question marks
+は行末！だったので元に戻しました	Removed the space after a final exclamation mark
+は行末？だったので元に戻しました	Removed the space after a final question mark
+で空白が連続していたので一つに戻しました	Collapsed consecutive spaces
+は行末は感嘆符が三つ連続していたので元に戻しました	Removed spaces between three final exclamation marks
+は行末は感嘆符が二つ連続していたので元に戻しました	Removed spaces between two final exclamation marks
+は台詞の！？だったので元に戻しました	Closed up exclamation/question marks in dialogue
+は台詞の？！だったので元に戻しました	Closed up question/exclamation marks in dialogue
+は台詞の末尾！だったので元に戻しました	Removed space after final exclamation mark in dialogue
+はカッコの末尾！だったので元に戻しました	Removed space after final exclamation mark in parentheses
+は台詞の末尾？だったので元に戻しました	Removed space after final question mark in dialogue
+はカッコの末尾？だったので元に戻しました	Removed space after final question mark in parentheses
+の三点リーダを偶数個にそろえました	Normalized ellipses to an even count
+のダッシュを――にそろえました	Normalized dashes to an even count
+の括弧の中の最後の。を取りました	Removed the final period inside quotes
+の段落の頭を字下げしました	Indented the paragraph
+から空行が%zu行続いていたので一つにしました	Collapsed %zu consecutive blank lines
+の空行を除きました	Removed the blank line
+の区切りの前に空行を入れました	Added a blank line before the scene break
+の区切りの後に空行を入れました	Added a blank line after the scene break
+の後に空行を入れました	Added a blank line after this line
+%zu行目%s\n	Line %zu: %s\n

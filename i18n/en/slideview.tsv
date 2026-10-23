@@ -1,0 +1,11 @@
+このスライドの文字を読めません	Cannot read slide text
+このスライドに直せる文字はありません	No editable text on this slide
+記録がスライドと合いません	Undo history does not match slide
+%s（スライド %d の %d 段落目）	%s (slide %d, paragraph %d)
+スライド番号が違います	Invalid slide number
+スライド番号	Slide number
+段落 %d/%d%s	Paragraph %d/%d%s
+スライド %d/%d	Slide %d/%d
+直す	Edit
+やり直し	Redo
+pptx を開けません	Cannot open pptx

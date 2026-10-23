@@ -1,0 +1,11 @@
+# Item 40 on a large file (made on the Pomera by check_pdf.py: 1503 pages,
+# 9 MB, a 4000 x 4000 image, a noise image, dense text, a vertical page).
+WAIT:0 SNAP                                    # 1 page 1: the 4000 x 4000 image
+PGDN WAIT:0 SNAP                               # 2 page 2: the noise
+PGDN WAIT:0 e WAIT:0 SNAP                      # 3 page 3: 60 dense lines in the mode
+S-DOWN S-DOWN S-DOWN S-DOWN S-DOWN S-DOWN S-DOWN S-DOWN S-DOWN S-DOWN h WAIT:0 SNAP   # 4 11 lines highlighted
+C-s SNAP                                       # 5 saved
+g "1503" RET WAIT:0 SNAP                       # 6 the vertical page: 字 1/15
+DOWN DOWN SNAP LEFT SNAP RIGHT SNAP            # 7 字 3, 8 字 11 (the next column), 9 字 3
+S-DOWN S-DOWN u WAIT:0 SNAP                    # 10 underline down the column
+C-s SNAP e q SNAP                              # 11 saved, 12 back

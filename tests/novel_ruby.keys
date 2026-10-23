@@ -1,0 +1,12 @@
+# Ruby notations (fixture ruby.txt). 1: all collapsed, caret before あ.
+SNAP
+# 2-3: caret on the bar / inside the base: that span is shown as written.
+RIGHT SNAP
+RIGHT RIGHT SNAP
+# 4: caret at the end of the line: collapsed again. 5: last line.
+END SNAP
+C-END SNAP
+# 6: caret inside 《《傍点》》 and 7: inside 東京（とうきょう） (line 0).
+C-HOME END LEFT LEFT LEFT SNAP
+C-HOME RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT SNAP
+ESC

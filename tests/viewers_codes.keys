@@ -1,0 +1,25 @@
+C-s "c1-" ESC v
+SNAP # sjis
+q C-s "c2-" ESC v
+SNAP # jis
+/ "needle" RET
+SNAP # jis_search
+PGDN
+SNAP # jis_page
+q C-s "c3-" ESC v
+SNAP # euc
+q C-s "c4-" ESC v
+SNAP # utf8
+q C-s "c5-" ESC v
+SNAP # utf16le
+q C-s "c6-" ESC v
+SNAP # utf16be
+q C-s "c7-" ESC v
+SNAP # nobom_auto
+c RIGHT RIGHT RIGHT RIGHT RIGHT RET
+SNAP # nobom_le
+q C-s "c2-" ESC b
+SNAP # hex_jis
+q C-s "c5-" ESC b
+SNAP # hex_utf16
+q

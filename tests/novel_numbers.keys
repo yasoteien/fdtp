@@ -1,0 +1,8 @@
+# Fixture numbers.txt (120 lines; line 2 is 50 characters, line 14 is 100).
+# 1: rule only. 2: C-l numbers on. 3: PGDN, the top in the middle of line 14.
+SNAP C-l SNAP PGDN SNAP
+# 4: vertical with numbers. 5: numbers off. 6: on again, PGDN. 7: C-END.
+C-HOME C-t SNAP C-l SNAP C-l PGDN SNAP C-END SNAP
+# 8: horizontal again (numbers stay on), C-END. Close: the state is kept.
+C-t SNAP
+ESC

@@ -1,0 +1,8 @@
+tar がありません	tar not found
+tar を起動できません	Cannot start tar
+アーカイブを読めません: %.120s	Cannot read archive: %.120s
+アーカイブを開けません	Cannot open archive
+アーカイブを読めません（zip が壊れています）	Cannot read archive (corrupt zip)
+この LHa の形式（レベル %d）は読めません	Cannot read LHa format (level %d)
+アーカイブを読めません（LHa が壊れています）	Cannot read archive (corrupt LHa)
+アーカイブを開けません: %.100s	Cannot open archive: %.100s

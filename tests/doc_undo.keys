@@ -1,0 +1,21 @@
+# Revision 1 item 38: Ctrl+z / Ctrl+y in the docx view (tests/check_doc.py check_undo).
+# Paragraphs: 1 一つ目, 2 太字 + 普通 (two runs), 3 三つ目, 4 四つ目.
+SNAP                                        # 1 initial
+C-z SNAP                                    # 2 nothing to undo
+DOWN RET C-u "二を直した" RET SNAP          # 3 paragraph 2 edited (its runs made one)
+C-z SNAP                                    # 4 undone: the two runs again, not changed
+C-y SNAP                                    # 5 redone
+C-y SNAP                                    # 6 nothing to redo
+DOWN o "足した" RET SNAP                    # 7 a paragraph added after 3
+HOME C-k y SNAP                             # 8 paragraph 1 deleted
+C-z SNAP                                    # 9 the deletion undone: on paragraph 1
+C-z SNAP                                    # 10 the addition undone: on paragraph 3
+C-s SNAP                                    # 11 saved (paragraph 2 edited), .bak made
+C-z SNAP                                    # 12 undone after the save: differs from the file
+C-s SNAP                                    # 13 saved: the original bytes again
+C-y SNAP                                    # 14 redone: differs
+C-z SNAP                                    # 15 back to what the file holds: not changed
+HOME DOWN DOWN RET C-u "三を直した" RET SNAP # 16 a new edit drops the redo side
+C-y SNAP                                    # 17 nothing to redo
+C-z SNAP                                    # 18 back to what the file holds
+ESC SNAP                                    # 19 not changed: closes without asking

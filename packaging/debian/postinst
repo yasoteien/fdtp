@@ -1,0 +1,17 @@
+#!/bin/sh
+# The .deb's postinst: on a Pomera DM250, the first install tells about
+# fdtp-pomera-setup. It never runs it (the settings ask questions and one
+# rewrites the SD). Icons and the menu entry are refreshed by the dpkg
+# triggers of hicolor-icon-theme and desktop-file-utils.
+set -e
+Q=/usr/share/fdtp/pomera/pomera_questions.sh
+if [ "$1" = configure ] && [ -z "${2:-}" ] && [ -f "$Q" ]; then
+	. "$Q"
+	if is_dm250 /proc/device-tree; then
+		msg_init
+		say "Pomera DM250 の設定（Wi-Fi の安定化、内蔵メモリの読み取り専用マウント）は、使うなら次で行います:" \
+			"The Pomera DM250 settings (Wi-Fi stabilization, a read-only mount of the internal memory), if you want them:"
+		echo "  sudo fdtp-pomera-setup"
+	fi
+fi
+exit 0

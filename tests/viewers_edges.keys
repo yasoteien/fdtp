@@ -1,0 +1,20 @@
+C-s "f09.txt" ESC v
+PGDN PGDN PGDN PGDN PGDN PGDN PGDN PGDN PGDN PGDN PGDN PGDN PGDN
+SNAP # checkpoint_forward
+PGUP
+SNAP # checkpoint_backward
+"#"
+SNAP # numbers_keep_place
+"#" >
+SNAP # indexed_bottom
+<
+SNAP # indexed_top
+/ "line 0550" RET
+SNAP # indexed_search
+q C-s "f10.txt" ESC v
+SNAP # sample_boundary
+q C-s "f11.txt" ESC v
+SNAP # wide_numbered
+"#"
+SNAP # wide_boundary
+q

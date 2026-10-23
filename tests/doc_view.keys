@@ -1,0 +1,8 @@
+# Stage 5: the saved docx opened again, scrolled, edited again, left unsaved.
+SNAP                                        # 1 top
+PGDN SNAP                                   # 2 next page
+PGUP SNAP                                   # 3 back
+HOME DOWN RET C-u "二度目" RET SNAP         # 4 edited again
+ESC SNAP                                    # 5 asks before leaving unsaved
+n C-s SNAP                                  # 6 saved again
+q SNAP                                      # 7 closes with q

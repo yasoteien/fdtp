@@ -1,0 +1,106 @@
+この環境では PDF の操作はできません	PDF tools unavailable on this system
+複数の PDF を 1 つにつなぐ	Join multiple PDFs into one
+結合しました	Joined
+ページの範囲ごと・N ページごとに分ける	Split by ranges or every N pages
+分割しました	Split complete
+ページの抽出	Extract pages
+選んだページだけを書き出す	Write selected pages
+ページを抽出しました	Pages extracted
+ページの削除	Delete pages
+選んだページを除いて書き出す	Write without selected pages
+ページを削除しました	Pages deleted
+ページの順番を変える（例 3,1,2,4-）	Reorder pages (e.g. 3,1,2,4-)
+並べ替えました	Reordered
+回転	Rotate
+選んだページを 90 度ずつ回す	Rotate selected pages in 90 deg steps
+回転しました	Rotated
+保護	Protect
+パスワードを付ける（AES-256）	Set password (AES-256)
+パスワードを付けました	Password set
+ロック解除	Unlock
+パスワードを外す	Remove password
+パスワードを外しました	Password removed
+中の画像の解像度を落として小さくする	Shrink by lowering image resolution
+圧縮しました	Compressed
+ページごとの JPEG にする	Create a JPEG for each page
+JPEG にしました	Converted to JPEG
+画像→PDF	Image to PDF
+JPEG・PNG を 1 枚 1 ページの PDF にする	JPEG/PNG to PDF, one image per page
+PDF にしました	Converted to PDF
+修復	Repair
+開いて保存し直す	Open and save again
+修復しました	Repaired
+%lld バイト	Bytes: %lld
+ページの範囲が空です	Empty page range
+ページの範囲が違います（1〜%d）	Invalid page range (1-%d)
+ページの指定が多すぎます	Too many pages specified
+ページの範囲が正しくありません（例 1-3,5,8-）	Invalid page range (e.g. 1-3,5,8-)
+%.200s のパスワード	Password for %.200s
+付けるパスワード	New password
+確かめのため、もう一度	Reenter to confirm
+結合する PDF と順番	PDFs to join and their order
+PDF にする画像と順番	Images for PDF and their order
+(R) ページの範囲で	(R) Page ranges
+(N) N ページごと	(N) Every N pages
+(R) 右に 90 度	(R) 90 deg clockwise
+(U) 180 度	(U) 180 deg
+(L) 左に 90 度	(L) 90 deg counterclockwise
+(S) 強く（72 dpi）	(S) Strong (72 dpi)
+(M) ふつう（150 dpi）	(M) Medium (150 dpi)
+(W) 弱く（220 dpi）	(W) Light (220 dpi)
+(N) 新しい名前で書き出す	(N) Write to new name
+(R) 元のファイルを置き換える	(R) Replace original file
+分けるページの範囲	Page ranges to split
+抽出するページ	Pages to extract
+削除するページ	Pages to delete
+新しいページの順番	New page order
+回転するページ	Pages to rotate
+JPEG にするページ	Pages for JPEG
+%s（全 %d ページ。例 %s）	%s (%d total; e.g. %s)
+同じページが 2 回以上あります	Duplicate pages
+全部のページは削除できません	Cannot delete all pages
+ページの順番が変わりません	Page order unchanged
+ページの数が違います（1〜%d）	Invalid page count (1-%d)
+名前に / は使えません（元と同じディレクトリに書き出します）	Name cannot contain / (output stays in source directory)
+同じ名前のファイルが 2 つできます: %.200s	Duplicate output name: %.200s
+PDF を開けません: %.200s	Cannot open PDF: %.200s
+パスワードが違います	Wrong password
+この PDF にはパスワードが付いていません	This PDF has no password
+1 ページの PDF は分けられません	Cannot split a one-page PDF
+分割のしかた	Split method
+何ページごとに分けますか（全 %d ページ）	Pages per part (%d total)
+回す向き	Rotation
+解像度（dpi、72〜300）	Resolution (dpi, 72-300)
+どのくらい縮めますか（画像の解像度）	Compression (image resolution)
+書き出し先（元: %.200s）	Output (source: %.200s)
+書き出す名前	Output name
+%.200s はディレクトリです	%.200s is a directory
+元のファイル %.200s を置き換えますか？	Replace original file %.200s?
+%.200s は既にあります。上書きしますか？	%.200s exists. Overwrite?
+%zu 個のファイルが既にあります（%.120s など）。上書きしますか？	Existing files: %zu (including %.120s). Overwrite?
+解像度が違います（72〜300）	Invalid resolution (72-300)
+%zu 個	Count: %zu
+%.300s  %dx%d・%s	%.300s  %dx%d; %s
+%.300s  %d ページ・%s	%.300s  Pages: %d; %s
+合計	Total
+%zu 枚・%s	Images: %zu; %s
+%zu 個・%d ページ・%s	Files: %zu; pages: %d; %s
+元の大きさ	Original size
+%s（%.0f%% になりました）	%s (now %.0f%%)
+結合する PDF を 2 つ以上マークしてください	Mark at least two PDFs to join
+PDF 以外のファイルが混ざっています	Selection includes non-PDF files
+JPEG か PNG の画像を選んでください	Select JPEG or PNG images
+JPEG・PNG 以外のファイルが混ざっています	Selection includes files other than JPEG/PNG
+PDF を 1 つだけ選んでください（マークを外すとカーソルの PDF）	Select one PDF (unmark to use cursor)
+PDF を選んでください	Select a PDF
+パスワードが空です	Empty password
+パスワードが一致しません。もう一度入れてください	Passwords do not match. Try again
+対象 %.200s	Target: %.200s
+対象 画像 %zu 枚	Target images: %zu
+対象 PDF %zu 個	Target PDFs: %zu
+対象 %zu 個（PDF %d・画像 %d）	Targets: %zu (PDFs: %d; images: %d)
+  今のページ %d	  Current page: %d
+↑↓ 選ぶ  RET 決める  Esc 戻る	Up/Down Select  RET OK  Esc Back
+* で隠しています	Masked with *
+%s中	%s in progress
+Esc で中止	Esc Cancel

@@ -1,0 +1,14 @@
+# Fixture search.txt. 1-4: forward search, wrapping at the end.
+C-f "猫" RET SNAP
+C-f RET SNAP
+C-f RET SNAP
+C-f RET SNAP
+# 5: replace: asked at the first match. 6: y, n, a.
+C-h "猫" RET "ねこ" RET SNAP
+"y" "n" "a" SNAP
+# 7: go to line 2. 8: an invalid line number.
+C-g "2" RET SNAP
+C-g "x" RET SNAP
+# 9: not found.
+C-f "象" RET SNAP
+C-s ESC

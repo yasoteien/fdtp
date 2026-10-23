@@ -1,0 +1,74 @@
+やり直す操作はありません	Nothing to redo
+取り消す操作はありません	Nothing to undo
+ルビは1行の中で付けてください	Keep ruby within one line
+置換する文字	Find text
+置換後の文字	Replace with
+行へ移動	Go to line
+置換しますか？ (Y:置換 N:次へ A:全部 Esc:やめる)	Replace? (Y:Yes N:Next A:All Esc:Cancel)
+保存しますか？ (Y/N/Esc)	Save? (Y/N/Esc)
+この文字コードで表せない字があります。UTF-8 で保存しますか？ (Y/N)	Some characters need UTF-8. Save as UTF-8? (Y/N)
+前回の続きがあります。開きますか？ (Y/N)	Restore previous session? (Y/N)
+元のバイト列には戻りません。保存しますか	Original bytes cannot be restored. Save?
+そのディレクトリはありません	Directory not found
+保存しました（%s）	Saved (%s)
+名前を付けて保存	Save as
+%s に保存しました（%s）	Saved to %s (%s)
+ファイルの名前がありません	No file name
+ディレクトリには保存できません	Cannot save to a directory
+%s は既にあります。上書きしますか？	%s exists. Overwrite?
+（同じ名前の物があれば上書きの確認）	(Confirm before overwriting)
+終了（変更があれば保存の確認）	Quit (confirm saving changes)
+検索・移動	Find / Go to
+置換	Replace
+末尾へ	End
+編集	Edit
+選ぶ	Select
+全部を選ぶ	Select all
+写す・切り取る・貼り付ける	Copy / Cut / Paste
+取り消す・やり直す	Undo / Redo
+ルビ（｜《》）を入れる	Insert ruby
+半角/全角	IME key
+日本語入力の入・切（Alt+Space も）	Toggle IME (also Alt+Space)
+縦書き・横書き	Vertical / Horizontal
+行番号	Line numbers
+変換（F2。どれも y/n で確かめてから）	Convert (F2; confirm with y/n)
+出版社の書式に整形	Apply publisher format
+原稿形式へ・Web 形式へ	Manuscript / Web format
+Word 縦書きで書き出す	Export vertical Word
+小説エディタのキー	Novel editor keys
+原稿形式へ（空行を除く）	Manuscript (remove blank lines)
+Web 形式へ（空行を入れる）	Web (add blank lines)
+変換	Convert
+%s は既にあります。上書きして書き出しますか。\nこの処理は取り消し（Undo）が効きません	%s exists. Overwrite and export?\nThis cannot be undone.
+Word 縦書きで %s に書き出しますか。\nこの処理は取り消し（Undo）が効きません	Export vertical Word to %s?\nThis cannot be undone.
+%sしますか	%s?
+原稿形式に（空行を除く）	Convert to manuscript (remove blank lines)
+Web 形式に（空行を入れる）	Convert to Web (add blank lines)
+%zu行目	Line %zu
+%zu 件	Count: %zu
+記録	Log
+書けません: 	Cannot write: 
+%s（%zu 件）	%s (count: %zu)
+書き出せません: %s	Cannot export: %s
+%s に書き出しました（ルビ: %s）	Exported to %s (ruby: %s)
+%s に既定の雛形で書き出しました（ルビ: %s）	Exported to %s with the default template (ruby: %s)
+Word のルビ	Word ruby
+記法のまま	Plain markup
+メモリが足りません（変えていません）	Out of memory (unchanged)
+メモリが足りません（直した所の一覧は不完全です）	Out of memory (change list incomplete)
+直す所はありませんでした	No changes needed
+先頭に戻って見つけました	Found after wrapping to top
+%d 個置換しました	Replacements: %d
+行の番号を入力してください	Enter line number
+前回の続きを読めません	Cannot restore previous session
+%s  行 %zu  字 %zu	%s  Line %zu  Char %zu
+縦書き	Vertical
+横書き	Horizontal
+別名	As
+縦横	V/H
+ルビ	Ruby
+ファイル名がありません	No file name
+大きすぎて開けません（16 MB まで）	Too large to open (16 MB limit)
+開けません: %s	Cannot open: %s
+新しいファイルです	New file
+読めない字を〓（U+FFFD）にしました。保存すると元に戻りません	Unreadable characters replaced (U+FFFD). Saving is irreversible.

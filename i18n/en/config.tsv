@@ -1,0 +1,42 @@
+表示の言語: auto（環境）/ ja（日本語）/ en（英語）。RET で切替	Language: auto (locale) / ja (Japanese) / en (English); RET cycles
+C-e・Alt+e で使うエディタ（空なら $VISUAL・$EDITOR・vi）	C-e/Alt+e editor (empty: $VISUAL, $EDITOR, vi)
+使いません（FDclone との互換のため読むだけ）	Unused (read for FDclone compatibility)
+Shift+F6 と x で使うシェル（空なら $SHELL）	Shell for Shift+F6 and x (empty: $SHELL)
+0〜5 = 並べない・名前・拡張子・サイズ・日付・長さ、+100 で降順	0-5: none/name/ext/size/date/length; +100: descending
+列数（1 2 3 5）	Columns (1 2 3 5)
+1 = ドットファイルを隠す、0 = 見せる	1 = hide dotfiles, 0 = show
+1 = シンボリックリンクの指し先を表示	1 = show symlink targets
+1 = 名前の後に種類の記号（/ * @ = |）	1 = append type symbols (/ * @ = |)
+1 = 小説エディタの Word 書き出しでルビを Word のルビに	1 = export novel ruby as Word ruby
+画面の桁と行: auto（画面に合わせる。1024x600 では 85x25）か 桁x行（80x25〜320x90）	Screen: auto (1024x600: 85x25) or cols x rows (80x25-320x90)
+最後のキーからこの分（0〜1440）は画面を休ませず速く応える。0 = 休ませる（既定 15）	Stay awake after input: 0-1440 minutes; 0 = sleep (default: 15)
+Alt+n の分割の大きさの既定: 数字に K か M（1K〜1023M。既定 10M）	Alt+n split size: number with K/M (1K-1023M; default: 10M)
+docx・xlsx の Ctrl+z・Ctrl+y で戻せる段数（1〜1000。既定 100）	docx/xlsx Ctrl+z/Ctrl+y undo levels (1-1000; default: 100)
+%d 行を読み飛ばしました	Skipped %d lines
+%sキーの割り当て %d 件が入りません	%sCannot add %d key bindings
+。	.
+%sランチャ %d 件を登録できません	%sCannot register %d launchers
+設定ファイルを読めません	Cannot read settings file
+~/.fdtprc を読めません	Cannot read ~/.fdtprc
+キーの割り当てが正しくありません	Invalid key binding
+キーの割り当てが入りません	Cannot add key binding
+キーの対応が正しくありません	Invalid key mapping
+ランチャを登録できません	Cannot register launcher
+書き込み先がありません	No save path
+%s.bak を作れません	Cannot create %s.bak
+%s に書き込めません	Cannot write to %s
+%s に書き込みました	Saved to %s
+~/.fdtprc を作れません	Cannot create ~/.fdtprc
+半角の英数字・記号を全角に	Full-width ASCII letters, digits and symbols
+・・・を三点リーダに	Convert three middle dots to ellipsis
+！？の後に全角の空白	Space after exclamation/question marks
+行末・！！ ！？・」』）の前は空白なし	Skip space at EOL, repeats and closers
+全角の空白の 2 つ続きを 1 つに	Merge two full-width spaces
+・・・を……に（0 = … 1 つ）	Double ellipsis (0 = single)
+半角の空白を抜く	Remove ASCII spaces
+段落の頭を字下げ（「『（ の行は除く）	Indent except opening quotes/brackets
+。」 。』 の 。 を取る	Remove periods before closing quotes
+ダッシュを――に（かなの後のーは長音）	Double dashes; keep kana long vowels
+三点リーダを偶数個に	Use an even number of ellipses
+記号だけの行は区切り（前後に空行）	Blank lines around symbol-only scene breaks
+Web 形式の空行を除く（原稿形式に）	Remove Web-format blank lines (manuscript form)

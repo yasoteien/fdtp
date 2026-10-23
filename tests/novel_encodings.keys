@@ -1,0 +1,2 @@
+# EUC-JP / UTF-8 with BOM: append at the end and save in the same form.
+SNAP C-END "あ" C-s SNAP ESC

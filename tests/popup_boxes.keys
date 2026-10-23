@@ -1,0 +1,9 @@
+# Revision 1 §7: confirm, choice, input and error boxes over the filer, and
+# the screen after the last box closes. Fixture: alpha/ beta/ a.txt b.txt.
+SNAP # initial
+q SNAP # confirm
+n s SNAP # choice
+ESC DOWN DOWN DOWN c SNAP # input
+ESC l "nowhere" RET SNAP # error
+ESC SNAP # closed
+UP UP UP SNAP # back_at_top

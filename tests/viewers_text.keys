@@ -1,0 +1,38 @@
+C-s "f00.txt" ESC v
+SNAP # initial
+DOWN
+SNAP # down
+UP PGDN
+SNAP # page_down
+PGUP SPC
+SNAP # space_page
+< / "needle" RET
+SNAP # first_match
+n
+SNAP # next_match
+N
+SNAP # previous_match
+/ "absent-value" RET
+SNAP # no_match
+/ "cancel" ESC
+SNAP # search_cancel
+>
+SNAP # bottom
+<
+SNAP # top
+"#"
+SNAP # numbers_off
+"#"
+SNAP # numbers_on
+c
+SNAP # code_window
+RIGHT RET
+SNAP # code_sjis
+c RIGHT RIGHT RET
+SNAP # code_euc
+c ESC
+SNAP # code_cancel
+c LEFT LEFT LEFT RET
+SNAP # code_auto
+q
+SNAP # returned

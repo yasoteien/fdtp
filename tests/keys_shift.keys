@@ -1,0 +1,17 @@
+# Revision 1 §2: the Shift band while Shift is held, and Shift+F1..F10.
+SNAP # plain_band
+HOLD-SHIFT SNAP # shift_band
+RELEASE-SHIFT SNAP # band_back
+C-s "plain.dat" ESC S-F1 SNAP # s_f1_attr
+ESC S-F2 SNAP # s_f2_info
+ESC S-F3 SNAP # s_f3_move
+ESC C-s "beta" ESC S-F4 SNAP # s_f4_rmdir
+n S-F5 SNAP # s_f5_mkdir
+ESC S-F6 SNAP # s_f6_shell
+ESC S-F7 SNAP # s_f7_write
+ESC                                  # closes the error box
+C-s "plain.dat" ESC S-F8 SNAP # s_f8_backup
+ESC S-F9 SNAP # s_f9_view
+q S-F10 SNAP # s_f10_pack
+ESC F1 SNAP # f1_still_path
+ESC

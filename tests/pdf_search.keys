@@ -1,0 +1,8 @@
+# Search: / then n through both pages, wrapping, then a miss
+WAIT:0 / "target" RET SNAP WAIT:0 SNAP   # 1 描画中, 2 hit on page 1
+n WAIT:0 SNAP                            # 3 hit on page 2
+n WAIT:0 SNAP                            # 4 wrapped to page 1 with a notice
+w / BS BS BS BS BS BS "FDTP" RET WAIT:0 SNAP  # 5 hit at fit width (the field starts with the last word)
++ + + + + + n WAIT:0 SNAP                # 6 zoomed in, n (same word, wraps) reveals it
+/ "zzzz" RET WAIT:0 SNAP                 # 7 not found
+q

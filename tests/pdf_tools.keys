@@ -1,0 +1,7 @@
+# Item 39: Alt+p in the viewer calls the PDF menu with the file and the page.
+WAIT:0 PGDN WAIT:0 M-p SNAP ESC                # 1 page 2: PDFTOOLS page=1, the stub's notice
+e WAIT:0 RIGHT S-RIGHT h WAIT:0 M-p SNAP       # 2 with changes it asks first
+ESC SNAP                                       # 3 Esc: no menu
+M-p n SNAP ESC                                 # 4 (N): the menu, the changes kept (変更あり)
+M-p s SNAP ESC                                 # 5 (S): saved, then the menu
+e q SNAP                                       # 6 back

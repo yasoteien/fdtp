@@ -1,0 +1,14 @@
+# Revision 1 §1 11: Shift+letter, the next name with that initial (either case).
+SNAP # top
+B SNAP # b1
+B SNAP # b2
+B SNAP # b3
+B SNAP # b4
+B SNAP # b5
+B SNAP # b_wrapped
+A SNAP # a1
+A SNAP # a2
+Z SNAP # z_none
+C-s "plain.dat" ESC S SNAP # s_from_plain
+S SNAP # s_wrapped
+D L T E W SNAP # old_keys_jump

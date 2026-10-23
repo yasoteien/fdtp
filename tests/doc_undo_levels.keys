@@ -1,0 +1,9 @@
+# Revision 1 item 38: UNDO_LEVELS=2 (tests/check_doc.py check_undo): three edits,
+# only the last two can be undone and redone.
+SNAP                                                             # 1 initial
+RET C-u "A" RET DOWN RET C-u "B" RET DOWN RET C-u "C" RET SNAP   # 2 three edits
+C-z C-z SNAP                                                     # 3 two undone
+C-z SNAP                                                         # 4 the oldest is gone
+C-y C-y C-y SNAP                                                 # 5 two redone, then nothing
+ESC SNAP                                                         # 6 changed: asks
+y SNAP                                                           # 7 leaves

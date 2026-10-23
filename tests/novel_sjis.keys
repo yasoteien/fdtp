@@ -1,0 +1,8 @@
+# Shift_JIS with CRLF. 1: opened; 2: appended and saved in Shift_JIS.
+SNAP
+C-END "追加" C-s SNAP
+# 3: a character Shift_JIS lacks: asked, 4: refused (file unchanged).
+"🍣" C-s SNAP "n" SNAP
+# 5: accepted: saved as UTF-8.
+C-s "y" SNAP
+ESC

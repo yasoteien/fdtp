@@ -1,0 +1,8 @@
+# 1b: LHa through lhasa in ~/.fdtp/bin (only when lhasa exists on this machine).
+# Root of l.lzh: .. sub a.txt 日本語.txt
+C-s "l.lzh" ESC RET SNAP # lzh_root
+DOWN DOWN RET SNAP # lzh_open
+q UP RET SNAP # lzh_sub
+ESC C-s "l.lzh" ESC u C-u "@CASE@/dst" RET SNAP # lzh_u
+C-s "l2.lzh" ESC u C-u "@CASE@/dst2" RET SNAP # lzh2_u
+C-s "garbage.lzh" ESC RET SNAP # lzh_broken
