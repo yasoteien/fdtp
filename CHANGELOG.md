@@ -4,6 +4,12 @@ All notable changes to FDTP are recorded in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions have two decimal places (0.01, 0.02, ... 1.00); they do not follow Semantic Versioning.
 
+## [1.01] - 2026-10-25
+
+### Fixed
+
+- Running rmp-jukebox with `x` (execute) no longer ends at once: it is started without a terminal around it, as when a song is opened.
+
 ## [1.00] - 2026-10-24
 
 The first public release.

@@ -351,6 +351,14 @@ class Acceptance:
                 snapshots[1]['external']['flags'] == 3, 'x runs through sh -c and pauses')
         require(snapshots[2]['external']['argv'] == ['/bin/sh', '-c', "cat 'plain text'"], 'x puts command before a plain file')
         require(snapshots[3]['external']['flags'] == 2, 'interactive h does not pause')
+        # 1.01: x on rmp-jukebox starts it without a terminal (flags 0), as opening a song does.
+        self.file(src / 'rmp-jukebox', '#!/bin/sh\n', 0o755)
+        snapshots = self.run(home, select('rmp-jukebox') + 'x RET SNAP # jukebox\n' +
+                             select('plain text') + 'x "rmp-jukebox" RET SNAP # jukebox song\n')
+        require(snapshots[0]['external']['argv'] == ['/bin/sh', '-c', './rmp-jukebox'] and
+                snapshots[0]['external']['flags'] == 0, 'x starts ./rmp-jukebox without a terminal')
+        require(snapshots[1]['external']['argv'] == ['/bin/sh', '-c', "rmp-jukebox 'plain text'"] and
+                snapshots[1]['external']['flags'] == 0, 'x starts rmp-jukebox with a song without a terminal')
 
     def smoke_templates(self):
         for template in sorted((ROOT / 'tests').glob('fileops_*.keys')):

@@ -238,6 +238,18 @@ static char *shell_quote(const char *name)
     char *q=malloc(n),*out=q; if(!q) return NULL;
     *out++='\''; for(const char *p=name;*p;++p) { if(*p=='\'') { memcpy(out,"'\\''",4); out+=4; } else *out++=*p; } *out++='\''; *out=0; return q;
 }
+/* 1.01: rmp-jukebox draws on the display itself, so x starts it without a
+ * terminal around it, as launcher_jukebox does (in fbterm the two fight over
+ * the screen). The command's first word, its directory and quotes aside. */
+static int runs_jukebox(const char *command)
+{
+    while(*command==' '||*command=='\t') ++command;
+    size_t n=strcspn(command," \t;&|<>");
+    if(n>=2 && command[0]=='\'' && command[n-1]=='\'') { ++command; n-=2; }
+    const char *base=command;
+    for(size_t i=0;i<n;++i) if(command[i]=='/') base=command+i+1;
+    return (size_t)(command+n-base)==11 && !memcmp(base,"rmp-jukebox",11);
+}
 static int key(Screen *s,App *a,const Key *k)
 {
     Ops *o=s->self;
@@ -285,6 +297,7 @@ static int key(Screen *s,App *a,const Key *k)
         int interactive_shell=o->op==SHELL && !*a->widgets.text;
         /* A command waits for a key afterwards; an interactive shell returns at exit. */
         unsigned flags=APP_EXTERNAL_TERMINAL|(interactive_shell?0u:APP_EXTERNAL_PAUSE);
+        if(o->op==EXECUTE && runs_jukebox(a->widgets.text)) flags=0;
         if(app_request_external_at(a,interactive_shell?interactive:argv,flags,o->directory)<0) error(a,o,T("外部コマンド"));
         return 1;
     }

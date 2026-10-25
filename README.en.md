@@ -70,7 +70,7 @@ The novel editor (ruby and emphasis dots) and the F2 conversion menu.
 The [Releases](https://github.com/yasoteien/fdtp/releases) page has `.deb` packages for the Pomera (armhf) and for PCs (amd64).
 
 ```sh
-sudo apt install ./fdtp_1.00-1_armhf.deb   # on a PC: ./fdtp_1.00-1_amd64.deb
+sudo apt install ./fdtp_1.01-1_armhf.deb   # on a PC: ./fdtp_1.01-1_amd64.deb
 sudo fdtp-pomera-setup      # optional: the Pomera settings described below
 ```
 

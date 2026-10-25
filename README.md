@@ -70,7 +70,7 @@ fdtp -v      # 版を出す
 [Releases](https://github.com/yasoteien/fdtp/releases) に、ポメラ向け（armhf）と PC 向け（amd64）の `.deb` があります。
 
 ```sh
-sudo apt install ./fdtp_1.00-1_armhf.deb   # PC は ./fdtp_1.00-1_amd64.deb
+sudo apt install ./fdtp_1.01-1_armhf.deb   # PC は ./fdtp_1.01-1_amd64.deb
 sudo fdtp-pomera-setup      # 任意。下に書いたポメラの設定
 ```
 
