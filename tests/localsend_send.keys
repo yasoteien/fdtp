@@ -1,0 +1,9 @@
+# Fixture order: .., a folder/, b special-name file, c.txt.
+DOWN DOWN TAB DOWN TAB
+M-l s REALWAIT:0.6 SNAP # peers
+DOWN UP DOWN SNAP # selected
+RET REALWAIT:0.6 SNAP # pin
+RET SNAP # invalid_pin
+"111111" RET REALWAIT:0.6 SNAP # wrong_pin
+C-u "FxDR7m" RET REALWAIT:0.6 SNAP # sent
+ESC REALWAIT:0.1 SNAP # closed

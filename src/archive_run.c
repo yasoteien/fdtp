@@ -116,6 +116,20 @@ fail:
     return -1;
 }
 
+/* lhasa, or an lha that names itself Lhasa: Homebrew installs lhasa as lha.
+ * Another lha (lha for UNIX, jlha) takes other options and is not used.
+ * Absolute path, or NULL. */
+static char *find_lhasa(void)
+{
+    char *p=find_command("lhasa"); if(p) return p;
+    if(!(p=find_command("lha"))) return NULL;
+    const char *argv[]={p,NULL}; RunResult r; int lhasa=0;
+    if(!run_command(argv,NULL,&r)) lhasa=(r.out && strstr(r.out,"Lhasa")) || (r.err && strstr(r.err,"Lhasa"));
+    run_free(&r);
+    if(!lhasa) { free(p); return NULL; }
+    return p;
+}
+
 /* `a | b > out_fd` in cwd (tar into a compressor, with its level). Both
  * standard errors are collected in r->err. r->status is a's status when it
  * failed, otherwise b's. Returns 0 when both ran, -1 when one could not start. */

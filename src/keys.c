@@ -204,13 +204,28 @@ ScriptEvent keys_script_next(KeyScript *s)
             if (token[0] == 'H') s->mods |= MOD_SHIFT; else s->mods &= ~MOD_SHIFT;
             return (ScriptEvent){.kind = SCRIPT_MODS, .mods = s->mods};
         }
-        if (!strncmp(token, "WAIT:", 5)) {
+        if (!strncmp(token, "WAIT:", 5) || !strncmp(token, "REALWAIT:", 9)) {
+            int real = token[0] == 'R';
+            const char *value_text = token + (real ? 9 : 5);
             char *end;
             errno = 0;
-            double value = strtod(token + 5, &end);
-            if (!token[5] || *end || errno || !isfinite(value) || value < 0)
+            double value = strtod(value_text, &end);
+            if (!*value_text || *end || errno || !isfinite(value) || value < 0 || (real && value > 10))
                 return failure(s, "Invalid WAIT duration");
-            return (ScriptEvent){.kind = SCRIPT_WAIT, .seconds = value};
+            return (ScriptEvent){.kind = real ? SCRIPT_REALWAIT : SCRIPT_WAIT, .seconds = value};
+        }
+        if (!strncmp(token, "CLICK:", 6)) {
+            char *end;
+            long col = strtol(token + 6, &end, 10), row = -1;
+            int action = 1;   /* FILER_SELECT (filer.h) */
+            if (*end == ',') row = strtol(end + 1, &end, 10);
+            if (*end == ',') {
+                const char *how = end + 1;
+                action = !strcmp(how, "POINT") ? 0 : !strcmp(how, "CMD") ? 2 : !strcmp(how, "SHIFT") ? 3 : -1;
+                end += strlen(end);
+            }
+            if (*end || col < 0 || row < 0 || col > 1000 || row > 1000 || action < 0) return failure(s, "Invalid CLICK");
+            return (ScriptEvent){.kind = SCRIPT_CLICK, .width = (int)col, .height = (int)row, .mods = action};
         }
         if (!strncmp(token, "DISPLAY:", 8)) {
             char *end;

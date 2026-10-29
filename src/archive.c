@@ -61,7 +61,7 @@ static int unpack(App *app,const FileSelection *selection,int tree)
     }
     if(!n) { free(names); app_notice(app,refused==FMT_7Z ? T("この環境では使えません") : T("アーカイブではありません")); return -1; }
     for(size_t i=0;i<n;++i) if(archive_format(names[i])==FMT_LHA) {
-        char *l=find_command("lhasa"); if(!l) { free(names); app_notice(app,T("lhasa がありません")); return -1; } free(l); break;
+        char *l=find_lhasa(); if(!l) { free(names); app_notice(app,T("lhasa がありません")); return -1; } free(l); break;
     }
     ArcOp *o=op_create(app,ARC_UNPACK,selection->directory,names,n); free(names);
     if(!o) return -1;

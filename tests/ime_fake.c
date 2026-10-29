@@ -109,3 +109,4 @@ void ime_candidates(const Ime *ime, ImeCandidates *out)
     for (int i = 0; i < ime->count; ++i) out->items[out->shown++] = ime->cand[i];
 }
 void ime_reset(Ime *ime) { reset(ime); }
+void ime_caret(Ime *ime, int x, int y, int h) { (void)ime; (void)x; (void)y; (void)h; }

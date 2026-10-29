@@ -5,11 +5,13 @@
 # at /usr/share/fdtp/pomera). From the source tree: sudo sh pomera/pomera_setup.sh.
 #
 #   sudo fdtp-pomera-setup [--yes]          the questions of ./configure (Wi-Fi
-#                                           stability, the read-only mount of the
-#                                           internal memory), each after what it
-#                                           does and how to undo it; then the
-#                                           settings answered yes (the PIO change
-#                                           is asked once more, default no)
+#                                           stability, the mount mode of the
+#                                           internal memory, installing libheif
+#                                           for HEIC when it is missing), each
+#                                           after what it does and how to undo
+#                                           it; then the settings answered yes
+#                                           (the PIO change is asked once more,
+#                                           default no)
 #   sudo fdtp-pomera-setup --undo [--yes]   undo what is set (the PIO change is
 #                                           asked once more, default no)
 #   sudo fdtp-pomera-setup --status         list what is set; exit 0 when
@@ -17,8 +19,9 @@
 # --yes, or no terminal, takes every default: then the SD is never rewritten.
 # Does nothing on anything but a DM250. The language of the messages is
 # that of ./configure (LC_ALL, LC_MESSAGES, LANG; English on the Linux console).
-# For the tests: FDTP_CONFIGURE_DT, FDTP_CONFIGURE_UID, FDTP_CONFIGURE_PROBE
-# and FDTP_CONFIGURE_TTY as in ./configure; FDTP_POMERA_DIR, where the scripts are.
+# For the tests: FDTP_CONFIGURE_DT, FDTP_CONFIGURE_UID, FDTP_CONFIGURE_PROBE,
+# FDTP_CONFIGURE_TTY, FDTP_CONFIGURE_HEIF and FDTP_CONFIGURE_APT as in ./configure;
+# FDTP_POMERA_DIR, where the scripts are.
 # This file is part of FDTP (File & Directory Tool for Pomera).
 # SPDX-FileCopyrightText: 2026 yasoteien
 # SPDX-License-Identifier: AGPL-3.0-or-later
@@ -40,8 +43,8 @@ for a; do
 	-y|--yes) YES=1 ;;
 	--undo) MODE=undo ;;
 	--status) MODE=status ;;
-	-h|--help) sed -n '2,21p' "$0"; exit 0 ;;
-	*) echo "fdtp-pomera-setup: unknown option $a" >&2; sed -n '7,17p' "$0" >&2; exit 2 ;;
+	-h|--help) sed -n '2,24p' "$0"; exit 0 ;;
+	*) echo "fdtp-pomera-setup: unknown option $a" >&2; sed -n '7,18p' "$0" >&2; exit 2 ;;
 	esac
 done
 msg_init
@@ -125,13 +128,17 @@ ask_wifi
 echo
 ask_internal
 echo
-if [ "$STABILITY" = no ] && [ "$INTERNAL" = no ]; then
+ask_heif
+echo
+# 3 (do not mount) changes something only when an earlier mount is set up.
+if [ "$INTERNAL" = no ] && ! sh "$PDIR/pomera_mount_internal.sh" persisted 2>/dev/null; then INTERNAL=keep; fi
+if [ "$STABILITY" = no ] && [ "$INTERNAL" = keep ]; then
 	say "何も変えませんでした。" "Nothing was changed."
 	exit 0
 fi
 # install_pomera.sh asks before the PIO change only on a terminal.
 if [ "$TTY" = yes ]; then
-	POMERA_STABILITY=$STABILITY POMERA_INTERNAL_RO=$INTERNAL FDTP_MSG_LANG=$MSG FDTP_CONFIGURE_DT=$DT sh "$PDIR/install_pomera.sh"
+	POMERA_STABILITY=$STABILITY POMERA_INTERNAL=$INTERNAL FDTP_MSG_LANG=$MSG FDTP_CONFIGURE_DT=$DT sh "$PDIR/install_pomera.sh"
 else
-	POMERA_STABILITY=$STABILITY POMERA_INTERNAL_RO=$INTERNAL FDTP_MSG_LANG=$MSG FDTP_CONFIGURE_DT=$DT sh "$PDIR/install_pomera.sh" </dev/null
+	POMERA_STABILITY=$STABILITY POMERA_INTERNAL=$INTERNAL FDTP_MSG_LANG=$MSG FDTP_CONFIGURE_DT=$DT sh "$PDIR/install_pomera.sh" </dev/null
 fi

@@ -1,0 +1,57 @@
+%.100s から %llu 個（%.1f MB）を受け取りますか	From %.100s: receive %llu items (%.1f MB)?
+(R)受け取る	(R)Receive
+(S)送る	(S)Send
+(B)ブラウザで渡す	(B)Share with a browser
+LocalSend: ブラウザで渡す	LocalSend: Share with a browser
+ブラウザで渡す準備をしています	Preparing to share with a browser
+ブラウザからの受け取りを待っています	Waiting for browser downloads
+ブラウザで次の所を開いてください	Open one of these addresses in a browser
+暗号化されません。自宅など信頼できる LAN だけで使ってください	This is not encrypted. Use only a trusted LAN, such as at home.
+渡す物:	Items to share:
+ダウンロードの記録:	Download history:
+%s に %s を渡しています	%s: sending %s
+%s が %s を受け取りました	%s downloaded %s
+%s が PIN を間違えました	%s entered an incorrect PIN
+一覧を移動	Scroll list
+先頭/末尾	First/last
+Esc で止めます	Esc to stop
+IP を取得できません	Cannot get IP addresses
+LocalSend: 受け取る	LocalSend: Receive
+LocalSend: 送る	LocalSend: Send
+PIN が違います	Incorrect PIN
+PIN を作れません	Cannot create a PIN
+fdtp-localsend がありません（OpenSSL 無しで組み立てた時）	fdtp-localsend is missing (built without OpenSSL)
+ファイルを読み書きできません	Cannot read or write files
+他の LocalSend（公式アプリなど）が 53317 番を使っています。受け取れません。送るのはできます	Another LocalSend (such as the official app) is using port 53317. Receiving is unavailable. You can still send.
+全体: %.0f%%	Overall: %.0f%%
+受け取っています	Receiving
+受け取りを待っています	Waiting to receive
+受け取りを準備しています	Preparing to receive
+受け取り先:	Destination:
+同じネットワークにいる人には、この機器の名前が見えます。自宅など信頼できる LAN か、スマートフォンのインターネット共有（テザリング）で使ってください	People on this network can see this device's name. Use a trusted LAN, such as at home, or your smartphone's personal hotspot (tethering).
+止めて戻る	Stop and return
+相手が断りました	The peer refused the transfer
+相手につながりません	Cannot connect to the peer
+相手の PIN が必要です	The peer requires a PIN
+相手の画面の PIN	The receiver's PIN (on its screen)
+自分の名前: %s	Device name: %s
+補助プログラムとの接続が切れました	The helper disconnected
+補助プログラムの応答が正しくありません	Invalid response from the helper
+補助プログラムを起動できません	Cannot start the helper
+送っています	Sending
+送りました（%zu 個）	Items sent: %zu
+送り先	Peer
+送り先を探しています	Looking for peers
+送る	Send
+送る物を選んでください（.. は送れません）	Select items to send (.. cannot be sent)
+%zu 個を受け取りました。続けて受け取れます（Esc で終わります）	Received %zu files. More can come (Esc to stop)
+相手から届かないので取りやめました。続けて受け取れます	Nothing came from the sender, so it was given up. More can come
+受け取りに失敗しました。続けて受け取れます	Receiving failed. More can come
+相手が取りやめました。続けて受け取れます	The sender gave up. More can come
+ネットワークにつながっていません	Not connected to a network
+(F)FDTM で続ける	(F)Keep FDTM
+(L)公式アプリを使う	(L)Use the official app
+FDTM で受け付けを続けます。公式アプリは 53317 番を使えません	FDTM keeps receiving. The official app cannot use port 53317
+公式の LocalSend が起動しました。どちらで受け取りますか	The official LocalSend app has started. Which should receive?
+公式の LocalSend アプリが動いています。受け取りは公式アプリでしてください。FDTM からは送れます	The official LocalSend app is running. Receive with it; FDTM can still send
+公式の LocalSend アプリに任せました。受け取りは公式アプリでしてください（Esc で戻ります）	Left to the official LocalSend app. Receive with it (Esc to go back)

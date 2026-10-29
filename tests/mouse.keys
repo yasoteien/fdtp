@@ -1,0 +1,17 @@
+# FDTM's mouse (docs/FDTP_MACOS.md): Finder's clicks on the filer.
+SNAP # start
+CLICK:2,8 SNAP # select_a
+CLICK:2,10,CMD CLICK:2,12,CMD SNAP # cmd_two
+CLICK:2,10,CMD SNAP # cmd_off
+CLICK:2,9 SNAP # plain_clears
+CLICK:2,11,SHIFT SNAP # range
+CLICK:2,6,SHIFT SNAP # range_up
+CLICK:2,7,CMD SNAP # dir_cmd
+CLICK:42,6 SNAP # second_column
+CLICK:79,22 SNAP # empty
+h CLICK:2,8 SNAP # boxed
+ESC SNAP # unboxed
+CLICK:2,7,POINT SNAP # point
+RET SNAP # entered
+RET CLICK:2,8 c "dir1" RET SNAP # notice
+CLICK:2,9 SNAP # after_notice

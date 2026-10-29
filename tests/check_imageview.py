@@ -6,6 +6,7 @@
 stays under BUILD; no network. Builds the harness (tests/imageview_harness.c)
 with make, runs it once plainly and once under ASan/UBSan (BUILD/asan)."""
 import argparse
+import base64
 import importlib.util
 import os
 from pathlib import Path
@@ -19,6 +20,51 @@ spec = importlib.util.spec_from_file_location('fixtures', ROOT / 'tools/make_tes
 fixtures = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixtures)
 NAVY = (0, 0, 85)
+# HEIC made by macOS sips (sips -s format heic) from the quadrant pattern
+# (red, green / blue, white): 1200x800 as a 3x2 grid of 512x512 HEVC tiles,
+# like an iPhone photo, and 64x48 as one coded image. Both carry irot 0;
+# the rotated one is made from the first by changing that byte.
+HEIC_GRID = base64.b64decode(
+    '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'
+)
+HEIC_SMALL = base64.b64decode(
+    'AAAAJGZ0eXBoZWljAAAAAG1pZjFNaVBybWlhZk1pSEJoZWljAAABhm1ldGEAAAAAAAAAIWhkbHIAAAAAAAAAAHBpY3QAAAAAAAAA'
+    'AAAAAAAAAAAAJGRpbmYAAAAcZHJlZgAAAAAAAAABAAAADHVybCAAAAABAAAADnBpdG0AAAAAAAEAAAAjaWluZgAAAAAAAQAAABVp'
+    'bmZlAgAAAAABAABodmMxAAAAAOZpcHJwAAAAxWlwY28AAAATY29scm5jbHgAAgACAAaAAAAADGNsbGkAywBAAAAAFGlzcGUAAAAA'
+    'AAAAQAAAADAAAAAJaXJvdAAAAAAQcGl4aQAAAAADCAgIAAAAcWh2Y0MBA3AAAACwAAAAAAAe8AD8/fj4AAALA6AAAQAXQAEMAf//'
+    'A3AAAAMAsAAAAwAAAwAecCShAAEAI0IBAQNwAAADALAAAAMAAAMAHqAUIEHBjE4h7kWVTcCAgYAgogABAAlEAcBhcshAUyQAAAAZ'
+    'aXBtYQAAAAAAAAABAAEGgQIDBYaEAAAAHmlsb2MAAAAARAAAAQABAAAAAQAAAboAAABcAAAAAW1kYXQAAAAAAAAAbAAAAFgoAa+j'
+    'xoAqtP/84T//Q3rLyFO8q+/0r1f51f7mKv/AUP7+cVtnXSJPfTXv+RStBihTuF4H62fVqTADBJeeu6zxP9yYN/MHcP3n74JOIENO'
+    'b3WP4R2kmwRM'
+)
 SANITIZE = '-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=undefined'
 
 
@@ -255,6 +301,75 @@ def check_malformed(s, src):
         s.decode(corrupt, expected=3)
 
 
+def check_heic(s):
+    """HEIC goes through libheif read with dlopen (src/img_modern.c). Without
+    it (FDTP_LIBHEIF names a missing library) the notice tells how to install
+    it; with it the grid is decoded tile by tile and irot is applied."""
+    d = s.out / 'heic'
+    d.mkdir(exist_ok=True)
+    grid, small, rot = d / 'grid.heic', d / 'small.HEIC', d / 'rot.heif'
+    grid.write_bytes(HEIC_GRID)
+    small.write_bytes(HEIC_SMALL)
+    i = HEIC_GRID.index(b'irot')
+    rot.write_bytes(HEIC_GRID[:i + 4] + b'\x01' + HEIC_GRID[i + 5:])  # 90 degrees counterclockwise
+    install = 'brew install libheif' if sys.platform == 'darwin' else 'sudo apt install libheif1 libheif-plugin-libde265'
+    missing = dict(s.env, FDTP_LIBHEIF=str(d / 'no-such-libheif.so'))
+    saved, s.env = s.env, missing
+    try:
+        _, message = s.decode(grid, expected=3)
+        require('libheif が入っていません' in message and install in message, ('no libheif', message))
+        r = s.run(grid, s.out / 'navigation.keys', s.out / 'heic-missing', expected=3)
+        require('libheif が入っていません' in r.stderr and install in r.stderr, ('no libheif, viewer', r.stderr))
+        s.env = dict(missing, FDTP_LANGUAGE='en')
+        r = s.run(grid, s.out / 'navigation.keys', s.out / 'heic-missing', expected=3)
+        require('libheif is not installed. To open it:\n' + install in r.stderr, ('no libheif, English', r.stderr))
+    finally:
+        s.env = saved
+    r = subprocess.run([str(s.exe), '--decode', str(grid), '1024', '552', str(s.out / 'heic.ppm')],
+                       capture_output=True, text=True, env=s.env, timeout=60)
+    if 'libheif が入っていません' in r.stderr:
+        print('  (no libheif here: HEIC decoding not checked, only the notice)')
+        return
+    corners = lambda im: [pixel(im, x, y) for x, y in ((im[0] // 8, im[1] // 8), (im[0] - im[0] // 8, im[1] // 8),
+                                                       (im[0] // 8, im[1] - im[1] // 8), (im[0] - im[0] // 8, im[1] - im[1] // 8))]
+    red, green, blue, white = fixtures.COLORS[:4]
+    # img_size truncates: 1200 x 0.69 may come out 827.
+    fits = lambda size, w, h: abs(size[0] - w) <= 1 and abs(size[1] - h) <= 1
+    im, info = s.decode(grid)
+    require(fits(im[:2], 828, 552) and info[:3] == ['HEIC', '1200', '800'], ('HEIC grid size', im[:2], info))
+    require(all(near(a, b, 40) for a, b in zip(corners(im), (red, green, blue, white))), ('HEIC grid colors', corners(im)))
+    im, _ = s.decode(grid, 1200, 800)
+    require(im[:2] == (1200, 800) and near(pixel(im, 599, 399), red, 40) and near(pixel(im, 600, 400), white, 40),
+            ('HEIC grid full size, tile edges', pixel(im, 599, 399), pixel(im, 600, 400)))
+    im, _ = s.decode(grid, 1, 1)
+    require(im[:2] == (1, 1) and near(pixel(im, 0, 0), (128, 128, 128), 12), ('HEIC area average', pixel(im, 0, 0)))
+    im, info = s.decode(rot)
+    require(fits(im[:2], 368, 552) and info[:3] == ['HEIC', '800', '1200'], ('HEIC irot size', im[:2], info))
+    require(all(near(a, b, 40) for a, b in zip(corners(im), (green, white, red, blue))), ('HEIC irot colors', corners(im)))
+    im, info = s.decode(small)
+    require(im[:2] == (64, 48) and all(near(a, b, 40) for a, b in zip(corners(im), (red, green, blue, white))),
+            ('HEIC single image', im[:2], corners(im)))
+    images, notices, depths = s.view(grid, 'SNAP i SNAP 1 SNAP q', 'heic-view')
+    require(depths == [1, 1, 1] and '1200 x 800  HEIC' in notices[1], ('HEIC in the viewer', notices, depths))
+    require(near(pixel(images[0], 300, 200), red, 40), ('HEIC on the canvas', pixel(images[0], 300, 200)))
+    # Cut or changed files: decoded or refused, never a crash.
+    corrupt = d / 'corrupt.heic'
+    rng = random.Random(2482)
+    cases = [HEIC_GRID[:n] for n in (0, 12, 16, 40, 300, 760, 1000, len(HEIC_GRID) - 1)]
+    for _ in range(40):
+        bad = bytearray(HEIC_GRID)
+        for _ in range(rng.randrange(1, 6)):
+            bad[rng.randrange(12, len(bad))] = rng.randrange(256)
+        cases.append(bytes(bad))
+    for data in cases:
+        corrupt.write_bytes(data)
+        r = subprocess.run([str(s.exe), '--decode', str(corrupt), '1024', '552', str(s.out / 'bad.ppm')],
+                           capture_output=True, text=True, env=s.env, timeout=60)
+        s.count += 1
+        require(r.returncode in (0, 3), ('HEIC corrupt', len(data), r.returncode, r.stderr))
+        require('runtime error:' not in r.stderr and 'AddressSanitizer' not in r.stderr, ('HEIC corrupt', r.stderr))
+
+
 def suite(exe, out, env):
     out.mkdir(parents=True, exist_ok=True)
     s = Suite(exe, out, env)
@@ -268,6 +383,7 @@ def suite(exe, out, env):
     check_decoders(s, src)
     check_screen(s, src)
     check_malformed(s, src)
+    check_heic(s)
     return s.count
 
 
@@ -275,11 +391,20 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--build', type=Path, required=True)
     parser.add_argument('--no-sanitize', action='store_true', help='skip the ASan/UBSan run')
+    parser.add_argument('--harness', type=Path, help='run the checks with this imageview-harness (built elsewhere, '
+                        'e.g. cross-built for the Pomera) instead of building one')
     args = parser.parse_args()
     build = args.build.resolve()
     (build / 'tmp').mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, FDTP_LANGUAGE='ja', TMPDIR=str(build / 'tmp'), UBSAN_OPTIONS='print_stacktrace=1:halt_on_error=1',
                ASAN_OPTIONS='abort_on_error=0:detect_leaks=' + ('1' if sys.platform != 'darwin' else '0'))
+    if args.harness:
+        try:
+            print(f'PASS image-check: {suite(args.harness.resolve(), build / "image-check", env)} runs')
+        except (AssertionError, OSError, subprocess.TimeoutExpired) as error:
+            print(f'FAIL: {error}', file=sys.stderr)
+            return 1
+        return 0
     runs = [(build, 'CFLAGS=-Werror', None, 'image-check')]
     if not args.no_sanitize:
         runs.append((build / 'asan', 'CFLAGS=-Werror -O1 -g ' + SANITIZE, 'LDFLAGS=' + SANITIZE, 'image-check-asan'))
@@ -288,7 +413,7 @@ def main():
             command = ['make', '-s', '-C', str(ROOT), 'all', 'imageview-harness', cflags, 'BUILD=' + str(target)]
             subprocess.run(command + ([ldflags] if ldflags else []), check=True, env=env, stdout=subprocess.DEVNULL)
             count = suite(target / 'imageview-harness', build / name, env)
-            print(f'PASS {name}: {count} runs (decode, canvas, zoom, pan, i, animation, SPC/BS, malformed)')
+            print(f'PASS {name}: {count} runs (decode, canvas, zoom, pan, i, animation, SPC/BS, malformed, HEIC)')
     except (AssertionError, OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
         print(f'FAIL: {error}', file=sys.stderr)
         return 1

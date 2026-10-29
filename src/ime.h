@@ -9,7 +9,10 @@
  *              used like uim-fep: uim_init, one uim context per Ime handle
  *              (UTF-8, "ja"), keys through uim_press_key/uim_release_key,
  *              commit/preedit/candidate callbacks.
- *   ime_none.c macOS, or Linux when uim cannot start: alphanumerics only,
+ *   ime_mac.m  the macOS window (fdtp_mac_main.m): the Mac's own input
+ *              method through the view's NSTextInputClient; the Mac draws
+ *              the candidate window (ime_candidates is never active).
+ *   ime_none.c macOS tests, or Linux when uim cannot start: alphanumerics only,
  *              the state is always 切 (off) and every key is passed back.
  *
  * Usage, per key the field receives:
@@ -71,4 +74,7 @@ void ime_preedit(const Ime *ime, ImePreedit *out);
 void ime_candidates(const Ime *ime, ImeCandidates *out);
 /* Drop the preedit/candidates without committing (e.g. the field closes). */
 void ime_reset(Ime *ime);
+/* Where the caret was drawn (canvas pixels, top-left, h tall), for an input
+ * method that shows its own candidate window (ime_mac.m); others ignore it. */
+void ime_caret(Ime *ime, int x, int y, int h);
 #endif

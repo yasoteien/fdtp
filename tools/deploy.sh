@@ -65,9 +65,10 @@ LIBS="libmupdf.so.25.1 libjbig2dec.so.0 libgumbo.so.3 libmujs.so.3 liblhasa.so.0
 # Pomera already has (checksums) and resumes a cut transfer (--partial).
 DIST=$APP/build/dist
 rm -rf "$DIST" && mkdir -p "$DIST/bin" "$DIST/lib" "$DIST/libexec"
-ssh "$BUILD_HOST" "tar -chf - -C $BUILD_DIR/$APP/build-arm-linux-gnueabihf fdtp -C $SYSROOT/usr/lib/arm-linux-gnueabihf $LIBS -C $SYSROOT/usr/bin zip lhasa" |
+# fdtp-localsend (LocalSend, OpenSSL) goes beside fdtp, where fdtp looks first.
+ssh "$BUILD_HOST" "tar -chf - -C $BUILD_DIR/$APP/build-arm-linux-gnueabihf fdtp fdtp-localsend -C $SYSROOT/usr/lib/arm-linux-gnueabihf $LIBS -C $SYSROOT/usr/bin zip lhasa" |
 	tar -C "$DIST" -xf -
-mv "$DIST/fdtp" "$DIST/bin/fdtp.new"; mv "$DIST/zip" "$DIST/bin/"; mv "$DIST/lhasa" "$DIST/libexec/"
+mv "$DIST/fdtp" "$DIST/bin/fdtp.new"; mv "$DIST/fdtp-localsend" "$DIST/zip" "$DIST/bin/"; mv "$DIST/lhasa" "$DIST/libexec/"
 for f in $LIBS; do mv "$DIST/$f" "$DIST/lib/"; done
 # Xfce's menu entry and its icon (revision 1 item 23): ~/.fdtp/share, then
 # copied into ~/.local/share below. The PNGs come from the same script as

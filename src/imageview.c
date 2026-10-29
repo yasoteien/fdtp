@@ -43,7 +43,7 @@ static int is_image(const char *name)
 {
     const char *e=strrchr(name,'.');
     if(!e) return 0;
-    const char *ext[]={".jpg",".jpeg",".png",".gif",".bmp",".webp",".mag",".pi"};
+    const char *ext[]={".jpg",".jpeg",".png",".gif",".bmp",".webp",".heic",".heif",".mag",".pi"};
     for(size_t i=0;i<sizeof(ext)/sizeof(*ext);i++) if(!strcasecmp(e,ext[i])) return 1;
     return 0;
 }

@@ -25,13 +25,14 @@ amd64) TRIPLET=x86_64-linux-gnu ;;
 arm64) TRIPLET=aarch64-linux-gnu ;;
 *) echo "make_sysroot: ARCH is armhf, amd64 or arm64" >&2; exit 2 ;;
 esac
-ROOT=${1:-$HOME/work/sysroot-$ARCH$([ "$DEB" = 1 ] && echo -deb)}
+ROOT=${1:-$HOME/work/sysroot-$ARCH$(if [ "$DEB" = 1 ]; then echo -deb; fi)}
 DEBS=$ROOT/debs
 mkdir -p "$DEBS"
 PKGS=(
 	libmupdf-dev libmupdf25.1 libfreetype-dev libfreetype6
 	libzip-dev libzip5 zlib1g-dev
 	libexpat1-dev libexpat1
+	libssl-dev libssl3t64
 	libjpeg62-turbo-dev libpng-dev libgif-dev libwebp-dev libsharpyuv-dev
 	libuim-dev libuim8 libuim-custom2 libuim-scm0 libgcroots-dev libgcroots0
 	libjbig2dec0 libgumbo3 libmujs3 libopenjp2-7 libharfbuzz0b

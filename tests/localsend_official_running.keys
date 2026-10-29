@@ -1,0 +1,5 @@
+# FDTM: the official app already runs: only sending is started.
+M-l r REALWAIT:0.2 SNAP # receive_refused
+ESC DOWN DOWN M-l b REALWAIT:0.2 SNAP # browser_refused
+ESC M-l s REALWAIT:0.3 SNAP # sending
+ESC REALWAIT:0.1 SNAP # closed

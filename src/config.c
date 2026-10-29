@@ -49,6 +49,8 @@ const char *const config_variable_names[CONFIG_VARIABLES] = {
 #define NOVEL_FORMAT_VARIABLE(name, on, help) "NOVEL_FORMAT_" #name,
     NOVEL_FORMAT_RULES(NOVEL_FORMAT_VARIABLE)
 #undef NOVEL_FORMAT_VARIABLE
+    "LOCALSEND_OFFICIAL",
+    "LOCALSEND_ALIAS",
     "LANGUAGE",
     "SCREENSIZE",
     "AWAKE_MINUTES",
@@ -304,6 +306,13 @@ static int variable_valid(const char *name, const char *value)
     long v; int i = variable_index(name);
     if (i < 0 || !value) return 0;
     if (i <= 2) return strlen(value) < 256;
+    if (i == CONFIG_LOCALSEND) {
+        if (strlen(value) >= sizeof(((AppSettings *)0)->localsend_alias)) return 0;
+        for (const unsigned char *p = (const unsigned char *)value; *p; ++p)
+            if (iscntrl(*p)) return 0;
+        return 1;
+    }
+    if (i == CONFIG_OFFICIAL) return !strcmp(value, "ask") || !strcmp(value, "fdtm") || !strcmp(value, "official");
     if (i == CONFIG_LANGUAGE) return !strcmp(value, "auto") || !strcmp(value, "ja") || !strcmp(value, "en");
     if (i == CONFIG_SCREENSIZE) { int c, r; return screen_parse(value, &c, &r) == 0; }
     if (i == CONFIG_SPLIT) return split_parse(value, &v) == 0;
@@ -317,6 +326,8 @@ static int variable_valid(const char *name, const char *value)
 static void variable_apply(AppSettings *s, const char *name, const char *value)
 {
     long v = 0; int i = variable_index(name);
+    if (i == CONFIG_LOCALSEND) { copy_text(s->localsend_alias, sizeof(s->localsend_alias), value); return; }
+    if (i == CONFIG_OFFICIAL) { s->localsend_official = !strcmp(value, "fdtm") ? 1 : !strcmp(value, "official") ? 2 : 0; return; }
     if (i == CONFIG_LANGUAGE) { copy_text(s->language, sizeof(s->language), value); return; }
     if (i == CONFIG_SCREENSIZE) {
         if (screen_parse(value, &s->screen_cols, &s->screen_rows)) s->screen_cols = s->screen_rows = 0;
@@ -336,7 +347,7 @@ static void variable_apply(AppSettings *s, const char *name, const char *value)
     case 6: s->symlink = (int)v; break;
     case 7: s->filetype = (int)v; break;
     case 8: s->novel_word_ruby = (int)v; break;
-    default: if (i > 8) s->novel_format[i - CONFIG_BASE_VARIABLES] = (signed char)v; break;
+    default: if (i >= CONFIG_BASE_VARIABLES && i < CONFIG_OFFICIAL) s->novel_format[i - CONFIG_BASE_VARIABLES] = (signed char)v; break;
     }
 }
 static void settings_default(AppSettings *s)
@@ -363,6 +374,8 @@ const char *config_variable_help(const char *name)
 #define NOVEL_FORMAT_HELP(name, on, help) help,
         NOVEL_FORMAT_RULES(NOVEL_FORMAT_HELP)
 #undef NOVEL_FORMAT_HELP
+        N_("Mac で公式の LocalSend とぶつかった時: ask（聞く）/ fdtm（常に FDTM）/ official（常に公式）。RET で切替"),
+        N_("LocalSend で見えるこの機器の名前（空ならホスト名）"),
         N_("表示の言語: auto（環境）/ ja（日本語）/ en（英語）。RET で切替"),
         N_("画面の桁と行: auto（画面に合わせる。1024x600 では 85x25）か 桁x行（80x25〜320x90）"),
         N_("最後のキーからこの分（0〜1440）は画面を休ませず速く応える。0 = 休ませる（既定 15）"),
@@ -371,7 +384,7 @@ const char *config_variable_help(const char *name)
     };
     int i = variable_index(name);
     if (i < 0) return NULL;
-    if (i >= CONFIG_BASE_VARIABLES && i < CONFIG_LANGUAGE) {
+    if (i >= CONFIG_BASE_VARIABLES && i < CONFIG_OFFICIAL) {
         static char rule_help[256];
         snprintf(rule_help, sizeof(rule_help), "%s: 1 = %s", name, T(help[i]));
         return rule_help;
@@ -391,6 +404,7 @@ void config_variable_text(App *a, const char *name, char *out, size_t size)
     case 6: snprintf(out, size, "%d", s->symlink); break;
     case 7: snprintf(out, size, "%d", s->filetype); break;
     case 8: snprintf(out, size, "%d", s->novel_word_ruby); break;
+    case CONFIG_LOCALSEND: copy_text(out, size, s->localsend_alias); break;
     case CONFIG_SCREENSIZE:
         if (s->screen_cols > 0) snprintf(out, size, "%dx%d", s->screen_cols, s->screen_rows);
         else copy_text(out, size, "auto");
@@ -402,9 +416,10 @@ void config_variable_text(App *a, const char *name, char *out, size_t size)
         break;
     case CONFIG_UNDO: snprintf(out, size, "%d", s->undo_levels); break;
     case CONFIG_LANGUAGE: snprintf(out, size, "%s", s->language); break;
+    case CONFIG_OFFICIAL: snprintf(out, size, "%s", s->localsend_official == 1 ? "fdtm" : s->localsend_official == 2 ? "official" : "ask"); break;
     default: {
         int i = variable_index(name);
-        if (i > 8) snprintf(out, size, "%d", s->novel_format[i - CONFIG_BASE_VARIABLES]);
+        if (i >= CONFIG_BASE_VARIABLES && i < CONFIG_OFFICIAL) snprintf(out, size, "%d", s->novel_format[i - CONFIG_BASE_VARIABLES]);
         else if (size) *out = 0;
         break;
     }

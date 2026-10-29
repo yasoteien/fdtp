@@ -23,7 +23,9 @@ FDTP のソース（`src/` などと、描画層の `lib/rmp-platform/`）は、
 | gumbo・MuJS（MuPDF が使う） | 〃 | Apache-2.0・ISC 系 |
 | expat | docx・xlsx の XML | MIT |
 | zlib | docx・xlsx・zip | zlib |
+| OpenSSL 3（libssl・libcrypto、任意） | fdtp-localsend の TLS・証明書・SHA-256 | Apache-2.0 |
 | libjpeg-turbo・libpng・giflib・libwebp | 画像 | BSD 系・libpng・MIT・BSD |
+| libheif・libde265（任意） | HEIC（iPhone の写真）。組み立てにはつながず、開く時に読むだけ（dlopen）。HEVC を解くコードは FDTP に含まない | LGPL-3.0-or-later |
 | uim（libuim） | 日本語入力 | BSD-3-Clause（一部 GPL・LGPL の部分あり） |
 | libdrm・Mesa（GBM・EGL・GLES2）・libxcb | 画面 | MIT 系 |
 | lhasa | LHa の解凍 | ISC |

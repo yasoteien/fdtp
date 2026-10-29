@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # make install / make uninstall for those who build from the source
 # (docs/FDTP_CONFIGURE.md). ./configure writes config.mk next to Makefile:
-# PREFIX, FDTP_LANGUAGE, POMERA_STABILITY, POMERA_INTERNAL_RO, HAVE_* and,
+# PREFIX, FDTP_LANGUAGE, POMERA_STABILITY, POMERA_INTERNAL, HAVE_* and,
 # without libuim, NOVEL_IME = ime_none (this file comes before mk/novel.mk,
 # whose NOVEL_IME ?= then keeps it). Without config.mk the build is as
 # before. Cross builds (CROSS=, tools/deploy.sh) never read it.
@@ -25,6 +25,9 @@ DESTDIR ?=
 FDTPRC ?= /etc/fdtprc
 POMERA_STABILITY ?= no
 POMERA_INTERNAL_RO ?= no
+# keep: not answered (an old config.mk's POMERA_INTERNAL_RO = no says only
+# that it was not set up then), so an earlier setting is left alone.
+POMERA_INTERNAL ?= $(if $(filter yes,$(POMERA_INTERNAL_RO)),ro,keep)
 INSTALL_EXE ?= $(BUILD)/fdtp
 BINDIR = $(PREFIX)/bin
 APPSDIR = $(PREFIX)/share/applications
@@ -48,10 +51,12 @@ ifeq ($(UNAME)/$(origin INSTALL_EXE),Darwin/file)
 install uninstall:
 	@echo "make $@: for Linux (macOS builds fdtp-preview only)" >&2; exit 1
 else
-install: $(INSTALL_EXE)
+.SECONDEXPANSION:
+install: $(INSTALL_EXE) $$(LOCALSEND_EXE)
 	@case "$(FDTP_LANGUAGE)" in ''|auto|ja|en) ;; *) echo "FDTP_LANGUAGE must be auto, ja or en" >&2; exit 1 ;; esac
 	install -d "$(DESTDIR)$(BINDIR)" "$(DESTDIR)$(APPSDIR)" "$(DESTDIR)$(DOCDIR)"
 	install -m 755 "$(INSTALL_EXE)" "$(DESTDIR)$(BINDIR)/fdtp"
+	$(if $(LOCALSEND_EXE),install -m 755 "$(LOCALSEND_EXE)" "$(DESTDIR)$(BINDIR)/fdtp-localsend")
 	sed 's|^Exec=.*|Exec=$(BINDIR)/fdtp|' "$(ICONS_DIR)/fdtp.desktop" > "$(DESTDIR)$(APPSDIR)/fdtp.desktop"
 	chmod 644 "$(DESTDIR)$(APPSDIR)/fdtp.desktop"
 	for s in $(ICON_SIZES); do \
@@ -78,14 +83,14 @@ install: $(INSTALL_EXE)
 		fi; \
 		chmod 644 "$$f"; echo "$$f: LANGUAGE=$(FDTP_LANGUAGE)"; \
 	fi
-	@if [ -z "$(DESTDIR)" ] && { [ "$(POMERA_STABILITY)" = yes ] || [ "$(POMERA_INTERNAL_RO)" = yes ]; }; then \
-		POMERA_STABILITY="$(POMERA_STABILITY)" POMERA_INTERNAL_RO="$(POMERA_INTERNAL_RO)" FDTP_MSG_LANG="$(INSTALL_MSG_LANG)" \
+	@if [ -z "$(DESTDIR)" ] && { [ "$(POMERA_STABILITY)" = yes ] || { [ "$(POMERA_INTERNAL)" = ro ] || [ "$(POMERA_INTERNAL)" = rw ] || [ "$(POMERA_INTERNAL)" = no ]; }; }; then \
+		POMERA_STABILITY="$(POMERA_STABILITY)" POMERA_INTERNAL="$(POMERA_INTERNAL)" FDTP_MSG_LANG="$(INSTALL_MSG_LANG)" \
 			sh "$(POMERA_SCRIPTS)/install_pomera.sh"; \
 	fi
 	@echo "installed: $(BINDIR)/fdtp$(if $(DESTDIR), (under $(DESTDIR)))"
 
 uninstall:
-	rm -f "$(DESTDIR)$(BINDIR)/fdtp" "$(DESTDIR)$(APPSDIR)/fdtp.desktop"
+	rm -f "$(DESTDIR)$(BINDIR)/fdtp" "$(DESTDIR)$(BINDIR)/fdtp-localsend" "$(DESTDIR)$(APPSDIR)/fdtp.desktop"
 	for s in $(ICON_SIZES); do rm -f "$(DESTDIR)$(ICONDIR)/$${s}x$${s}/apps/fdtp.png"; done
 	rm -rf "$(DESTDIR)$(PREFIX)/share/doc/fdtp"
 	@# /etc/fdtprc only when make install made it and it has nothing else.
@@ -96,13 +101,13 @@ uninstall:
 			rm -f "$$f" && echo "removed $$f"; \
 		else echo "$$f is kept (it has settings of its own)"; fi; \
 	fi
-	@if [ "$(POMERA_STABILITY)" = yes ] || [ "$(POMERA_INTERNAL_RO)" = yes ]; then \
+	@if [ "$(POMERA_STABILITY)" = yes ] || { [ "$(POMERA_INTERNAL)" = ro ] || [ "$(POMERA_INTERNAL)" = rw ]; }; then \
 		echo "The Pomera settings are not undone. To undo them:"; \
 		if [ "$(POMERA_STABILITY)" = yes ]; then \
 			echo "  sudo sh $(POMERA_SCRIPTS)/pomera_stability.sh remove"; \
 			echo "  sudo sh $(POMERA_SCRIPTS)/pomera_dma_pio.sh restore     (if the SD was rewritten)"; \
 		fi; \
-		if [ "$(POMERA_INTERNAL_RO)" = yes ]; then echo "  sudo sh $(POMERA_SCRIPTS)/pomera_mount_internal.sh unpersist"; fi; \
+		if { [ "$(POMERA_INTERNAL)" = ro ] || [ "$(POMERA_INTERNAL)" = rw ]; }; then echo "  sudo sh $(POMERA_SCRIPTS)/pomera_mount_internal.sh unpersist"; fi; \
 		echo "and reboot."; \
 	fi
 endif

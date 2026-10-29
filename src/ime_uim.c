@@ -270,3 +270,4 @@ void ime_reset(Ime *ime)
     preedit_clear_cb(ime);
     cand_deactivate_cb(ime);
 }
+void ime_caret(Ime *ime, int x, int y, int h) { (void)ime; (void)x; (void)y; (void)h; }

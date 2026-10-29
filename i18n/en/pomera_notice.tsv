@@ -1,0 +1,10 @@
+結果	Result
+つなぎ方	Mounted
+点検の時刻	Checked at
+点検の出力	Check output
+直し方	To repair
+Pomera の起動時の点検で、内蔵メモリに破損が見つかりました	The Pomera's boot check found damage on the internal memory
+読み取り専用（/mnt/pomera-internal）	Read-only (/mnt/pomera-internal)
+つないでいません	Not mounted
+自動修復はしていません。写しから戻すか、sudo fsck.fat -r で 1 つずつ確かめて直してください。短い名前の改名を聞かれたら n で断ってください（純正の OS の日本語名です）	Nothing was repaired. Restore it from a copy, or repair it one step at a time with sudo fsck.fat -r. Answer n when asked to rename a short name (they are the stock OS's Japanese names)
+内蔵メモリの点検	Internal memory check

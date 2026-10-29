@@ -37,7 +37,7 @@ static const struct { const char *extension, *command; } defaults[]={
     {".tar","archive"},{".tar.gz","archive"},{".tgz","archive"},{".tar.bz2","archive"},{".tbz","archive"},
     {".tar.xz","archive"},{".txz","archive"},{".zip","archive"},{".lzh","archive"},{".lha","archive"},{".7z","archive"},
     {".jpg","imageview"},{".jpeg","imageview"},{".png","imageview"},{".gif","imageview"},{".bmp","imageview"},
-    {".webp","imageview"},{".mag","imageview"},{".mki","imageview"},{".pi","imageview"},
+    {".webp","imageview"},{".heic","imageview"},{".heif","imageview"},{".mag","imageview"},{".mki","imageview"},{".pi","imageview"},
     {".pdf","pdfview"},{".csv","sheetview"},{".tsv","sheetview"},{".xlsx","sheetview"},
     {".docx","docview"},{".pptx","slideview"},
     {".mid","jukebox"},{".rcp","jukebox"},{".r36","jukebox"},{".g36","jukebox"},
@@ -244,6 +244,12 @@ int launcher_open(App *app,const char *path)
     if(S_ISDIR(st.st_mode)) { app_notice(app,T("ディレクトリです")); return -1; }
     const Entry *e=lookup(path);
     if(!e && launcher_binary(path)==1) return ask_binary(app,path);
+    if(e && app && app->open_native && (e->kind==LAUNCHER_PDF || e->kind==LAUNCHER_SHEET || e->kind==LAUNCHER_DOC || e->kind==LAUNCHER_SLIDE)) {
+        const char *argv[]={"/usr/bin/open",path,NULL};
+        int r=app_request_external_at(app,argv,0,NULL);
+        if(r<0) app_notice(app,T("外部コマンドを起動できません"));
+        return r;
+    }
     switch(e ? e->kind : LAUNCHER_TEXT) {
     case LAUNCHER_ARCHIVE: return archive_browse(app,path);
     case LAUNCHER_IMAGE: return push(app,imageview_create(app,path));

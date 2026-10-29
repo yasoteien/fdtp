@@ -18,3 +18,8 @@ GIF: メモリが足りません	GIF: out of memory
 GIF: 壊れています	GIF: corrupt
 画像: 開けません	Image: cannot open
 画像: 未知の形式です	Image: unknown format
+HEIC: メモリが足りません	HEIC: out of memory
+HEIC: 壊れています	HEIC: corrupt
+HEIC: 大きすぎます	HEIC: too large
+HEIC: 解く部品がありません。次で入れると開けます:\n%s	HEIC: no decoder for it. To open it:\n%s
+libheif が入っていません。次で入れると開けます:\n%s	libheif is not installed. To open it:\n%s

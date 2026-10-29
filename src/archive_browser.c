@@ -288,7 +288,7 @@ static int browse(App *a,const char *path)
     ArchiveFormat f=archive_format(path);
     if(f==FMT_NONE) { app_notice(a,T("アーカイブではありません")); return -1; }
     if(f==FMT_7Z) { app_notice(a,T("この環境では使えません")); return -1; }
-    if(f==FMT_LHA) { char *l=find_command("lhasa"); if(!l) { app_notice(a,T("lhasa がありません")); return -1; } free(l); }
+    if(f==FMT_LHA) { char *l=find_lhasa(); if(!l) { app_notice(a,T("lhasa がありません")); return -1; } free(l); }
     Browser *b=calloc(1,sizeof(*b)); if(!b) { app_notice(a,T("メモリが足りません")); return -1; }
     b->screen=(Screen){.self=b,.key=browser_key,.draw=browser_draw,.tick=browser_tick,.destroy=browser_destroy};
     b->below=app_top(a); b->columns=2; b->state=BR_LOAD;

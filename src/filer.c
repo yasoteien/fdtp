@@ -18,6 +18,7 @@
 #include "sysinfo.h"
 #include "splitjoin.h"
 #include "pdftools.h"
+#include "localsend_ui.h"
 #include <errno.h>
 #include <fnmatch.h>
 #include <stdio.h>
@@ -32,6 +33,7 @@ typedef struct {
     DirList list;
     size_t *visible, count, cursor;
     int columns, rows, sort, descending, hide, type, links, shift;
+    size_t anchor; /* Shift+click's other end (filer_mouse) */
     char filter[PATH_CAP], previous[PATH_CAP];
     char *stack[5]; int stacked;
     char *history[DIRECTORY_HISTORY]; int history_count;
@@ -582,6 +584,7 @@ void filer_command(Screen *s,App *a,const char *id)
         else if(IS(SPLIT_FILE)) splitjoin_split(a,&selection);
         else if(IS(JOIN_FILE)) splitjoin_join(a,&selection);
         else if(IS(PDF_MENU)) pdftools_open(a,&selection,PDFTOOLS_MENU,-1);
+        else if(IS(LOCALSEND)) localsend_ui_open(a,&selection);
     }
     if(f->active<f->count && current(f)==w && old!=w->cursor) w->shift=0;
     a->changed=1;
@@ -599,6 +602,83 @@ static int filer_key(Screen *s,App *a,const Key *k)
     else if(b) filer_command(s,a,b->dir_id && e && e->is_dir ? b->dir_id : b->id);
     else if(k->key==KCHAR && !(k->mods & (MOD_CTRL | MOD_ALT)) && k->ch>='A' && k->ch<='Z') { jump(current(f),(char)k->ch); a->changed=1; }
     return 0;
+}
+/* ---- the mouse (the macOS window, docs/FDTP_MACOS.md) ---- */
+/* The pane and the entry at cell (col,row), as filer_draw lays them out. */
+static int hit(Filer *f,int col,int row,int *pane,size_t *pos)
+{
+    int top=6;
+    for(int wi=0;wi<f->count;++wi) {
+        Window *v=&f->windows[wi];
+        if(row>=top && row<top+v->rows) {
+            int slots=fdscreen_slots(v->columns),width=fdscreen_slot_width(v->columns);
+            int slot=col/width; if(slot>=slots || col<0) return 0;
+            size_t per=page_size(v),first=v->cursor/per*per;
+            size_t p=first+(size_t)slot*(size_t)v->rows+(size_t)(row-top);
+            if(p>=v->count) return 0;
+            *pane=wi; *pos=p; return 1;
+        }
+        top+=v->rows+1;
+    }
+    return 0;
+}
+/* The line-23 notice ("完了 1 件" after a copy) is no box: a key passes it
+ * to the filer, and so does the mouse (a drop onto a window that has just
+ * taken one was refused until a key was pressed). */
+static int mouse_ready(Screen *s,App *a)
+{
+    return s && s->key==filer_key && app_top(a)==s && (a->widgets.kind==WIDGET_NONE || a->widgets.kind==WIDGET_NOTICE)
+        && ((Filer *)s->self)->pending==P_NONE;
+}
+int filer_mouse(Screen *s,App *a,int col,int row,int action)
+{
+    if(!mouse_ready(s,a)) return 0;
+    Filer *f=s->self; int pane; size_t pos;
+    if(!hit(f,col,row,&pane,&pos)) return 0;
+    if(a->widgets.kind==WIDGET_NOTICE) a->widgets.kind=WIDGET_NONE;   /* as a key clears it */
+    if(f->active!=pane) { f->active=pane; current(f)->anchor=current(f)->cursor; }
+    Window *w=current(f);
+    DirEntry *e=&w->list.entries[w->visible[pos]];
+    if(action==FILER_SELECT) {
+        for(size_t i=0;i<w->list.count;++i) w->list.entries[i].marked=0;
+        w->anchor=pos;
+    } else if(action==FILER_TOGGLE) { if(!e->is_dir) e->marked=!e->marked; w->anchor=pos; }
+    else if(action==FILER_RANGE) {
+        /* Finder's Shift+click: from the last plain or Cmd click; directories cannot be marked (as with Space). */
+        size_t from=w->anchor<w->count ? w->anchor : w->cursor;
+        size_t lo=from<pos ? from : pos,hi=from<pos ? pos : from;
+        for(size_t i=0;i<w->list.count;++i) w->list.entries[i].marked=0;
+        for(size_t i=lo;i<=hi;++i) { DirEntry *v=&w->list.entries[w->visible[i]]; if(!v->is_dir) v->marked=1; }
+    }
+    if(w->cursor!=pos) w->shift=0;
+    w->cursor=pos; a->changed=1; return 1;
+}
+int filer_mouse_marked(Screen *s,App *a,int col,int row)
+{
+    if(!mouse_ready(s,a)) return 0;
+    Filer *f=s->self; int pane; size_t pos;
+    return hit(f,col,row,&pane,&pos) && f->windows[pane].list.entries[f->windows[pane].visible[pos]].marked;
+}
+int filer_drag_selection(Screen *s,App *a,int col,int row,FileSelection *out)
+{
+    if(!mouse_ready(s,a)) return -1;
+    Filer *f=s->self; int pane; size_t pos;
+    if(!hit(f,col,row,&pane,&pos) || pane!=f->active) return -1;
+    Window *w=current(f); DirEntry *e=&w->list.entries[w->visible[pos]];
+    if(!strcmp(e->name,"..")) return -1;
+    if(filer_selection(s,out)<0) return -1;
+    /* A marked entry drags every marked one, any other just itself (Finder). */
+    if(!e->marked || !out->count) { f->selection[0]=e->name; out->names=f->selection; out->count=1; }
+    return 0;
+}
+char *filer_drop_directory(Screen *s,App *a,int col,int row)
+{
+    if(!mouse_ready(s,a)) return NULL;
+    Filer *f=s->self; int pane; size_t pos;
+    if(!hit(f,col,row,&pane,&pos)) return strdup(current(f)->list.path);
+    Window *w=&f->windows[pane]; DirEntry *e=&w->list.entries[w->visible[pos]];
+    if(e->is_dir && strcmp(e->name,"..")) return join(w->list.path,e->name);
+    return strdup(w->list.path);
 }
 static void filer_destroy(Screen *s)
 {

@@ -316,6 +316,12 @@ static void begin_edit(Editor *e, App *a)
     char label[96], value[COMMAND_TEXT + 80]; int i = e->cursor[e->tab];
     e->pending = E_EDIT;
     if (e->tab == TAB_VARIABLES) {
+        if (i == CONFIG_OFFICIAL) {
+            int v = a->settings.localsend_official;
+            config_set_variable(a, "LOCALSEND_OFFICIAL", v == 0 ? "fdtm" : v == 1 ? "official" : "ask");
+            e->pending = E_NONE;
+            return;
+        }
         if (i == CONFIG_LANGUAGE) {
             const char *v = a->settings.language;
             config_set_variable(a, "LANGUAGE", !strcmp(v, "auto") ? "ja" : !strcmp(v, "ja") ? "en" : "auto");

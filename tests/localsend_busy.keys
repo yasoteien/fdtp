@@ -1,0 +1,2 @@
+M-l r REALWAIT:0.6 SNAP # busy
+ESC ESC REALWAIT:0.1 SNAP # closed

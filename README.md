@@ -30,6 +30,7 @@ FDTP は、キングジムのポメラ DM250 に Debian 13 を入れた環境で
 - ポメラの Alt キーが使えます。Alt の操作は Shift+F1〜F10 と Ctrl+英字でもできます。
 - 書庫: tar（gz・bz2・xz）・zip・LHa の閲覧・作成・解凍ができます。
 - ファイルの分割（Alt+n。既定は 10 MB ごと）と結合（Alt+h）。
+- LocalSend（Alt+l）: iPhone・Mac などとファイルを送り合えます。相手がブラウザで受け取る事もできます。
 - システム情報（Alt+i）: 画面の出力、キーの装置、メモリ、ディスク、電池、GPU の省電力の設定などを見られます。
 
 **ビューワとエディタ**（`v` か Enter）
@@ -38,7 +39,7 @@ FDTP は、キングジムのポメラ DM250 に Debian 13 を入れた環境で
 - PDF のメニュー（Alt+p）: 結合・分割・ページの抽出・削除・並べ替え・回転、パスワードの設定と解除、圧縮、PDF から JPEG、JPEG・PNG から PDF。どれもポメラの中だけで行い、外へは何も送りません。
 - docx は段落を直せます。xlsx と csv はセルを直せて、よく使う関数は計算し直します。Ctrl+z で取り消し、Ctrl+y でやり直しです（既定で 100 段）。
 - pptx: スライドの文字を直せます。F5 でスライドを画面いっぱいに出します（Esc で戻ります）。
-- 画像: JPEG・PNG・GIF・BMP・WebP と、PC-98 の MAG・Pi。
+- 画像: JPEG・PNG・GIF・BMP・WebP・HEIC（iPhone の写真。libheif があれば）と、PC-98 の MAG・Pi。
 
 **小説用エディタ**（`e` か F9）
 - 日本語の原稿を書くためのエディタです。なろう・カクヨムのルビ記法（`｜漢字《かんじ》`、`《《傍点》》`）を、画面の上でルビと傍点にして見せます。縦書きでも横書きでも書けます。
@@ -90,7 +91,9 @@ sudo make install           # 消すときは sudo make uninstall
    - 書き換える前に、元の 1 MiB を保存します。戻すには `sudo sh scripts/pomera/pomera_dma_pio.sh restore` です。
    - `sudo make install` は、SD に書く前にもう一度聞きます。
    - 電池の持ちが少し悪くなり、Wi-Fi が遅くなる事があります。終わったら再起動が要ります。
-3. **ポメラ DM250 の時だけ**: 内蔵メモリ（ポメラの標準のエディタが文書を置く所）を、起動のたびに `/mnt/pomera-internal` へ読み取り専用でつなぎます。内蔵メモリには何も書きません。やめるには `sudo sh scripts/pomera/pomera_mount_internal.sh unpersist` です。その場所が見つからない時は、この質問を飛ばします。
+3. **ポメラ DM250 の時だけ**: 内蔵メモリを `/mnt/pomera-internal` へつなぎます。読み取り専用（既定）・読み書き・マウントしない、の 3 つから選びます。場所が見つからない時は質問を飛ばし、前の設定を残します。やめるには `sudo sh scripts/pomera/pomera_mount_internal.sh unpersist` です。
+   - 読み書きを選ぶと、注意を説明してもう一度確認します。止まった時に書いていたファイルは、元に戻らない事があります。
+   - 起動時に使用中の印が残っていた時だけ、`dosfstools` の `fsck.fat -n` で点検します。自動修復はしません。問題があれば読み取り専用でつなぎ、ログイン時と FDTP の起動時に知らせます。
 
 オプション: `--yes`（既定の答えで進む）、`--lang=ja|en|auto`、`--prefix=DIR`（既定は `/usr/local`）、`--no-pomera`（ポメラの質問をしない）。`sudo make uninstall` はポメラの設定を戻しません。戻し方を表示します。
 
@@ -106,6 +109,9 @@ C11 のコンパイラ（gcc か clang）、GNU make、Python 3（表の生成�
 | 画像 | libjpeg-dev libpng-dev libgif-dev libwebp-dev |
 | docx・xlsx・zip | zlib1g-dev libexpat1-dev |
 | 日本語入力（任意） | libuim-dev |
+| LocalSend（任意） | libssl-dev |
+
+HEIC を開く `libheif1`・`libheif-plugin-libde265` は、組み立てには要りません（開く時に読み込みます）。
 
 動かす時、書庫には `zip`・`unzip`・`lhasa`・`tar` のコマンドを使います。
 
@@ -120,6 +126,14 @@ C11 のコンパイラ（gcc か clang）、GNU make、Python 3（表の生成�
 #### 試験
 
 `make check` は、画面を使わずに（`--headless`）試験を流します。macOS でも流れます。macOS では `make preview DIR=~ OUT=preview.ppm` で画面を画像に書き出せます（Homebrew の `jpeg-turbo libpng giflib webp` が要ります）。機能ごとの試験は `tests/check_*.py --build build` です。`check_novel_format.py` は、このリポジトリに無い原稿と突き合わせる試験なので、原稿が無ければ飛ばします。`check_pdf.py` は、ssh でポメラの実機を使います。
+
+## 版を上げる
+
+前の版を消さず、新しい版を上に入れます。今の版は `fdtp -v` で確かめられます。
+
+.deb で入れた時は、新しい .deb を `sudo apt install ./fdtp_<新しい版>-1_armhf.deb` で入れます。ソースから入れた時は、新しいソースを取得して `./configure`、`make -j4`、`sudo make install` を流します。
+
+本体・補助プログラム・メニュー・マニュアルは新しくなります。`~/.fdtprc`、入力履歴、LocalSend の証明書は残ります。`/etc/fdtprc` は言語の行だけ変わります。ポメラの設定は、違う答えを選ぶと入れ替わり、質問を飛ばすと残ります。
 
 ## 電池について
 

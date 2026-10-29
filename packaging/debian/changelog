@@ -1,3 +1,12 @@
+fdtp (1.10-1) trixie; urgency=medium
+
+  * LocalSend (Alt+l): send to and receive from the LocalSend apps; give by
+    browser. fdtp-localsend is packaged beside fdtp.
+  * HEIC in the image viewer with libheif loaded at run time.
+  * The internal memory can be mounted read-write after a read-only check.
+
+ -- yasoteien <263659156+yasoteien@users.noreply.github.com>  Thu, 29 Oct 2026 21:00:00 +0900
+
 fdtp (1.01-1) trixie; urgency=medium
 
   * x (execute) starts rmp-jukebox without a terminal around it, as opening

@@ -501,7 +501,15 @@ class Acceptance:
         (w / 'broken.tgz').write_bytes(b'\x1f\x8b\x08\x00' + os.urandom(200))
         (w / 'x.7z').write_bytes(b"7z\xbc\xaf'\x1c")
         (w / 'l.lzh').write_bytes(lzh_level0([('a.txt', b'a\n')]))
-        s = self.run(home, 'archive_bad.keys')
+        # no_lhasa: PATH without lhasa, nor an lha that is Lhasa (Homebrew's name).
+        def lhasa_in(d):
+            if (Path(d) / 'lhasa').exists(): return True
+            lha = Path(d) / 'lha'
+            if not lha.exists(): return False
+            r = subprocess.run([str(lha)], capture_output=True)
+            return b'Lhasa' in r.stdout + r.stderr
+        path = os.pathsep.join(d for d in os.environ.get('PATH', '').split(os.pathsep) if d and not lhasa_in(d))
+        s = self.run(home, 'archive_bad.keys', extra_env={'PATH': path})
         dst = home / 'dst'
         require(s['bad_browse']['depth'] == 2 and '外に出る名前が 2 個' in notice(s['bad_browse']), f'bad listing notice: {notice(s["bad_browse"])!r}')
         require(names(s['bad_root']) == ['..', '../evil .txt', '/abs/evi.txt', 'ok      .txt'], f'bad root (unsafe names at the top, as stored): {names(s["bad_root"])}')
@@ -577,7 +585,7 @@ int main(int argc,char **argv)
         {"a.tbz",LAUNCHER_ARCHIVE},{"a.tar.xz",LAUNCHER_ARCHIVE},{"a.txz",LAUNCHER_ARCHIVE},{"a.zip",LAUNCHER_ARCHIVE},
         {"a.lzh",LAUNCHER_ARCHIVE},{"a.lha",LAUNCHER_ARCHIVE},{"a.7z",LAUNCHER_ARCHIVE},
         {"p.jpg",LAUNCHER_IMAGE},{"p.JPEG",LAUNCHER_IMAGE},{"p.png",LAUNCHER_IMAGE},{"p.gif",LAUNCHER_IMAGE},{"p.bmp",LAUNCHER_IMAGE},
-        {"p.webp",LAUNCHER_IMAGE},{"p.mag",LAUNCHER_IMAGE},{"p.mki",LAUNCHER_IMAGE},{"p.pi",LAUNCHER_IMAGE},
+        {"p.webp",LAUNCHER_IMAGE},{"p.HEIC",LAUNCHER_IMAGE},{"p.heif",LAUNCHER_IMAGE},{"p.mag",LAUNCHER_IMAGE},{"p.mki",LAUNCHER_IMAGE},{"p.pi",LAUNCHER_IMAGE},
         {"d.pdf",LAUNCHER_PDF},{"s.csv",LAUNCHER_SHEET},{"s.tsv",LAUNCHER_SHEET},{"s.xlsx",LAUNCHER_SHEET},
         {"w.docx",LAUNCHER_DOC},{"k.pptx",LAUNCHER_SLIDE},{"t.txt",LAUNCHER_TEXT},{"noext",LAUNCHER_TEXT},
         {".zip",LAUNCHER_TEXT},{"x.gz",LAUNCHER_TEXT},{"dir/a.b/c",LAUNCHER_TEXT},

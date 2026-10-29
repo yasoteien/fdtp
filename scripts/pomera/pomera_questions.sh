@@ -4,7 +4,8 @@
 # The Pomera DM250 questions, in one place: sourced (". FILE") by
 # ../configure (before make install) and by pomera_setup.sh (the .deb's
 # fdtp-pomera-setup, after apt install). Not run by itself. Each question
-# comes after what it does and how to undo it. Plain sh (dash).
+# comes after what it does and how to undo it. Plain sh (dash). The libheif
+# question (HEIC) is asked on any Debian, not only on a DM250.
 #
 # msg_init                 MSG=ja|en from LC_ALL, LC_MESSAGES, LANG (the first
 #                          set; ja* is Japanese, but not on the Linux console,
@@ -17,12 +18,19 @@
 # ask_yn y|n JA EN         ANSWER=yes|no; without a terminal the default, said so
 # is_dm250 DT              true when DT/compatible or DT/model has "dm250"
 # ask_wifi                 the Wi-Fi notes and question: STABILITY=yes|no
-# ask_internal             the internal memory: INTERNAL=yes|no (asked only
-#                          when root and a FAT is found there)
+# ask_internal             the internal memory: INTERNAL=ro|rw|no (asked only
+#                          when root and a FAT is found there; keep when the
+#                          question was skipped: the setting is left as it is)
+# ask_heif                 libheif for HEIC (iPhone photos), which FDTP reads
+#                          with dlopen when one is opened: when it is missing,
+#                          root is asked to install it with apt; others are
+#                          told the apt line. HEIF=yes|no (yes: there now)
 # The caller sets PDIR (this directory), UID_NOW (id -u), and PQ_AGAIN:
 # make-install (configure: make install asks again before the PIO change)
 # or now (fdtp-pomera-setup: asked again right before it).
-# FDTP_CONFIGURE_PROBE replaces the internal memory probe (the tests).
+# FDTP_CONFIGURE_PROBE replaces the internal memory probe (the tests);
+# FDTP_CONFIGURE_HEIF=yes|no whether libheif is installed, and
+# FDTP_CONFIGURE_APT the apt-get command (the tests).
 
 msg_init() {
 	locale_now=${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}
@@ -115,7 +123,7 @@ EOF
 }
 
 ask_internal() {
-	INTERNAL=no
+	INTERNAL=keep
 	say "== 内蔵メモリのマウント（Pomera DM250 だけ） ==" "== Mounting the internal memory (Pomera DM250 only) =="
 	found_fs=
 	if [ "$UID_NOW" != 0 ]; then
@@ -132,25 +140,115 @@ ask_internal() {
 		return ;;
 	esac
 	if [ "$MSG" = ja ]; then cat <<EOF
-標準の OS（ポメラのモード）で書いた文書がある内蔵メモリの領域（${found_fs}）を、
-起動のたびに /mnt/pomera-internal に読み取り専用でつなぎます。FDTP から読めます。
-注意:
-  - 読み取り専用です。内蔵メモリには何も書きません。
-  - /etc/fstab に 1 行足します（元は /etc/fstab.bak-internal に保存）。
-    やめるには: sudo sh $PDIR/pomera_mount_internal.sh unpersist
-  - 位置は日本語版の DM250 の値です。見つからない時はこの質問を飛ばします。
+標準 OS（ポメラのモード）の文書がある内蔵メモリ（${found_fs}）を
+/mnt/pomera-internal にマウントします。FDTP から利用できます。
+  1. 読み取り専用（既定）: /etc/fstab に 1 行追加します。
+     元の fstab は /etc/fstab.bak-internal に保存します。
+  2. 読み書き: 起動後に pomera-internal.service が点検してマウントします。
+  3. マウントしない
+設定をやめるには: sudo sh $PDIR/pomera_mount_internal.sh unpersist
 EOF
 	else cat <<EOF
-The area of the internal memory with the documents written in the stock OS (the
-Pomera mode; $found_fs) is attached read-only at /mnt/pomera-internal at every boot.
-FDTP can read them there.
-Notes:
-  - Read-only: nothing is written to the internal memory.
-  - Adds one line to /etc/fstab (the old one is kept as /etc/fstab.bak-internal).
-    To stop it: sudo sh $PDIR/pomera_mount_internal.sh unpersist
-  - The place is that of the Japanese DM250. Where nothing is found there, this question is skipped.
+Mount the internal memory containing documents from the stock OS (Pomera mode;
+${found_fs}) at /mnt/pomera-internal for use by FDTP.
+  1. Read-only (default): adds a line to /etc/fstab and saves the original
+     as /etc/fstab.bak-internal.
+  2. Read-write: pomera-internal.service checks and mounts it after boot.
+  3. Do not mount
+To stop either setting: sudo sh $PDIR/pomera_mount_internal.sh unpersist
 EOF
 	fi
-	ask_yn y "内蔵メモリを読み取り専用でマウントしますか" "Mount the internal memory read-only?"
-	INTERNAL=$ANSWER
+	if [ "$TTY" != yes ]; then
+		INTERNAL=ro
+		printf '%s\n' "$(pick "選択 [1/2/3] → 1（既定の答え、${why}）" "Choice [1/2/3] -> 1 (the default, $why)")"
+		return
+	fi
+	while :; do
+		printf '%s ' "$(pick '選択 [1/2/3]:' 'Choice [1/2/3]:')"
+		if ! read -r a; then a=; echo; fi
+		case $a in
+		''|1) INTERNAL=ro; return ;;
+		3) INTERNAL=no; return ;;
+		2)
+			if [ "$MSG" = ja ]; then cat <<EOF
+読み書きを選ぶと Linux から内蔵メモリに書けます。純正のポメラのモードでも同じファイルが見えます。
+Pomera が止まった時に書いていたファイルは、戻らないことがあります。
+起動時は「使用中」の印だけを見ます。印が残っていた時（前回止まった時）だけ、
+起動後に fsck.fat -n（読むだけ）で点検します。毎回は流さないので起動は遅くなりません。
+dosfstools が純正 OS の Shift_JIS の短い名前を誤って改名するため、自動修復はしません。
+既知の指摘だけなら読み書きで、それ以外なら読み取り専用でマウントし、
+ログイン時と FDTP 起動時に結果を知らせます。
+点検には dosfstools（fsck.fat）が要ります。無い時は sudo apt install dosfstools
+やめるには: sudo sh $PDIR/pomera_mount_internal.sh unpersist
+EOF
+			else cat <<EOF
+Read-write lets Linux write to the internal memory. The same files are visible
+in the stock Pomera mode. A file being written when the Pomera stops may be lost.
+At boot only the in-use flag is checked. If it remains set (the Pomera stopped
+last time), fsck.fat -n checks the memory after boot without writing to it.
+It does not run every time, so it does not slow down boot.
+There is no automatic repair: dosfstools can incorrectly rename Shift_JIS short
+names used by the stock OS. With only known findings it mounts read-write; otherwise
+it mounts read-only. The result is shown at login and when FDTP starts.
+The check needs dosfstools (fsck.fat): sudo apt install dosfstools
+To stop it: sudo sh $PDIR/pomera_mount_internal.sh unpersist
+EOF
+			fi
+			ask_yn n "それでも読み書きにしますか" "Mount it read-write anyway?"
+			if [ "$ANSWER" = yes ]; then INTERNAL=rw; return; fi ;;
+		*) say "1・2・3 のどれかで答えてください。" "Please answer 1, 2 or 3." ;;
+		esac
+	done
+}
+
+HEIF_PKGS='libheif1 libheif-plugin-libde265'
+heif_have() {
+	case ${FDTP_CONFIGURE_HEIF:-} in yes) return 0 ;; no) return 1 ;; esac
+	if command -v dpkg-query >/dev/null 2>&1; then
+		for p in $HEIF_PKGS; do
+			case $(dpkg-query -W -f='${Status}' "$p" 2>/dev/null) in *" installed") ;; *) return 1 ;; esac
+		done
+		return 0
+	fi
+	{ /sbin/ldconfig -p 2>/dev/null || ldconfig -p 2>/dev/null; } | grep -q 'libheif\.so\.1 '
+}
+
+ask_heif() {
+	say "== HEIC（iPhone の写真） ==" "== HEIC (iPhone photos) =="
+	if heif_have; then
+		HEIF=yes
+		say "libheif があるので、HEIC の写真を画像の表示で開けます。" "libheif is installed: the image viewer opens HEIC photos."
+		return
+	fi
+	HEIF=no
+	apt=${FDTP_CONFIGURE_APT:-apt-get}
+	if [ "$UID_NOW" != 0 ] || ! command -v "${apt%% *}" >/dev/null 2>&1; then
+		say "HEIC を開くには libheif が要ります。入れるには: sudo apt install $HEIF_PKGS" \
+			"Opening HEIC needs libheif. To install it: sudo apt install $HEIF_PKGS"
+		return
+	fi
+	if [ "$MSG" = ja ]; then cat <<EOF
+iPhone のカメラの写真（HEIC）を FDTP の画像の表示で開くための部品
+（$HEIF_PKGS）を apt で入れます。
+FDTP は libheif を写真を開く時に読むので、入れなくても FDTP は動きます（HEIC だけ開けません）。
+あとで入れても FDTP の作り直しは要りません。
+外すには: sudo apt remove $HEIF_PKGS
+EOF
+	else cat <<EOF
+Installs $HEIF_PKGS with apt, for opening iPhone camera photos (HEIC)
+in FDTP's image viewer. FDTP reads libheif when a photo is opened: without it
+FDTP still works (only HEIC does not open), and installing it later needs no rebuild.
+To remove it: sudo apt remove $HEIF_PKGS
+EOF
+	fi
+	ask_yn y "HEIC を開くには libheif が要ります。入れますか" "Opening HEIC needs libheif. Install it?"
+	if [ "$ANSWER" != yes ]; then
+		say "入れませんでした。あとで入れるには: sudo apt install $HEIF_PKGS" \
+			"Not installed. To install it later: sudo apt install $HEIF_PKGS"
+	elif $apt install -y $HEIF_PKGS; then
+		HEIF=yes
+	else
+		say "入りませんでした（上の理由）。あとで入れるには: sudo apt install $HEIF_PKGS" \
+			"It was not installed (see above). To install it later: sudo apt install $HEIF_PKGS"
+	fi
 }

@@ -17,9 +17,13 @@ int keys_parse(const char *token, Key *out);
 int keys_equal(const Key *a, const Key *b);
 /* SCRIPT_MODS: HOLD-SHIFT / RELEASE-SHIFT (Shift pressed or released alone,
  * mods = the modifiers held afterwards). */
+/* SCRIPT_REALWAIT: REALWAIT:seconds, real time with ticks for child jobs. */
+/* SCRIPT_CLICK: CLICK:COL,ROW or CLICK:COL,ROW,CMD / SHIFT / POINT, a mouse
+ * click on the filer's cell (filer_mouse; the macOS window's). width and
+ * height carry the cell, mods the FILER_* action. */
 /* SCRIPT_DISPLAY: DISPLAY:WxH, the headless run's screen becomes W x H
  * pixels (as an X window resized; WIDE_NOTES.md). */
-typedef enum { SCRIPT_KEY, SCRIPT_SNAP, SCRIPT_WAIT, SCRIPT_END, SCRIPT_ERROR, SCRIPT_MODS, SCRIPT_DISPLAY } ScriptKind;
+typedef enum { SCRIPT_KEY, SCRIPT_SNAP, SCRIPT_WAIT, SCRIPT_END, SCRIPT_ERROR, SCRIPT_MODS, SCRIPT_DISPLAY, SCRIPT_REALWAIT, SCRIPT_CLICK } ScriptKind;
 typedef struct { const char *text; size_t pos; int quoted; char error[128]; int mods; } KeyScript;
 typedef struct { ScriptKind kind; Key key; double seconds; int mods; int width, height; } ScriptEvent;
 void keys_script_init(KeyScript *s, const char *text);

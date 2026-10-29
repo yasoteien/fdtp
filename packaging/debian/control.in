@@ -4,7 +4,7 @@ Architecture: @ARCH@
 Maintainer: @MAINTAINER@
 Installed-Size: @INSTALLED_SIZE@
 Depends: @DEPENDS@
-Recommends: zip, unzip, lhasa
+Recommends: zip, unzip, lhasa, dosfstools, libheif1, libheif-plugin-libde265
 Suggests: uim-mozc | uim-anthy, python3
 Section: utils
 Priority: optional

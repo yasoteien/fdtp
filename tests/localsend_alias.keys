@@ -1,0 +1,5 @@
+z END UP UP UP UP UP SNAP # alias
+RET C-u "edited alias" RET SNAP # edited
+ESC y SNAP # written
+z END UP UP UP UP UP SNAP # reopened
+ESC n SNAP # closed

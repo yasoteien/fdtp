@@ -40,7 +40,7 @@ export TMPDIR := $(BUILD)/tmp
 # needs 64-bit file offsets for files over 2 GB.
 CFLAGS_ALL = -O2 -std=c11 -D_DEFAULT_SOURCE -D_FILE_OFFSET_BITS=64 -Wall -Wextra -MMD -MP $(CFLAGS)
 INCLUDES = -I$(APP_DIR)/src -I$(BUILD)
-COMMON = font24 cells canvas raster dirlist fdscreen keys widgets commands app filer headless fileops textview hexview jis archive config launcher pdfview slideview sysinfo splitjoin order_box pdftools
+COMMON = font24 cells canvas raster dirlist fdscreen keys widgets commands app filer headless fileops textview hexview jis archive config launcher pdfview slideview sysinfo splitjoin order_box pdftools pomera_notice localsend_ui
 # Modules with their own libraries: mk/*.mk add to MODULES and the flags.
 MODULES :=
 MODULE_CFLAGS :=
@@ -95,6 +95,9 @@ clean:
 # set here because /usr/bin/make itself drops DYLD_* from its environment.
 check: i18n-check $(CHECK_EXE)
 	$(if $(FIXENV),DYLD_INSERT_LIBRARIES="$(FIXENV)") CC="$(CC)" FDTP_COMMON="$(COMMON)" FDTP_MODULE_LIBS="$(MODULE_LIBS)" python3 -B $(APP_DIR)/tests/check.py --build $(BUILD) --executable $(CHECK_EXE) $(CHECK_MODE)
+	python3 -B $(APP_DIR)/tests/check_localsend_ui.py --build $(BUILD)
+	python3 -B $(APP_DIR)/tests/check_mouse.py --build $(BUILD)
+	$(if $(LOCALSEND_EXE),python3 -B $(APP_DIR)/tests/check_localsend_browser_e2e.py --build $(BUILD))
 # T1's refactor check against stage 0 (844bd79). The screen has changed on
 # purpose since (gap before sizes, ".." not hidden), so it is run by hand only.
 # Not in the public copy (it has no such commit).

@@ -1,4 +1,5 @@
 表示の言語: auto（環境）/ ja（日本語）/ en（英語）。RET で切替	Language: auto (locale) / ja (Japanese) / en (English); RET cycles
+LocalSend で見えるこの機器の名前（空ならホスト名）	Device name visible on LocalSend (empty: host name)
 C-e・Alt+e で使うエディタ（空なら $VISUAL・$EDITOR・vi）	C-e/Alt+e editor (empty: $VISUAL, $EDITOR, vi)
 使いません（FDclone との互換のため読むだけ）	Unused (read for FDclone compatibility)
 Shift+F6 と x で使うシェル（空なら $SHELL）	Shell for Shift+F6 and x (empty: $SHELL)
@@ -40,3 +41,4 @@ docx・xlsx の Ctrl+z・Ctrl+y で戻せる段数（1〜1000。既定 100）	do
 三点リーダを偶数個に	Use an even number of ellipses
 記号だけの行は区切り（前後に空行）	Blank lines around symbol-only scene breaks
 Web 形式の空行を除く（原稿形式に）	Remove Web-format blank lines (manuscript form)
+Mac で公式の LocalSend とぶつかった時: ask（聞く）/ fdtm（常に FDTM）/ official（常に公式）。RET で切替	On a Mac, when the official LocalSend app is in the way: ask / fdtm (always FDTM) / official (always it). RET switches

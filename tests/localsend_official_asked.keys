@@ -1,0 +1,4 @@
+# FDTM: the official LocalSend app starts while receiving (docs/FDTP_MACOS.md).
+M-l r REALWAIT:0.6 WAIT:2 REALWAIT:0.1 SNAP # asked
+l REALWAIT:0.1 SNAP # left
+ESC REALWAIT:0.1 SNAP # closed

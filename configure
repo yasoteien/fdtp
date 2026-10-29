@@ -11,9 +11,11 @@
 #    (port/app/platform here, lib/rmp-platform in the public copy)
 #    (tests/check_configure.py checks that it does).
 # 2. Asks, each question after what it does and how to undo it: the
-#    language of the screens; on a Pomera DM250 only, the Wi-Fi stability
-#    settings and the read-only mount of the internal memory. Enter takes
-#    the default; --yes, or no terminal, takes every default.
+#    language of the screens; on Linux, installing libheif for HEIC photos
+#    when it is missing (root only; others are told the apt line); on a
+#    Pomera DM250 only, the Wi-Fi stability settings and the read-only mount
+#    of the internal memory. Enter takes the default; --yes, or no terminal,
+#    takes every default.
 # 3. Writes the answers to config.mk, which mk/install.mk reads.
 # Messages are in Japanese when LC_ALL, LC_MESSAGES or LANG (the first one
 # set) is ja* (not on the Linux console, which cannot show Japanese).
@@ -26,6 +28,9 @@
 #   FDTP_CONFIGURE_PROBE    the internal memory probe (a command printing
 #                           vfat or exfat when found)
 #   FDTP_CONFIGURE_TTY      yes|no: whether to ask (default: stdin is a terminal)
+#   FDTP_CONFIGURE_HEIF     yes|no: whether libheif is installed
+#   FDTP_CONFIGURE_APT      the apt-get command (installing libheif)
+#   FDTP_CONFIGURE_BREW     the Homebrew prefix (default /opt/homebrew)
 #   PKG_CONFIG, CC          as usual
 # This file is part of FDTP (File & Directory Tool for Pomera).
 # SPDX-FileCopyrightText: 2026 yasoteien
@@ -62,7 +67,8 @@ pc zlib zlib1g-dev need office
 pc expat libexpat1-dev need office
 lib mupdf:mupdf/fitz.h libmupdf-dev need pdf
 lib uim:uim/uim.h libuim-dev opt ime
-lib uim-scm:uim/uim.h libuim-dev opt ime'
+lib uim-scm:uim/uim.h libuim-dev opt ime
+pc openssl libssl-dev opt localsend'
 # Commands FDTP runs (archives): missing ones only warn.
 RUNTIME='zip zip
 unzip unzip
@@ -107,7 +113,7 @@ say "FDTP の ./configure（${SRC}）" "FDTP's ./configure ($SRC)"
 # ---- 1. what the build needs ------------------------------------------------------
 TMPD=$(mktemp -d "${TMPDIR:-/tmp}/fdtp-configure.XXXXXX") || exit 1
 trap 'rm -rf "$TMPD"' EXIT INT TERM
-MISSING= HAVE_XCB=no HAVE_UIM=no
+MISSING= HAVE_XCB=no HAVE_UIM=no HAVE_SSL=no
 add_missing() { case " $MISSING " in *" $1 "*) ;; *) MISSING="$MISSING $1" ;; esac; }
 found() { printf '  %-28s %s\n' "$1" "$(pick "あり" "found")"; }
 lacking() { printf '  %-28s %s\n' "$1" "$(pick "無し（$2）" "missing ($2)")"; }
@@ -151,7 +157,7 @@ else
 			label="$name ($pkg)"
 			if [ "$ok" = ok ]; then
 				found "$label"
-				case $feature in x11) HAVE_XCB=yes ;; ime) [ "$name" = uim ] && HAVE_UIM=yes ;; esac
+				case $feature in x11) HAVE_XCB=yes ;; ime) [ "$name" = uim ] && HAVE_UIM=yes ;; localsend) HAVE_SSL=yes ;; esac
 			elif [ "$need" = need ]; then lacking "$label" "apt: $pkg"; add_missing "$pkg"
 			else lacking "$label" "$(pick "任意" "optional")"
 			fi
@@ -169,6 +175,8 @@ else
 		"no libxcb1-dev: FDTP is built without the X window (DRM/KMS only)."
 	[ "$HAVE_UIM" = yes ] || warn "libuim-dev が無いので、日本語入力無し（NOVEL_IME=ime_none）で作ります。" \
 		"no libuim-dev: FDTP is built without Japanese input (NOVEL_IME=ime_none)."
+	[ "$HAVE_SSL" = yes ] || warn "libssl-dev が無いので、LocalSend の送受信（fdtp-localsend）無しで作ります。" \
+		"no libssl-dev: FDTP is built without LocalSend (fdtp-localsend)."
 	runtime_missing=
 	while read -r cmd pkg; do have_cmd "$cmd" || runtime_missing="$runtime_missing $pkg"; done <<EOF
 $RUNTIME
@@ -204,7 +212,23 @@ else
 	fi
 fi
 
-STABILITY=no INTERNAL=no POMERA=no
+# HEIC: libheif is read with dlopen (src/img_modern.c), not needed to build.
+HEIF=no
+echo
+if [ "$UNAME" = Darwin ]; then
+	say "== HEIC（iPhone の写真） ==" "== HEIC (iPhone photos) =="
+	if [ -d "${FDTP_CONFIGURE_BREW:-/opt/homebrew}/opt/libheif" ]; then
+		HEIF=yes
+		say "Homebrew の libheif があるので、HEIC を開けます。" "Homebrew's libheif is there: HEIC opens."
+	else
+		say "HEIC を開くには libheif が要ります。入れるには: brew install libheif" \
+			"Opening HEIC needs libheif. To install it: brew install libheif"
+	fi
+else
+	ask_heif
+fi
+
+STABILITY=no INTERNAL=keep POMERA=no
 if [ "$UNAME" = Linux ] && [ "$NOPOMERA" = 0 ] && is_dm250 "$DT"; then POMERA=yes; fi
 if [ "$POMERA" = yes ]; then
 	echo
@@ -222,7 +246,7 @@ tmp=$OUT.tmp.$$
 	echo "PREFIX = $PREFIX"
 	echo "FDTP_LANGUAGE = $LANG_ANSWER"
 	echo "POMERA_STABILITY = $STABILITY"
-	echo "POMERA_INTERNAL_RO = $INTERNAL"
+	echo "POMERA_INTERNAL = $INTERNAL"
 	echo "HAVE_XCB = $HAVE_XCB"
 	echo "HAVE_UIM = $HAVE_UIM"
 	if [ "$UNAME" != Darwin ] && [ "$HAVE_UIM" = no ]; then echo "NOVEL_IME = ime_none"; fi
@@ -232,6 +256,7 @@ echo
 say "== 設定（$OUT に書きました） ==" "== Settings (written to $OUT) =="
 printf '  %s: %s\n' "PREFIX" "$PREFIX"
 printf '  %s: %s\n' "$(pick "言語" "language")" "$LANG_ANSWER"
+printf '  %s: %s\n' "$(pick "HEIC（libheif）" "HEIC (libheif)")" "$HEIF"
 if [ "$POMERA" = yes ]; then
 	printf '  %s: %s\n' "$(pick "Wi-Fi の安定化" "Wi-Fi stability")" "$STABILITY"
 	printf '  %s: %s\n' "$(pick "内蔵メモリのマウント" "internal memory mount")" "$INTERNAL"

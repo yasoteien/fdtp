@@ -12,6 +12,8 @@
  * column of each and its width. 80 columns: 1 2 3 5 lists of 80 40 26 16.
  * Wider (WIDE_NOTES.md): mode 2 has a list for every 40 columns, 3 for every
  * 26, 5 for every 16, the width shared out; mode 1 stays one list. */
+/* The name in the title, "FDTP"; the macOS window's is "FDTM". 4 letters. */
+extern const char *fdscreen_program;
 int fdscreen_slots(int columns);
 int fdscreen_slot_x(int columns, int slot);
 int fdscreen_slot_width(int columns);

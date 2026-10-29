@@ -1,0 +1,4 @@
+# FDTM: the official app starts while giving to browsers.
+DOWN DOWN M-l b REALWAIT:0.6 WAIT:2 REALWAIT:0.1 SNAP # asked
+l REALWAIT:0.1 SNAP # left
+ESC REALWAIT:0.1 SNAP # closed

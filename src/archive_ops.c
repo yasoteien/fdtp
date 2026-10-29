@@ -7,20 +7,21 @@
 /* Extract which[0..n) (all members when n==0) into dest, an existing
  * directory. Refuses the whole request when any of them would be written
  * outside dest. Returns 0, or -1 with a row-23 message in msg. */
-static int extract_members(const Archive *a,const size_t *which,size_t n,const char *dest,char *msg,size_t msgn)
+static int extract_native(const Archive *a,const size_t *which,size_t n,const char *dest,char *msg,size_t msgn)
 {
     size_t total=n ? n : a->count;
     for(size_t i=0;i<total;++i) {
         const char *bad=member_danger(a,&a->members[n ? which[i] : i]);
         if(bad) { snprintf(msg,msgn,T("危険な名前があるので取り出しません: %.60s"),bad); return -1; }
     }
-    if(a->format==FMT_LHA) { char *l=find_command("lhasa"); if(!l) { snprintf(msg,msgn,"%s",T("lhasa がありません")); return -1; } free(l); }
+    char *lhasa=NULL;
+    if(a->format==FMT_LHA && !(lhasa=find_lhasa())) { snprintf(msg,msgn,"%s",T("lhasa がありません")); return -1; }
     const char **argv=calloc(n+10,sizeof(*argv)); char **owned=calloc(n+1,sizeof(*owned));
-    if(!argv || !owned) { free(argv); free(owned); snprintf(msg,msgn,"%s",T("メモリが足りません")); return -1; }
+    if(!argv || !owned) { free(argv); free(owned); free(lhasa); snprintf(msg,msgn,"%s",T("メモリが足りません")); return -1; }
     size_t c=0; const char *cwd=NULL;
     if(a->format==FMT_TAR) { argv[c++]="tar"; argv[c++]="-xf"; argv[c++]=a->path; argv[c++]="-C"; argv[c++]=dest; if(n) argv[c++]="--"; }
     else if(a->format==FMT_ZIP) { argv[c++]="unzip"; argv[c++]="-o"; argv[c++]="-q"; argv[c++]="-d"; argv[c++]=dest; argv[c++]=a->path; }
-    else { argv[c++]="lhasa"; argv[c++]="xf"; argv[c++]=a->path; cwd=dest; }
+    else { argv[c++]=lhasa; argv[c++]="xf"; argv[c++]=a->path; cwd=dest; }
     int failed=0;
     for(size_t i=0;i<n;++i) {
         const Member *m=&a->members[which[i]];
@@ -45,7 +46,73 @@ static int extract_members(const Archive *a,const size_t *which,size_t n,const c
     }
 out:
     for(size_t i=0;i<n;++i) free(owned[i]);
-    free(owned); free(argv); return result;
+    free(owned); free(argv); free(lhasa); return result;
+}
+
+#ifdef __APPLE__
+/* The Mac (docs/FDTP_MACOS.md): APFS takes only UTF-8 names, and lhasa
+ * writes an LZH member under its stored name, Shift-JIS in most old
+ * archives. Such a member is printed (lhasa pq) into a file of its UTF-8
+ * name; its directories are made here, links among them are left out. */
+static int lha_sjis(const Member *m)
+{
+    int high=0; for(const char *p=m->raw;*p;++p) if((unsigned char)*p>=0x80) high=1;
+    return high && jis_detect((const unsigned char *)m->raw,strlen(m->raw))!=JIS_UTF8;
+}
+static int lha_print(const Archive *a,const Member *m,const char *lhasa,const char *dest,char *msg,size_t msgn)
+{
+    if(m->is_link || !*m->path) return 0;
+    char *target=join2(dest,m->path); if(!target) { snprintf(msg,msgn,"%s",T("メモリが足りません")); return -1; }
+    int result=-1;
+    if(m->is_dir) {
+        result=make_dirs(target,0755);
+        if(result<0) snprintf(msg,msgn,"%s",T("作業用のディレクトリを作れません"));
+        free(target); return result;
+    }
+    char *slash=strrchr(target,'/'); *slash=0; int made=make_dirs(target,0755); *slash='/';
+    int fd=made<0 ? -1 : open(target,O_WRONLY|O_CREAT|O_TRUNC,0644);
+    if(fd<0) { snprintf(msg,msgn,T("取り出せません: %.120s"),m->path); free(target); return -1; }
+    pid_t child=fork();
+    if(!child) {
+        int null=open("/dev/null",O_RDWR); if(null>=0) { dup2(null,0); dup2(null,2); close(null); }
+        dup2(fd,1); close(fd); setenv("LC_ALL","C",1);
+        execl(lhasa,lhasa,"pq",a->path,m->raw,(char *)NULL); _exit(127);
+    }
+    close(fd);
+    int status=-1; if(child>0) while(waitpid(child,&status,0)<0 && errno==EINTR) {}
+    if(child>0 && WIFEXITED(status) && WEXITSTATUS(status)==0) {
+        result=0;
+        if(m->mode & 0777) chmod(target,(mode_t)(m->mode & 0777));
+        if(m->mtime) { struct timespec t[2]={{m->mtime,0},{m->mtime,0}}; utimensat(AT_FDCWD,target,t,0); }
+    } else { unlink(target); snprintf(msg,msgn,T("取り出せません: %.120s"),m->path); }
+    free(target); return result;
+}
+#endif
+static int extract_members(const Archive *a,const size_t *which,size_t n,const char *dest,char *msg,size_t msgn)
+{
+#ifdef __APPLE__
+    if(a->format==FMT_LHA) {
+        size_t total=n ? n : a->count,sjis=0;
+        for(size_t i=0;i<total;++i) sjis+=(size_t)lha_sjis(&a->members[n ? which[i] : i]);
+        if(sjis) {
+            for(size_t i=0;i<total;++i) {
+                const char *bad=member_danger(a,&a->members[n ? which[i] : i]);
+                if(bad) { snprintf(msg,msgn,T("危険な名前があるので取り出しません: %.60s"),bad); return -1; }
+            }
+            char *lhasa=find_lhasa(); if(!lhasa) { snprintf(msg,msgn,"%s",T("lhasa がありません")); return -1; }
+            size_t *rest=calloc(total,sizeof(*rest)),count=0; int result=rest ? 0 : -1;
+            if(!rest) snprintf(msg,msgn,"%s",T("メモリが足りません"));
+            for(size_t i=0;i<total && !result;++i) {
+                size_t k=n ? which[i] : i;
+                if(lha_sjis(&a->members[k])) result=lha_print(a,&a->members[k],lhasa,dest,msg,msgn);
+                else rest[count++]=k;
+            }
+            if(!result && count) result=extract_native(a,rest,count,dest,msg,msgn);
+            free(rest); free(lhasa); return result;
+        }
+    }
+#endif
+    return extract_native(a,which,n,dest,msg,msgn);
 }
 
 static void reload_filers(App *a) { for(int i=0;i<a->depth;++i) filer_reload(a->screens[i],a); }

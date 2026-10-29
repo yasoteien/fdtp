@@ -39,6 +39,7 @@ void fdscreen_number(Cells *c, int end, int row, uint64_t value, int min_col)
     }
     text(c,end-width+1,row,s,WHITE,width);
 }
+const char *fdscreen_program = "FDTP";
 int fdscreen_slots(int columns)
 {
     switch (columns) {
@@ -61,12 +62,14 @@ void fdscreen_build(Cells *cells, const DirList *list, size_t cursor, int column
      * the date and the numbers on the right all of them; the fields between
      * the row 1 dividers, the path and the Info name widen. */
     const int X = FD_XCOLS;
-    const char *title = " << FDTP Version " FDTP_VERSION " >> ";
+    char title[64], name[32];
+    snprintf(name,sizeof(name),"%.4s Version " FDTP_VERSION,fdscreen_program);
+    snprintf(title,sizeof(title)," << %s >> ",name);
     int title_x = 35 + X/2 - cells_width(title)/2;
     next.title_start = title_x; next.title_end = title_x + cells_width(title);
     next.date_start = 60 + X; next.date_end = 76 + X;
     text(&next,title_x,0,title,WHITE,40);
-    text(&next,title_x+4,0,"FDTP Version " FDTP_VERSION,YELLOW,17);
+    text(&next,title_x+4,0,name,YELLOW,17);
     struct tm *tm = localtime(&now);
     char s[128];
     if (tm) strftime(s,sizeof(s)," %y-%m-%d %H:%M ",tm); else strcpy(s," -- -- -- --:-- ");

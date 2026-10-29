@@ -1,0 +1,5 @@
+# The sender leaves while asked (check_localsend_ui.py, fake mode gone).
+M-l r REALWAIT:1.3 SNAP # asked
+REALWAIT:0.8 SNAP # gone
+REALWAIT:0.6 SNAP # idle
+ESC REALWAIT:0.1 SNAP # closed

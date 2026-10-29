@@ -7,6 +7,7 @@
 #include "version.h"
 #include "fileops.h"
 #include "config.h"
+#include "pomera_notice.h"
 #include "app.h"
 #include "headless.h"
 #include "raster.h"
@@ -249,6 +250,7 @@ int main(int argc,char **argv)
     if(!screen) { perror(directory); return 1; }
     app_push(&a,screen);
     config_first_run(&a, 0);
+    pomera_notice_start(&a, 0);   /* revision 1 §6 */
     Canvas *canvas=malloc(sizeof(*canvas)); Cells cells; cells_init(&cells);
     Texture texture={0}; int result=0,mods=0;
     if(!canvas) { app_destroy(&a); return 1; }

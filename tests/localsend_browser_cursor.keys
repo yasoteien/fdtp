@@ -1,0 +1,2 @@
+DOWN M-l B REALWAIT:0.4 SNAP # ready
+ESC REALWAIT:0.1 SNAP # closed

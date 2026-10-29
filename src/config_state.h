@@ -8,11 +8,16 @@
 #include "commands.h"
 #include "novel_format.h"
 /* EDITOR ... FILETYPE, NOVEL_WORD_RUBY, then NOVEL_FORMAT_<NAME> (novel_format.h),
- * then LANGUAGE, SCREENSIZE (WIDE_NOTES.md), AWAKE_MINUTES (revision 1 item 28),
+ * then LOCALSEND_OFFICIAL, LOCALSEND_ALIAS, LANGUAGE, SCREENSIZE (WIDE_NOTES.md), AWAKE_MINUTES (revision 1 item 28),
  * SPLIT_SIZE (item 37) and UNDO_LEVELS (item 38). LANGUAGE precedes the
  * screen/awake/split/undo group to preserve its END-relative navigation. */
 #define CONFIG_BASE_VARIABLES 9
-#define CONFIG_LANGUAGE (CONFIG_BASE_VARIABLES + NOVEL_FORMAT_COUNT)
+/* LOCALSEND_OFFICIAL (docs/FDTP_MACOS.md): ask / fdtm / official, before
+ * LOCALSEND_ALIAS so that the others keep their places in the customizer,
+ * from the top and from END alike. */
+#define CONFIG_OFFICIAL (CONFIG_BASE_VARIABLES + NOVEL_FORMAT_COUNT)
+#define CONFIG_LOCALSEND (CONFIG_OFFICIAL + 1)
+#define CONFIG_LANGUAGE (CONFIG_LOCALSEND + 1)
 #define CONFIG_SCREENSIZE (CONFIG_LANGUAGE + 1)
 #define CONFIG_AWAKE (CONFIG_SCREENSIZE + 1)
 #define CONFIG_SPLIT (CONFIG_AWAKE + 1)

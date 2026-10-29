@@ -30,6 +30,7 @@ The screens are in English or Japanese:
 - The Pomera's Alt key works. The Alt commands can also be reached with Shift+F1 to F10 and Ctrl+letter.
 - Archives: browse, create and extract tar (gz, bz2, xz), zip and LHa.
 - Split a file into pieces (Alt+n, 10 MB each by default) and join them again (Alt+h).
+- LocalSend (Alt+l): exchange files with an iPhone, Mac and other devices. The other device can also download them in a browser.
 - System information (Alt+i): screen output, key devices, memory, disk, battery, the GPU power setting, and more.
 
 **Viewers and editors** (`v` or Enter)
@@ -38,7 +39,7 @@ The screens are in English or Japanese:
 - The PDF menu (Alt+p): merge, split, extract, delete, reorder and rotate pages, add or remove a password, compress, PDF to JPEG, and JPEG/PNG to PDF. Everything runs on the Pomera; nothing is sent anywhere.
 - docx: edit paragraphs. xlsx and csv: edit cells, with recalculation of common functions. Undo and redo with Ctrl+z and Ctrl+y (100 steps by default).
 - pptx: edit the text on the slides, and show them full screen with F5 (Esc to return).
-- Images: JPEG, PNG, GIF, BMP, WebP, and the PC-98 formats MAG and Pi.
+- Images: JPEG, PNG, GIF, BMP, WebP, HEIC (iPhone photos, with libheif), and the PC-98 formats MAG and Pi.
 
 **Novel editor** (`e` or F9)
 - A writing editor for Japanese manuscripts. It shows ruby (furigana) and emphasis dots from the notation used by Japanese web novel sites, and writes vertically or horizontally.
@@ -90,7 +91,9 @@ sudo make install           # sudo make uninstall removes it
    - Before writing, it saves the original 1 MiB. To undo: `sudo sh scripts/pomera/pomera_dma_pio.sh restore`.
    - `sudo make install` asks once more before it writes to the card.
    - Battery life gets slightly shorter, and Wi-Fi may be slower. A reboot is needed.
-3. **Only on a Pomera DM250**: mount the internal memory (where the Pomera's own editor keeps its documents) read-only at `/mnt/pomera-internal` on every boot. It never writes to the internal memory. To stop: `sudo sh scripts/pomera/pomera_mount_internal.sh unpersist`. If the area is not found, this question is skipped.
+3. **Only on a Pomera DM250**: mount the internal memory at `/mnt/pomera-internal`. Choose read-only (default), read-write, or no mount. If the location is not found, the question is skipped and the previous setting stays. To stop mounting it, run `sudo sh scripts/pomera/pomera_mount_internal.sh unpersist`.
+   - If you choose read-write, setup explains the risks and asks again. A file being written when the Pomera freezes may not be recoverable.
+   - On boot, if the dirty flag is set, `fsck.fat -n` from `dosfstools` checks the memory without writing. It does not repair it automatically. If a problem is found, the memory is mounted read-only and you are notified at login and when FDTP starts.
 
 Options: `--yes` (take the defaults), `--lang=ja|en|auto`, `--prefix=DIR` (default `/usr/local`), `--no-pomera` (skip the Pomera questions). `sudo make uninstall` does not undo the Pomera settings; it prints how to undo them.
 
@@ -106,6 +109,9 @@ C11 compiler (gcc or clang), GNU make, Python 3 (standard library only, for gene
 | Images | libjpeg-dev libpng-dev libgif-dev libwebp-dev |
 | docx, xlsx, zip | zlib1g-dev libexpat1-dev |
 | Japanese input (optional) | libuim-dev |
+| LocalSend (optional) | libssl-dev |
+
+`libheif1` and `libheif-plugin-libde265`, for HEIC, are not needed to build (FDTP loads them when it opens a HEIC file).
 
 At run time, archives use the `zip`, `unzip`, `lhasa` and `tar` commands.
 
@@ -120,6 +126,14 @@ Building on the Pomera works but is slow. On an amd64 Debian 13 machine:
 #### Tests
 
 `make check` runs the tests without a screen (`--headless`). It also works on macOS, where `make preview DIR=~ OUT=preview.ppm` writes a screen to an image (Homebrew: `jpeg-turbo libpng giflib webp`). `tests/check_*.py --build build` are the tests for each feature. `check_novel_format.py` compares against manuscripts that are not in this repository and is skipped without them. `check_pdf.py` runs on a real Pomera over ssh.
+
+## Updating
+
+Install the new version over the old one; there is no need to remove it first. Check the current version with `fdtp -v`.
+
+If you installed a .deb, install the new one with `sudo apt install ./fdtp_<new-version>-1_armhf.deb`. If you installed from source, get the new source and run `./configure`, `make -j4` and `sudo make install`.
+
+The program, helper, menu and manual are replaced. Your `~/.fdtprc`, input history and LocalSend certificate stay. Only the language line in `/etc/fdtprc` changes. A Pomera setting is replaced if you choose a different answer, and kept if the question is skipped.
 
 ## Battery
 

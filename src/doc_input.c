@@ -5,6 +5,7 @@
 /* Row-23 input line with the input method (see doc_input.h). */
 #include "doc_input.h"
 #include "font24.h"
+#include "canvas.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -195,6 +196,7 @@ void doc_input_draw(DocInput *in, Cells *c)
         x += font24_width(s);
     }
     if (in->cursor >= in->len && !*pe.text && x < FD_COLS) cells_put(c, x, FD_LINE, ' ', BG, WHITE);
+    if (in->ime) ime_caret(in->ime, CANVAS_GRID_X + caret * 12, FD_LINE * 24, 24);
     /* The candidate list, above the line at the caret. */
     ImeCandidates cand = {0};
     if (in->ime) ime_candidates(in->ime, &cand);

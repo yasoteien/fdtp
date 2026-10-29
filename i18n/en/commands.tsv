@@ -98,3 +98,4 @@ sHell   シェル	sHell   Shell
 開く（ディレクトリなら入る）	Open (enter directory)
 隠しファイルの表示	Show dotfiles
 隠しファイルの表示・非表示	Show / hide dotfiles
+LocalSend で送る・受け取る	Send / receive with LocalSend

@@ -1419,6 +1419,9 @@ static void draw_bands(Novel *v, App *a, Canvas *c, Cells *cells)
 }
 static void draw_candidates(Novel *v, Canvas *c)
 {
+    if (v->ask == ASK_NAME) ime_caret(v->ime, v->field_x, v->field_y, 24);
+    else if (v->prompt != P_NONE) ime_caret(v->ime, v->caret_x, FD_LINE * 24, 24);
+    else ime_caret(v->ime, v->caret_x, v->caret_y, 24);
     ImeCandidates cand;
     ime_candidates(v->ime, &cand);
     if (!cand.active || !cand.shown) return;

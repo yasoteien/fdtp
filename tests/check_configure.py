@@ -95,12 +95,14 @@ class Machine:
 
     def configure(self, *args, uname="Linux", uid="1000", probe=None, tty=None, stdin="", lang=None, term=None,
                   pc="libdrm gbm egl glesv2 xcb libjpeg libpng libwebp zlib expat",
-                  libs="gif mupdf uim uim-scm", shell="sh"):
+                  libs="gif mupdf uim uim-scm", shell="sh", heif="yes", apt=None, brew=None):
         if os.path.exists(self.out):
             os.remove(self.out)
         env = base_env(FDTP_CONFIG_MK=self.out, FDTP_CONFIGURE_UNAME=uname, FDTP_CONFIGURE_DT=self.dt,
                        FDTP_CONFIGURE_UID=uid, PKG_CONFIG=self.pkg_config, CC=self.cc, FAKE_PC=pc, FAKE_LIBS=libs,
-                       FDTP_CONFIGURE_PROBE=probe if probe is not None else "echo should-not-run; exit 1")
+                       FDTP_CONFIGURE_PROBE=probe if probe is not None else "echo should-not-run; exit 1",
+                       FDTP_CONFIGURE_HEIF=heif, FDTP_CONFIGURE_BREW=brew or os.path.join(self.root, "no-brew"),
+                       FDTP_CONFIGURE_APT=apt or "echo apt-should-not-run; false")
         if uname == "Darwin":
             env["CC"] = "cc"
         if tty:
@@ -153,10 +155,11 @@ def test_deps_cover_makefiles():
         for m in re.finditer(r"(?<![\w-])-l([a-z](?:[\w-]*\w)?)(?=[\s)]|$)", text):
             used.add("-l" + m.group(1))
     # -lNAME that a pkg-config module stands for (the Mac branches name the
-    # libraries directly); libm is libc's.
-    alias = {"-ljpeg": "libjpeg", "-lpng": "libpng", "-lwebp": "libwebp", "-lz": "zlib", "-lexpat": "expat"}
+    # libraries directly); libm and libdl are libc's.
+    alias = {"-ljpeg": "libjpeg", "-lpng": "libpng", "-lwebp": "libwebp", "-lz": "zlib", "-lexpat": "expat",
+             "-lssl": "openssl", "-lcrypto": "openssl"}
     for u in sorted(used):
-        if u in ("-lm",) or u.startswith("$"):
+        if u in ("-lm", "-ldl") or u.startswith("$"):
             continue
         name = alias.get(u, u[2:] if u.startswith("-l") else u)
         check(name in listed, "%s (from the Makefiles) is not in configure's list" % u)
@@ -167,7 +170,7 @@ def test_darwin(m):
     code, text, mk = m.configure("--yes", "--no-pomera", "--prefix=/opt/fdtp/", uname="Darwin")
     check(code == 0, "Darwin --yes failed: " + text)
     check(mk == {"FDTP_CONFIGURED": "yes", "PREFIX": "/opt/fdtp", "FDTP_LANGUAGE": "auto", "POMERA_STABILITY": "no",
-                 "POMERA_INTERNAL_RO": "no", "HAVE_XCB": "no", "HAVE_UIM": "no"}, "Darwin config.mk: %s" % mk)
+                 "POMERA_INTERNAL": "keep", "HAVE_XCB": "no", "HAVE_UIM": "no"}, "Darwin config.mk: %s" % mk)
     check("Wi-Fi" not in text and "pkg-config" not in text, "Darwin asked about the Pomera or pkg-config")
     check("make install is for Linux" in text, "Darwin: no note that make install is for Linux")
     # The Pomera questions never come on the Mac, even with a DM250 tree.
@@ -223,7 +226,7 @@ def test_pomera(m):
     print("== Pomera DM250")
     m.device(POMERA_DT, b"King Jim Pomera DM250\0")
     code, text, mk = m.configure("--yes")
-    check(code == 0 and mk and mk["POMERA_STABILITY"] == "yes" and mk["POMERA_INTERNAL_RO"] == "no", "DM250 --yes: %s" % mk)
+    check(code == 0 and mk and mk["POMERA_STABILITY"] == "yes" and mk["POMERA_INTERNAL"] == "keep", "DM250 --yes: %s" % mk)
     check("Finding the internal memory needs root" in text and "should-not-run" not in text, "not root: probe not skipped")
     i_notes, i_ask = text.find("Notes:"), text.find("Make the Wi-Fi stable? [Y/n]")
     check(0 <= i_notes < i_ask, "Wi-Fi: the notes are not before [Y/n]")
@@ -237,22 +240,34 @@ def test_pomera(m):
     check(mk and mk["POMERA_STABILITY"] == "no" and "Wi-Fi" not in text, "--no-pomera asked")
     # Root: the probe finds the FAT.
     code, text, mk = m.configure("--yes", uid="0", probe="echo vfat")
-    check(mk and mk["POMERA_INTERNAL_RO"] == "yes", "root, vfat found: %s" % mk)
-    i_notes, i_ask = text.rfind("Notes:"), text.find("Mount the internal memory read-only? [Y/n]")
-    check(0 <= i_notes < i_ask and "unpersist" in text and "/etc/fstab" in text, "internal: notes not before [Y/n]")
+    check(mk and mk["POMERA_INTERNAL"] == "ro", "root, vfat found: %s" % mk)
+    i_notes, i_ask = text.find("To stop either setting:"), text.find("Choice [1/2/3]")
+    check(0 <= i_notes < i_ask and "unpersist" in text and "/etc/fstab" in text, "internal: undo instructions not before choice")
     code, text, mk = m.configure("--yes", uid="0", probe="echo ext4")
-    check(mk and mk["POMERA_INTERNAL_RO"] == "no" and "Mount the internal memory" not in text and "skipped" in text,
+    check(mk and mk["POMERA_INTERNAL"] == "keep" and "Mount the internal memory" not in text and "skipped" in text,
           "root, no FAT: %s" % text)
     code, text, mk = m.configure("--yes", uid="0", probe="exit 1")
-    check(mk and mk["POMERA_INTERNAL_RO"] == "no" and "skipped" in text, "root, probe failed")
+    check(mk and mk["POMERA_INTERNAL"] == "keep" and "skipped" in text, "root, probe failed")
     # Interactive, in Japanese: language 1 (after a wrong answer), Wi-Fi no, internal default.
     code, text, mk = m.configure(uid="0", probe="echo exfat", tty="yes", stdin="9\n1\nn\n\n", lang="ja_JP.UTF-8")
-    check(code == 0 and mk and mk["FDTP_LANGUAGE"] == "ja" and mk["POMERA_STABILITY"] == "no" and mk["POMERA_INTERNAL_RO"] == "yes",
+    check(code == 0 and mk and mk["FDTP_LANGUAGE"] == "ja" and mk["POMERA_STABILITY"] == "no" and mk["POMERA_INTERNAL"] == "ro",
           "interactive ja: %s %s" % (mk, text))
     check("== Wi-Fi の安定化（Pomera DM250 だけ） ==" in text and "1・2・3 のどれかで" in text, "ja messages")
     i_notes, i_ask = text.find("注意:"), text.find("Wi-Fi を安定させますか [Y/n]")
     check(0 <= i_notes < i_ask, "ja: notes not before [Y/n]")
-    check(text.find("やめるには:") < text.find("内蔵メモリを読み取り専用でマウントしますか [Y/n]"), "ja internal: notes after [Y/n]")
+    check(0 <= text.find("設定をやめるには:") < text.find("選択 [1/2/3]"), "ja internal: undo instructions after choice")
+    # Choose rw, decline its warning, and choose no; confirm rw; reject invalid input.
+    for answers, expected in (("2\nn\n3\n", "no"), ("2\ny\n", "rw"), ("x\n1\n", "ro")):
+        code, text, mk = m.configure("--lang=en", uid="0", probe="echo vfat", tty="yes", stdin="n\n" + answers)
+        check(code == 0 and mk and mk.get("POMERA_INTERNAL") == expected,
+              "interactive internal %r: %s %s" % (answers, mk, text))
+        if answers.startswith("2"):
+            check("fsck.fat -n" in text and "Mount it read-write anyway? [y/N]" in text,
+                  "read-write warning missing: " + text)
+            if expected == "no":
+                check(text.count("Choice [1/2/3]") >= 2, "declined read-write did not return to choice: " + text)
+        if answers.startswith("x"):
+            check("Please answer 1, 2 or 3." in text and text.count("Choice [1/2/3]") >= 2, "invalid internal choice: " + text)
     # y/n: a wrong answer is asked again; EOF takes the default.
     code, text, mk = m.configure(tty="yes", stdin="2\nmaybe\nn\n")
     check(mk and mk["FDTP_LANGUAGE"] == "en" and mk["POMERA_STABILITY"] == "no" and "Please answer y or n." in text,
@@ -267,7 +282,51 @@ def test_pomera(m):
     check("Make the Wi-Fi stable?" in text and "cannot show Japanese" in text, "TERM=linux not in English")
     for sh in SHELLS:
         code, text, mk = m.configure("--yes", uid="0", probe="echo vfat", lang="ja_JP.UTF-8", shell=sh)
-        check(code == 0 and mk and mk["POMERA_INTERNAL_RO"] == "yes", "%s: %s" % (sh, text))
+        check(code == 0 and mk and mk["POMERA_INTERNAL"] == "ro", "%s: %s" % (sh, text))
+    m.device()
+
+
+def test_heif(m):
+    """libheif (HEIC) is read by FDTP with dlopen: configure only tells or,
+    as root, offers to install it with apt (FDTP_CONFIGURE_APT replaces it)."""
+    print("== HEIC (libheif)")
+    m.device(b"raspberrypi,4-model-b\0")
+    log = os.path.join(m.root, "apt.log")
+    fake_apt = os.path.join(m.bin, "fake-apt")
+    with open(fake_apt, "w") as f:
+        f.write('#!/bin/sh\necho "$*" >> "%s"\n[ -z "$FAKE_APT_FAIL" ]\n' % log)
+    os.chmod(fake_apt, 0o755)
+    code, text, mk = m.configure("--yes")
+    check(code == 0 and "libheif is installed" in text and "HEIC (libheif): yes" in text, "heif found: " + text)
+    # Not root: the apt line only, no question.
+    code, text, mk = m.configure("--yes", heif="no")
+    check(code == 0 and "To install it: sudo apt install libheif1 libheif-plugin-libde265" in text
+          and "Install it?" not in text and "apt-should-not-run" not in text and "HEIC (libheif): no" in text,
+          "heif missing, not root: " + text)
+    # Root: what it does first, then [Y/n]; yes installs, no tells the line.
+    if os.path.exists(log):
+        os.remove(log)
+    code, text, mk = m.configure("--yes", heif="no", uid="0", apt=fake_apt)
+    i_notes, i_ask = text.find("To remove it: sudo apt remove"), text.find("Opening HEIC needs libheif. Install it? [Y/n]")
+    check(code == 0 and 0 <= i_notes < i_ask and "HEIC (libheif): yes" in text, "heif root --yes: " + text)
+    check(os.path.exists(log) and open(log).read() == "install -y libheif1 libheif-plugin-libde265\n", "heif: apt not run as expected")
+    os.remove(log)
+    code, text, mk = m.configure("--lang=en", heif="no", uid="0", apt=fake_apt, tty="yes", stdin="n\n", lang="ja_JP.UTF-8")
+    check(code == 0 and "HEIC を開くには libheif が要ります。入れますか [Y/n]" in text and "あとで入れるには: sudo apt install" in text
+          and not os.path.exists(log), "heif root, answered no (ja): " + text)
+    env_fail = dict(FAKE_APT_FAIL="1")
+    os.environ.update(env_fail)
+    try:
+        code, text, mk = m.configure("--yes", heif="no", uid="0", apt=fake_apt)
+    finally:
+        os.environ.pop("FAKE_APT_FAIL")
+    check(code == 0 and "It was not installed" in text and "HEIC (libheif): no" in text, "heif: apt failed: " + text)
+    # The Mac: Homebrew's libheif or the brew line.
+    code, text, mk = m.configure("--yes", uname="Darwin")
+    check(code == 0 and "brew install libheif" in text, "Darwin without libheif: " + text)
+    os.makedirs(os.path.join(m.root, "brew", "opt", "libheif"), exist_ok=True)
+    code, text, mk = m.configure("--yes", uname="Darwin", brew=os.path.join(m.root, "brew"))
+    check(code == 0 and "Homebrew's libheif is there" in text, "Darwin with libheif: " + text)
     m.device()
 
 
@@ -333,12 +392,20 @@ def test_install(m):
     check(code == 0 and not os.path.exists(rc), "install without config.mk wrote fdtprc")
     # Pomera answers: uninstall tells how to undo them.
     with open(m.out, "a") as f:
-        f.write("POMERA_STABILITY = yes\nPOMERA_INTERNAL_RO = yes\n")
+        f.write("POMERA_STABILITY = yes\nPOMERA_INTERNAL = ro\n")
     code, text = make(["uninstall"] + common, env)
     check("pomera_stability.sh remove" in text and "pomera_dma_pio.sh restore" in text and "unpersist" in text,
           "uninstall: how to undo the Pomera settings")
     code, text = run(["make", "-n", "-C", APP, "install"] + common, env=env)
     check("install_pomera.sh" in text, "make -n install: no Pomera part")
+    # A legacy config containing only the old setting is translated for the installer.
+    legacy = os.path.join(m.root, "legacy.mk")
+    with open(legacy, "w") as f:
+        f.write("POMERA_INTERNAL_RO = yes\n")
+    code, text = run(["make", "-n", "-C", APP, "install", "FDTP_CONFIG_MK=" + legacy,
+                      "INSTALL_EXE=" + fake, "UNAME=Linux"], env=env)
+    check(code == 0 and re.search(r'POMERA_INTERNAL=["\']?ro["\']?', text) and "install_pomera.sh" in text,
+          "legacy config did not pass ro to installer: " + text)
     if sys.platform == "darwin":
         code, text = make(["install", "FDTP_CONFIG_MK=" + m.out, "DESTDIR=" + root], env)
         check(code != 0 and "for Linux" in text, "make install on macOS not refused")
@@ -488,7 +555,7 @@ def test_install_pomera(m):
     print("== pomera/install_pomera.sh (without root)")
     script = os.path.join(POMERA, "install_pomera.sh")
     m.device(b"raspberrypi,4-model-b\0")
-    env = base_env(FDTP_CONFIGURE_DT=m.dt, POMERA_STABILITY="yes", POMERA_INTERNAL_RO="yes", FDTP_MSG_LANG="en")
+    env = base_env(FDTP_CONFIGURE_DT=m.dt, POMERA_STABILITY="yes", POMERA_INTERNAL="ro", FDTP_MSG_LANG="en")
     code, text = run(["sh", script], env=env)
     check(code == 0 and "Not a Pomera DM250" in text, "not a DM250: " + text)
     code, text = run(["sh", script], env=base_env(FDTP_CONFIGURE_DT=m.dt))
@@ -497,6 +564,35 @@ def test_install_pomera(m):
         m.device(POMERA_DT)
         code, text = run(["sh", script], env=env)
         check(code == 1 and "need root" in text, "DM250 without root: " + text)
+    # Copy the installer beside a harmless mount script and fake root identity.
+    fake_dir = os.path.join(m.root, "fake-pomera")
+    os.makedirs(fake_dir, exist_ok=True)
+    shutil.copy(script, os.path.join(fake_dir, "install_pomera.sh"))
+    log = os.path.join(m.root, "persist-args")
+    with open(os.path.join(fake_dir, "pomera_mount_internal.sh"), "w") as f:
+        f.write('#!/bin/sh\nprintf "%s\\n" "$@" > "$FAKE_PERSIST_LOG"\n')
+    with open(os.path.join(m.bin, "id"), "w") as f:
+        f.write('#!/bin/sh\necho 0\n')
+    os.chmod(os.path.join(m.bin, "id"), 0o755)
+    m.device(POMERA_DT)
+    env = base_env(FDTP_CONFIGURE_DT=m.dt, POMERA_INTERNAL="rw", FDTP_MSG_LANG="en",
+                   FAKE_PERSIST_LOG=log, PATH=m.bin + os.pathsep + os.environ.get("PATH", ""))
+    code, text = run(["sh", os.path.join(fake_dir, "install_pomera.sh")], env=env)
+    args = open(log).read().splitlines() if os.path.exists(log) else []
+    check(code == 0 and args == ["persist", "rw"], "installer rw persist: %s %s" % (args, text))
+    # The answer changed since an earlier install (revision 1 §9): 3 removes a
+    # mount set up before, and only then; a skipped question (keep) leaves it.
+    with open(os.path.join(fake_dir, "pomera_mount_internal.sh"), "w") as f:
+        f.write('#!/bin/sh\necho "$*" >> "$FAKE_PERSIST_LOG"\n'
+                '[ "$1" != persisted ] || [ "$FAKE_PERSISTED" = yes ]\n')
+    for internal, persisted, want in (("no", "yes", ["persisted", "unpersist"]), ("no", "no", ["persisted"]),
+                                      ("keep", "yes", [])):
+        if os.path.exists(log):
+            os.remove(log)
+        env.update(POMERA_INTERNAL=internal, FAKE_PERSISTED=persisted)
+        code, text = run(["sh", os.path.join(fake_dir, "install_pomera.sh")], env=env)
+        args = open(log).read().splitlines() if os.path.exists(log) else []
+        check(code == 0 and args == want, "installer %s (persisted %s): %s %s" % (internal, persisted, args, text))
     m.device()
 
 
@@ -506,8 +602,9 @@ def test_setup(m):
     print("== pomera/pomera_setup.sh (fdtp-pomera-setup; without root)")
     script = os.path.join(POMERA, "pomera_setup.sh")
 
-    def setup(*args, uid="1000", probe="echo should-not-run; exit 1", tty="no", stdin="", lang=None):
-        env = base_env(FDTP_CONFIGURE_DT=m.dt, FDTP_CONFIGURE_UID=uid, FDTP_CONFIGURE_PROBE=probe, FDTP_CONFIGURE_TTY=tty)
+    def setup(*args, uid="1000", probe="echo should-not-run; exit 1", tty="no", stdin="", lang=None, heif="yes"):
+        env = base_env(FDTP_CONFIGURE_DT=m.dt, FDTP_CONFIGURE_UID=uid, FDTP_CONFIGURE_PROBE=probe, FDTP_CONFIGURE_TTY=tty,
+                       FDTP_CONFIGURE_HEIF=heif, FDTP_CONFIGURE_APT="echo apt-ran")
         if lang:
             env["LANG"] = lang
         return run(["sh", script] + list(args), env=env, stdin=stdin)
@@ -524,15 +621,21 @@ def test_setup(m):
     m.device(POMERA_DT)
     code, text = setup()
     check(code == 1 and "needs root" in text and "Wi-Fi" not in text, "setup, DM250 without root: " + text)
-    # (Fake) root, both answered no: the notes before each [Y/n], nothing run.
-    code, text = setup(uid="0", probe="echo vfat", tty="yes", stdin="n\nn\n")
-    check(code == 0 and "Nothing was changed." in text, "setup n n: " + text)
+    # (Fake) root, both answered no: instructions precede the questions, nothing run.
+    code, text = setup(uid="0", probe="echo vfat", tty="yes", stdin="n\n3\n")
+    check(code == 0 and "Nothing was changed." in text, "setup n 3: " + text)
     i_notes, i_ask = text.find("Notes:"), text.find("Make the Wi-Fi stable? [Y/n]")
     check(0 <= i_notes < i_ask and "pomera_dma_pio.sh restore" in text and "fdtp-pomera-setup --undo" in text
           and "asked once more" in text and "sudo make install" not in text, "setup: Wi-Fi notes: " + text)
-    check(text.rfind("Notes:") < text.find("Mount the internal memory read-only? [Y/n]") and "unpersist" in text,
-          "setup: internal notes not before [Y/n]")
-    code, text = setup(uid="0", probe="echo vfat", tty="yes", stdin="n\nn\n", lang="ja_JP.UTF-8")
+    check(0 <= text.find("To stop either setting:") < text.find("Choice [1/2/3]") and "unpersist" in text,
+          "setup: internal undo instructions not before choice")
+    # libheif missing: asked after the internal memory; n keeps it out.
+    code, text = setup(uid="0", probe="echo vfat", tty="yes", stdin="n\n3\nn\n", heif="no")
+    check(code == 0 and 0 <= text.find("Choice [1/2/3]") < text.find("Opening HEIC needs libheif. Install it? [Y/n]")
+          and "apt-ran" not in text and "sudo apt install libheif1 libheif-plugin-libde265" in text, "setup heif n: " + text)
+    code, text = setup(uid="0", probe="echo vfat", tty="no", heif="no")
+    check("apt-ran install -y libheif1 libheif-plugin-libde265" in text, "setup heif default yes: " + text)
+    code, text = setup(uid="0", probe="echo vfat", tty="yes", stdin="n\n3\n", lang="ja_JP.UTF-8")
     check(code == 0 and "何も変えませんでした。" in text and "書き換える直前にもう一度聞きます" in text, "setup ja: " + text)
     # The backup directory: beside the scripts here, /var/lib/fdtp under /usr.
     code, text = run(["sh", os.path.join(POMERA, "pomera_dma_pio.sh"), "backup-dir"], env=base_env())
@@ -578,7 +681,7 @@ def main():
         for test, args in ((test_syntax, ()), (test_deps_cover_makefiles, ()), (test_darwin, (m,)),
                            (test_linux_deps, (m,)), (test_options, (m,)), (test_pomera, (m,)), (test_install, (m,)),
                            (test_make_reads_config, (m,)), (test_make_pio, (tmp,)), (test_install_pomera, (m,)),
-                           (test_setup, (m,)), (test_private, (tmp,))):
+                           (test_setup, (m,)), (test_heif, (m,)), (test_private, (tmp,))):
             try:
                 test(*args)
             except Exception as e:  # a broken step is a failure, the others still run

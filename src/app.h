@@ -22,6 +22,11 @@ typedef struct {
      * NOVEL_FORMAT_<NAME> switches in novel_format.h's order (default on). */
     int novel_word_ruby;
     signed char novel_format[16];
+    /* LOCALSEND_ALIAS: empty uses the host name. */
+    char localsend_alias[256];
+    /* LOCALSEND_OFFICIAL (docs/FDTP_MACOS.md): when the official LocalSend
+     * app runs beside the Mac window, 0 ask, 1 always FDTM, 2 always it. */
+    int localsend_official;
     /* SCREENSIZE (WIDE_NOTES.md): 0 x 0 = auto, else columns x rows. */
     int screen_cols, screen_rows;
     /* AWAKE_MINUTES (revision 1 item 28): minutes after the last key during
@@ -67,6 +72,12 @@ struct App {
     /* Optional window control; NULL in the preview/headless adapter. */
     int (*is_fullscreen)(void);
     void (*set_fullscreen)(int on);
+    /* 1 in the macOS window (docs/FDTP_MACOS.md): PDF and Office files go to
+     * the Mac's own applications (open) instead of the viewers. */
+    int open_native;
+    /* The macOS window: 1 while the official LocalSend app runs (NULL:
+     * never, as on the Pomera). localsend_ui.c asks it. */
+    int (*localsend_official)(void);
 };
 void app_init(App *app);
 /* The screen size to use (WIDE_NOTES.md): cols x rows from the command line

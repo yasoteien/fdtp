@@ -174,7 +174,14 @@ SHOTS=(
   '15-novel-horizontal|C-s "novel.txt" ESC e|'
   '16-novel-vertical|C-s "novel.txt" ESC e C-t|'
   '17-novel-format|C-s "novel.txt" ESC e F2|'
+  '21-localsend-send|C-s "readme.txt" ESC SPC SPC M-l s REALWAIT:0.6|@LS@'
+  '22-localsend-pin|C-s "readme.txt" ESC SPC SPC M-l s REALWAIT:0.6 RET REALWAIT:0.6|@LS@'
+  '23-localsend-receive|M-l r REALWAIT:0.4|@LS@'
+  '24-localsend-ask|M-l r REALWAIT:1.4|@LS@'
+  '25-localsend-browser|C-s "readme.txt" ESC SPC SPC M-l b REALWAIT:1.2|@LS@'
 )
+# The LocalSend screens with the stand-in helper and example addresses.
+LS='FDTP_LOCALSEND_HELPER=@APP@/tools/manual_localsend_fake.py FDTP_LOCALSEND_IPS=wlan0=192.0.2.36 FDTP_RC_USER=@WORK@/localsend.fdtprc'
 # On the build host (MuPDF). sample.pdf page 1's text: "Hello FDTP search
 # target" (characters 1-24), 日本語の明朝体 (25-31), ゴシック体の文字 (32-39).
 # 19: FDTP highlighted, "search" underlined, a note on 日, saved (the mode's
@@ -185,11 +192,15 @@ PDF_SHOTS=(
   '20-pdf-menu|C-s "sample.pdf" ESC v WAIT:0 M-p|'
 )
 
+# The LocalSend shots' own name (otherwise the host name would show).
+printf "LOCALSEND_ALIAS='pomera'\n" >"$WORK/localsend.fdtprc"
+
 # Which shots: all of them, or the names given (pdf: 18-20).
 mac_list="$WORK/mac.list" pdf_list="$WORK/pdf.list"
 : >"$mac_list"; : >"$pdf_list"
 wanted=" $* "
 for shot in "${SHOTS[@]}"; do
+  shot=${shot//@LS@/$LS}; shot=${shot//@APP@/$APP}
   if [ $# -eq 0 ] || [[ "$wanted" == *" ${shot%%|*} "* ]]; then printf '%s\n' "$shot" >>"$mac_list"; fi
 done
 for shot in "${PDF_SHOTS[@]}"; do
@@ -234,7 +245,8 @@ for lang in ja en; do
       script="$keys"
     else
       env+=(FDTP_LANGUAGE="$lang")
-      [ -z "$extra" ] || env+=("${extra//@WORK@/$WORK}")
+      # Several KEY=VALUE, space separated (no spaces inside a value).
+      [ -z "$extra" ] || { read -r -a more <<<"${extra//@WORK@/$WORK}"; env+=("${more[@]}"); }
       script="$keys SNAP"
     fi
     (cd "$home" && "${env[@]}" "$@" --size "$SIZE" --time "$NOW" --keys "$script" "$home" </dev/null)

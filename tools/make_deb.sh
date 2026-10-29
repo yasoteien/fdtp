@@ -16,6 +16,8 @@
 # The version is FDTP_VERSION of src/version.h; the Debian revision and the
 # Maintainer come from the top entry of packaging/debian/changelog, whose
 # version must be FDTP_VERSION-N (add an entry when the version changes).
+# fdtp-localsend beside BINARY is packaged too when present (OpenSSL is
+# optional at build time). Depends covers both programs' NEEDED libraries.
 # Depends: one package for each NEEDED library of the ELF, found with
 # dpkg -S (installed here for ARCH) or in SYSROOT/debs; unversioned (the
 # .deb is for Debian 13 only). It stops when a library has no package, when
@@ -86,24 +88,33 @@ if [ -z "$BINARY" ]; then
 	BINARY=$BUILD/fdtp
 fi
 [ -f "$BINARY" ] || die "no $BINARY"
-head=$(LC_ALL=C "$TRIPLET-readelf" -h "$BINARY") || die "$BINARY is not an ELF file"
+LOCALSEND_BINARY=$(dirname "$BINARY")/fdtp-localsend
+BINARIES=("$BINARY")
+[ ! -f "$LOCALSEND_BINARY" ] || BINARIES+=("$LOCALSEND_BINARY")
+NEEDED=
+for elf in "${BINARIES[@]}"; do
+head=$(LC_ALL=C "$TRIPLET-readelf" -h "$elf") || die "$elf is not an ELF file"
 printf '%s\n' "$head" | grep -q "Class:.*$CLASS" && printf '%s\n' "$head" | grep -q "Machine:.*$MACHINE" ||
-	die "$BINARY is not a $ARCH program"
-dynamic=$(LC_ALL=C "$TRIPLET-readelf" -d "$BINARY")
+	die "$elf is not a $ARCH program"
+dynamic=$(LC_ALL=C "$TRIPLET-readelf" -d "$elf")
 ! printf '%s\n' "$dynamic" | grep -q -E '\((RPATH|RUNPATH)\)' ||
-	die "$BINARY has an RPATH (build it with FDTP_RPATH=)"
+	die "$elf has an RPATH (build it with FDTP_RPATH=)"
 # Libraries linked in statically (a .so link of the sysroot left dangling):
 # Depends and copyright would miss them.
 static=
 for s in DGifOpenFileName:giflib WebPDecode:libwebp png_create_read_struct:libpng jpeg_CreateDecompress:libjpeg \
-	inflate:zlib XML_ParserCreate:expat fz_new_context_imp:mupdf uim_init:uim drmModeGetResources:libdrm; do
-	"$TRIPLET-nm" --defined-only "$BINARY" 2>/dev/null | grep -q " [TtWw] ${s%%:*}$" && static="$static ${s#*:}"
+	inflate:zlib XML_ParserCreate:expat fz_new_context_imp:mupdf uim_init:uim drmModeGetResources:libdrm \
+	SSL_new:openssl EVP_DigestInit_ex:openssl; do
+	"$TRIPLET-nm" --defined-only "$elf" 2>/dev/null | grep -q " [TtWw] ${s%%:*}$" && static="$static ${s#*:}"
 done
-[ -z "$static" ] || die "$BINARY has these linked in statically:$static (make the sysroot with make_sysroot.sh -d)"
+[ -z "$static" ] || die "$elf has these linked in statically:$static (make the sysroot with make_sysroot.sh -d)"
+needed=$(printf '%s\n' "$dynamic" | sed -n 's/.*(NEEDED).*\[\(.*\)\]$/\1/p')
+[ -n "$needed" ] || die "$elf has no NEEDED libraries"
+NEEDED="$NEEDED $needed"
+done
 
 # ---- Depends from NEEDED ---------------------------------------------------------------
-NEEDED=$(printf '%s\n' "$dynamic" | sed -n 's/.*(NEEDED).*\[\(.*\)\]$/\1/p')
-[ -n "$NEEDED" ] || die "$BINARY has no NEEDED libraries"
+NEEDED=$(printf '%s\n' $NEEDED | sort -u)
 INDEX=
 if [ -d "$SYSROOT/debs" ]; then
 	# path<TAB>package for the libraries in the sysroot's .debs of ARCH.
@@ -151,6 +162,10 @@ rm -rf "$STAGE" && mkdir -p "$STAGE/DEBIAN" && chmod 755 "$STAGE"
 inst() { install -D -m "$1" "$2" "$STAGE$3"; }
 inst 755 "$BINARY" /usr/bin/fdtp
 "$TRIPLET-strip" --strip-unneeded --remove-section=.comment --remove-section=.note "$STAGE/usr/bin/fdtp"
+if [ -f "$LOCALSEND_BINARY" ]; then
+	inst 755 "$LOCALSEND_BINARY" /usr/bin/fdtp-localsend
+	"$TRIPLET-strip" --strip-unneeded --remove-section=.comment --remove-section=.note "$STAGE/usr/bin/fdtp-localsend"
+fi
 mkdir -p "$STAGE/usr/share/applications"
 sed 's|^Exec=.*|Exec=/usr/bin/fdtp|' "$ICONS/fdtp.desktop" > "$STAGE/usr/share/applications/fdtp.desktop"
 chmod 644 "$STAGE/usr/share/applications/fdtp.desktop"

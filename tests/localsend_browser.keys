@@ -1,0 +1,9 @@
+# Same two literal marked file paths as the sending case.
+DOWN DOWN TAB DOWN TAB M-l b REALWAIT:0.4 SNAP # ready
+REALWAIT:0.6 SNAP # wrong
+REALWAIT:0.6 SNAP # downloading
+REALWAIT:0.7 END SNAP # downloaded
+HOME SNAP # home
+ESC REALWAIT:0.1 SNAP # closed
+M-l B REALWAIT:0.4 SNAP # ready_again
+ESC REALWAIT:0.1 SNAP # closed_again

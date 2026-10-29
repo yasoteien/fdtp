@@ -3,7 +3,12 @@
 # the answers of ./configure) and of fdtp-pomera-setup (pomera_setup.sh):
 #   POMERA_STABILITY=yes    pomera_stability.sh install, then (asked again,
 #                           default no, only on a terminal) pomera_dma_pio.sh wifi
-#   POMERA_INTERNAL_RO=yes  pomera_mount_internal.sh persist
+#   POMERA_INTERNAL=ro     pomera_mount_internal.sh persist
+#   POMERA_INTERNAL=rw     pomera_mount_internal.sh persist rw
+#   POMERA_INTERNAL=no      pomera_mount_internal.sh unpersist (a mount set up
+#                           by an earlier install is removed)
+#   POMERA_INTERNAL=keep    nothing (the question was skipped)
+#   POMERA_INTERNAL_RO=yes is accepted as the legacy equivalent of ro.
 # FDTP_MSG_LANG=ja|en picks the messages (default: LC_ALL, LC_MESSAGES, LANG).
 # Does nothing when the machine is not a DM250 (/proc/device-tree's
 # compatible or model has no "dm250"; FDTP_CONFIGURE_DT replaces
@@ -14,13 +19,16 @@
 set -eu
 DIR=$(cd "$(dirname "$0")" && pwd)
 STABILITY=${POMERA_STABILITY:-no}
-INTERNAL=${POMERA_INTERNAL_RO:-no}
+INTERNAL=${POMERA_INTERNAL:-}
+if [ -z "$INTERNAL" ]; then
+	if [ "${POMERA_INTERNAL_RO:-no}" = yes ]; then INTERNAL=ro; else INTERNAL=keep; fi
+fi
 DT=${FDTP_CONFIGURE_DT:-/proc/device-tree}
 msg_lang=${FDTP_MSG_LANG:-${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}}
 case $msg_lang in auto) msg_lang=${LC_ALL:-${LC_MESSAGES:-${LANG:-}}} ;; esac
 say() { case $msg_lang in ja*) printf '%s\n' "$1" ;; *) printf '%s\n' "$2" ;; esac; }
 
-[ "$STABILITY" = yes ] || [ "$INTERNAL" = yes ] || exit 0
+[ "$STABILITY" = yes ] || [ "$INTERNAL" = ro ] || [ "$INTERNAL" = rw ] || [ "$INTERNAL" = no ] || exit 0
 model=$(cat "$DT/compatible" "$DT/model" 2>/dev/null | tr '\0' ' ' || true)
 case $(printf '%s' "$model" | tr 'A-Z' 'a-z') in
 *dm250*) ;;
@@ -58,8 +66,21 @@ if [ "$STABILITY" = yes ]; then
 		"The SD was not rewritten. To do it later: sudo sh $DIR/pomera_dma_pio.sh wifi" ;;
 	esac
 fi
-if [ "$INTERNAL" = yes ]; then
+case $INTERNAL in
+ro)
 	say "== 内蔵メモリの読み取り専用マウント ==" "== Read-only mount of the internal memory =="
 	sh "$DIR/pomera_mount_internal.sh" persist || say "マウントの設定は行いませんでした（上の理由）。" "The mount was not set up (see above)."
-fi
+	;;
+rw)
+	say "== 内蔵メモリの読み書きマウント ==" "== Read-write mount of the internal memory =="
+	sh "$DIR/pomera_mount_internal.sh" persist rw || say "マウントの設定は行いませんでした（上の理由）。" "The mount was not set up (see above)."
+	;;
+no)
+	# "Do not mount" this time: a mount an earlier install set up is removed.
+	if sh "$DIR/pomera_mount_internal.sh" persisted 2>/dev/null; then
+		say "== 内蔵メモリのマウントをやめる ==" "== Removing the internal memory mount =="
+		sh "$DIR/pomera_mount_internal.sh" unpersist || true
+	fi
+	;;
+esac
 [ "$reboot" = no ] || say "再起動してください（sudo reboot）。" "Please reboot (sudo reboot)."

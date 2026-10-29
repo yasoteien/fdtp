@@ -1,0 +1,12 @@
+M-l r REALWAIT:0.6 SNAP # ready
+PGDN SNAP # ip_page
+PGUP SNAP # ip_back
+REALWAIT:0.9 SNAP # request
+ y REALWAIT:0.6 SNAP # saved
+REALWAIT:0.9 SNAP # request_again
+ n REALWAIT:0.2 SNAP # rejected
+REALWAIT:0.9 SNAP # default_request
+RET REALWAIT:0.2 SNAP # rejected_default
+ESC REALWAIT:0.1 SNAP # closed
+M-l R REALWAIT:0.6 SNAP # ready_again
+ESC REALWAIT:0.1 SNAP # closed_again

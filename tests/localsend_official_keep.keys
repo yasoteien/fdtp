@@ -1,0 +1,5 @@
+# FDTM: the official app starts; FDTM is kept, and not asked again.
+M-l r REALWAIT:0.6 WAIT:2 REALWAIT:0.1 SNAP # asked
+f REALWAIT:0.1 SNAP # kept
+WAIT:2 REALWAIT:0.1 SNAP # not_again
+ESC REALWAIT:0.1 SNAP # closed

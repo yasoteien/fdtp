@@ -6,6 +6,7 @@
 #include "filer.h"
 #include "fileops.h"
 #include "config.h"
+#include "pomera_notice.h"
 #include "raster.h"
 #include <errno.h>
 #include <math.h>
@@ -69,6 +70,7 @@ void headless_fit(ScriptRunner *r,App *a,Canvas *c,Cells *cells)
     if(!app_screen_differs(want)) return;
     screen_apply(want); canvas_fit(c); cells_invalidate(cells); a->changed=1;
 }
+_Static_assert(FILER_POINT==0 && FILER_SELECT==1 && FILER_TOGGLE==2 && FILER_RANGE==3, "CLICK: in keys.c");
 int headless_script_step(ScriptRunner *r,App *a,Canvas *c,Cells *cells,double now)
 {
     if(r->ended) return 2;
@@ -86,7 +88,21 @@ int headless_script_step(ScriptRunner *r,App *a,Canvas *c,Cells *cells,double no
         return 1;
     case SCRIPT_MODS: app_modifiers(a,e.mods); return 1;
     case SCRIPT_DISPLAY: r->display_w=e.width; r->display_h=e.height; return 1;
+    case SCRIPT_CLICK: filer_mouse(a->depth ? a->screens[0] : NULL,a,e.width,e.height,e.mods); return 1;
     case SCRIPT_WAIT: r->ready_at=now+e.seconds; return 0;
+    case SCRIPT_REALWAIT: {
+        struct timespec start, current;
+        clock_gettime(CLOCK_MONOTONIC, &start);
+        for (;;) {
+            app_tick(a, now);
+            clock_gettime(CLOCK_MONOTONIC, &current);
+            double elapsed = current.tv_sec - start.tv_sec + (current.tv_nsec - start.tv_nsec) / 1e9;
+            if (elapsed >= e.seconds) break;
+            struct timespec pause = {0, 10000000};
+            nanosleep(&pause, NULL);
+        }
+        return 1;
+    }
     case SCRIPT_END: r->ended=1; return 2;
     default: fprintf(stderr,"script: %s\n",r->parser.error); return -1;
     }
@@ -149,6 +165,7 @@ int headless_main(int argc,char **argv)
     if(!s) { perror(directory); app_destroy(&a); free(owned); return 1; }
     app_push(&a,s);
     config_first_run(&a, 1);
+    pomera_notice_start(&a, 1);
     if(columns!=2) { Key key={KCHAR,(uint32_t)('0'+columns),0}; app_key(&a,&key); }
     Canvas *canvas=malloc(sizeof(*canvas)); Cells cells; cells_init(&cells);
     if(!canvas) { app_destroy(&a); free(owned); return 1; }

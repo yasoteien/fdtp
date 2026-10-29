@@ -4,6 +4,25 @@ All notable changes to FDTP are recorded in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions have two decimal places (0.01, 0.02, ... 1.00); they do not follow Semantic Versioning.
 
+## [1.10] - 2026-10-29
+
+### Added
+
+- LocalSend (Alt+l): send files to, and receive files from, the LocalSend app on an iPhone, iPad, Mac, Windows or Android on the same network. Marked files go together; directories go as zip. Receiving makes a new PIN each time and asks before each sender's files. The helper `fdtp-localsend` (C and OpenSSL) does the network part.
+- Give by browser (Alt+l, B): a phone or PC without LocalSend downloads the files with its browser after the PIN.
+- HEIC (iPhone photos) in the image viewer, with libheif loaded when a HEIC file is opened (`libheif1`, `libheif-plugin-libde265`; not needed to build).
+- The internal memory of the Pomera DM250 can be mounted read-write: `./configure` asks read-only, read-write or none. Read-write checks the file system (read only) after a boot that followed a stop, mounts read-only when it finds damage, and tells at login and when FDTP starts. Nothing is repaired automatically.
+- The user manual: LocalSend (4.7), updating (2.5), and the internal memory choices.
+
+### Changed
+
+- `./configure` and `fdtp-pomera-setup` remove an earlier internal memory mount when the new answer differs.
+- Images open a little faster (the scaling was made faster).
+
+### Fixed
+
+- `tools/make_sysroot.sh` no longer stops without a word when no SYSROOT is given.
+
 ## [1.01] - 2026-10-25
 
 ### Fixed

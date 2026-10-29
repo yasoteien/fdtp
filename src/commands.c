@@ -43,7 +43,7 @@ C(LOG_TREE,NULL),C(COPY_TREE,NULL),C(MOVE_TREE,NULL),C(ATTR_DIR,"C-a"),C(FIND_DI
 C(VIEW_FILE,"v"),C(VIEW_FILE,"S-F9"),C(HEX_FILE,"b"),
 C(UNPACK_FILE,"u"),C(UNPACK_FILE,"F10"),C(UNPACK_TREE,NULL),C(PACK_FILE,"p"),C(PACK_FILE,"S-F8"),C(PACK_FILE,"S-F10"),
 C(EDIT_CONFIG,"z"),
-C(SPLIT_FILE,"M-n"),C(JOIN_FILE,"M-h"),C(PDF_MENU,"M-p"),
+C(SPLIT_FILE,"M-n"),C(JOIN_FILE,"M-h"),C(PDF_MENU,"M-p"),C(LOCALSEND,"M-l"),
 C(WARNING_BELL,NULL),C(NO_OPERATION,NULL)
 #undef C
 };
@@ -121,6 +121,7 @@ static const WidgetHelpItem help_items[]={
     {"Shift+F10",N_("Pack    圧縮")},
     H(N_("その他（設定・終了・ヘルプ・エディタの中）")),
     {"Alt+n Alt+h Alt+p",N_("分割・結合・PDF のメニュー")},
+    {"Alt+l",N_("LocalSend で送る・受け取る")},
     {"z",N_("設定（カスタマイザ）")},
     {"h ?",N_("このヘルプ")},
     {"q Esc",N_("終了（確認あり）")},
@@ -149,7 +150,7 @@ static const struct { const char *id, *label; } labels[]={
     {"WRITE_DIR",N_("ディレクトリの書き込み")},{"TREE_DIR",N_("ツリー")},{"LOG_TREE",N_("ツリーで移る")},{"COPY_TREE",N_("ツリーでコピー")},
     {"MOVE_TREE",N_("ツリーで移動")},{"ATTR_DIR",N_("下の階層の属性")},{"FIND_DIR",N_("ディレクトリ検索")},
     {"VIEW_FILE",N_("表示")},{"HEX_FILE",N_("16 進表示")},{"UNPACK_FILE",N_("解凍")},{"UNPACK_TREE",N_("ツリーで解凍")},{"PACK_FILE",N_("圧縮")},
-    {"EDIT_CONFIG",N_("設定（カスタマイザ）")},{"SPLIT_FILE",N_("分割")},{"JOIN_FILE",N_("結合")},{"PDF_MENU",N_("PDF のメニュー")},{"WARNING_BELL",N_("ベル")},{"NO_OPERATION",N_("何もしない")},
+    {"EDIT_CONFIG",N_("設定（カスタマイザ）")},{"SPLIT_FILE",N_("分割")},{"JOIN_FILE",N_("結合")},{"PDF_MENU",N_("PDF のメニュー")},{"LOCALSEND",N_("LocalSend で送る・受け取る")},{"WARNING_BELL",N_("ベル")},{"NO_OPERATION",N_("何もしない")},
 };
 const char *commands_label(const char *id)
 {

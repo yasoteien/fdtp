@@ -29,3 +29,4 @@ void ime_candidates(const Ime *ime, ImeCandidates *out)
     *out = (ImeCandidates){0};
 }
 void ime_reset(Ime *ime) { (void)ime; }
+void ime_caret(Ime *ime, int x, int y, int h) { (void)ime; (void)x; (void)y; (void)h; }

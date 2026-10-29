@@ -349,7 +349,7 @@ static int archive_read(Archive *a,const char *path,char *err,size_t errn)
     a->format=archive_format(path);
     if(a->format==FMT_NONE) { snprintf(err,errn,"%s",T("アーカイブではありません")); return -1; }
     if(a->format==FMT_7Z) { snprintf(err,errn,"%s",T("この環境では使えません")); return -1; }
-    if(a->format==FMT_LHA) { char *l=find_command("lhasa"); if(!l) { snprintf(err,errn,"%s",T("lhasa がありません")); return -1; } free(l); }
+    if(a->format==FMT_LHA) { char *l=find_lhasa(); if(!l) { snprintf(err,errn,"%s",T("lhasa がありません")); return -1; } free(l); }
     if(!(a->path=realpath(path,NULL))) { snprintf(err,errn,T("アーカイブを開けません: %.100s"),strerror(errno)); return -1; }
     int r=a->format==FMT_TAR ? list_tar(a,err,errn) : a->format==FMT_ZIP ? list_zip(a,err,errn) : list_lha(a,err,errn);
     if(!r) {

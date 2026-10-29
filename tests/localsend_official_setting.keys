@@ -1,0 +1,3 @@
+# FDTM: LOCALSEND_OFFICIAL decides without a question.
+M-l r REALWAIT:0.6 WAIT:2 REALWAIT:0.1 SNAP # decided
+ESC REALWAIT:0.1 SNAP # closed
