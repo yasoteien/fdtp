@@ -5,7 +5,7 @@ Maintainer: @MAINTAINER@
 Installed-Size: @INSTALLED_SIZE@
 Depends: @DEPENDS@
 Recommends: zip, unzip, lhasa, dosfstools, libheif1, libheif-plugin-libde265
-Suggests: uim-mozc | uim-anthy, python3
+Suggests: uim-mozc | uim-anthy, python3, python3-libgpiod
 Section: utils
 Priority: optional
 Description: file manager in the style of FD 3.13, for the Pomera DM250
@@ -16,4 +16,4 @@ Description: file manager in the style of FD 3.13, for the Pomera DM250
  Japanese manuscripts.
  .
  fdtp-pomera-setup makes the optional settings for the King Jim Pomera
- DM250 (Wi-Fi stabilization and a read-only mount of the internal memory).
+ DM250 (Wi-Fi stabilization, internal memory mounting and RK818 PD hub charging).

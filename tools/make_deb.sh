@@ -189,7 +189,7 @@ awk -v lic="$LICENSE" '
 gzip -9n -c "$PKGDIR/changelog" > "$STAGE$DOC/changelog.Debian.gz"
 chmod 644 "$STAGE$DOC/copyright" "$STAGE$DOC/changelog.Debian.gz"
 # The Pomera scripts; those starting with #! executable.
-for f in "$PDIR"/*.sh "$PDIR"/*.py; do
+for f in "$PDIR"/*.sh "$PDIR"/*.py "$PDIR"/*.service; do
 	b=$(basename "$f")
 	[ "$b" = pomera_setup.sh ] && continue
 	if [ "$(head -c 2 "$f")" = '#!' ]; then m=755; else m=644; fi

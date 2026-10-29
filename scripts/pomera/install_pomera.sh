@@ -8,6 +8,7 @@
 #   POMERA_INTERNAL=no      pomera_mount_internal.sh unpersist (a mount set up
 #                           by an earlier install is removed)
 #   POMERA_INTERNAL=keep    nothing (the question was skipped)
+#   POMERA_PDCHARGE=yes|no|keep  install / remove / leave pdcharge unchanged
 #   POMERA_INTERNAL_RO=yes is accepted as the legacy equivalent of ro.
 # FDTP_MSG_LANG=ja|en picks the messages (default: LC_ALL, LC_MESSAGES, LANG).
 # Does nothing when the machine is not a DM250 (/proc/device-tree's
@@ -19,6 +20,7 @@
 set -eu
 DIR=$(cd "$(dirname "$0")" && pwd)
 STABILITY=${POMERA_STABILITY:-no}
+PDCHARGE=${POMERA_PDCHARGE:-keep}
 INTERNAL=${POMERA_INTERNAL:-}
 if [ -z "$INTERNAL" ]; then
 	if [ "${POMERA_INTERNAL_RO:-no}" = yes ]; then INTERNAL=ro; else INTERNAL=keep; fi
@@ -28,7 +30,7 @@ msg_lang=${FDTP_MSG_LANG:-${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}}
 case $msg_lang in auto) msg_lang=${LC_ALL:-${LC_MESSAGES:-${LANG:-}}} ;; esac
 say() { case $msg_lang in ja*) printf '%s\n' "$1" ;; *) printf '%s\n' "$2" ;; esac; }
 
-[ "$STABILITY" = yes ] || [ "$INTERNAL" = ro ] || [ "$INTERNAL" = rw ] || [ "$INTERNAL" = no ] || exit 0
+[ "$STABILITY" = yes ] || [ "$INTERNAL" = ro ] || [ "$INTERNAL" = rw ] || [ "$INTERNAL" = no ] || [ "$PDCHARGE" = yes ] || [ "$PDCHARGE" = no ] || exit 0
 model=$(cat "$DT/compatible" "$DT/model" 2>/dev/null | tr '\0' ' ' || true)
 case $(printf '%s' "$model" | tr 'A-Z' 'a-z') in
 *dm250*) ;;
@@ -82,5 +84,9 @@ no)
 		sh "$DIR/pomera_mount_internal.sh" unpersist || true
 	fi
 	;;
+esac
+case $PDCHARGE in
+ yes) sh "$DIR/pomera_pdcharge.sh" install || say "pdcharge の設定は行いませんでした（上の理由）。" "pdcharge was not set up (see above)." ;;
+ no) sh "$DIR/pomera_pdcharge.sh" remove || true ;;
 esac
 [ "$reboot" = no ] || say "再起動してください（sudo reboot）。" "Please reboot (sudo reboot)."

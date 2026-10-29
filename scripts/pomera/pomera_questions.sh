@@ -21,6 +21,8 @@
 # ask_internal             the internal memory: INTERNAL=ro|rw|no (asked only
 #                          when root and a FAT is found there; keep when the
 #                          question was skipped: the setting is left as it is)
+# ask_pdcharge             PD hub charging: PDCHARGE=yes|no|keep; skipped
+#                          unless the read-only hardware probe passes
 # ask_heif                 libheif for HEIC (iPhone photos), which FDTP reads
 #                          with dlopen when one is opened: when it is missing,
 #                          root is asked to install it with apt; others are
@@ -34,6 +36,7 @@
 
 msg_init() {
 	locale_now=${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}
+	case ${FDTP_MSG_LANG:-auto} in auto) ;; *) locale_now=$FDTP_MSG_LANG ;; esac
 	case $locale_now in ja*) MSG=ja ;; *) MSG=en ;; esac
 	CONSOLE_NOTE=
 	if [ "$MSG" = ja ] && [ "${TERM:-}" = linux ]; then MSG=en; CONSOLE_NOTE=1; fi
@@ -251,4 +254,49 @@ EOF
 		say "入りませんでした（上の理由）。あとで入れるには: sudo apt install $HEIF_PKGS" \
 			"It was not installed (see above). To install it later: sudo apt install $HEIF_PKGS"
 	fi
+}
+
+# Default remains configurable while the release choice is being confirmed.
+POMERA_PDCHARGE_DEFAULT=${POMERA_PDCHARGE_DEFAULT:-y}
+# The configure probe can be replaced in tests; the installer and daemon
+# always repeat their own hardware checks before making any change.
+pdcharge_probe() {
+	if [ -n "${FDTP_CONFIGURE_PDCHARGE_PROBE:-}" ]; then
+		(eval "$FDTP_CONFIGURE_PDCHARGE_PROBE")
+	else
+		sh "$PDIR/pomera_pdcharge.sh" probe
+	fi
+}
+ask_pdcharge() {
+	PDCHARGE=keep
+	say "== PD ハブ経由の充電（Pomera DM250 / RK818 だけ） ==" "== Charging through a PD hub (Pomera DM250 / RK818 only) =="
+	if ! pdcharge_probe; then
+		say "安全の点検を通らないため飛ばします。前の設定は変えません。" "Safety check did not pass: skipped; earlier settings are kept."
+		return
+	fi
+	if [ "$MSG" = ja ]; then cat <<EOF
+給電付きハブ（PD）経由でも充電します。入力の上限を 2.0A に保ち、直挿しの 3.0A は下げません。
+充電 LED: 赤＝充電中、緑＝満充電、赤の点滅＝つないでいるのに放電。
+systemd で常駐します（CPU 約 4%）。ハブを使わなければ充電設定は何もしません。
+LED には python3-libgpiod が要ります。無ければ LED だけ使いません。
+やめるには: sudo sh $PDIR/pomera_pdcharge.sh remove
+確かめたのは ekesete.net の D250 用 Debian 13.7（カーネル 6.18.41-g653d8276acb7）です。
+イメージ（カーネル）が新しくなると、要らなくなったり合わなくなったりするかもしれません。
+「いいえ」は前の設定を外します。
+EOF
+	else cat <<EOF
+Charge through a powered PD hub: keep the input limit at 2.0 A; direct 3.0 A is not lowered.
+Charge LEDs: red = charging, green = full, blinking red = plugged in but discharging.
+Runs under systemd (about 4% CPU). Without a hub no charging setting is changed.
+LEDs need python3-libgpiod; without it only the LEDs are disabled.
+To stop: sudo sh $PDIR/pomera_pdcharge.sh remove
+Checked on the ekesete.net D250 Debian 13.7 image (kernel 6.18.41-g653d8276acb7).
+A newer image (kernel) may no longer need this, or it may not fit.
+Answering no removes an earlier setting.
+EOF
+	fi
+	python3 -c 'import gpiod; from gpiod.line import Direction, Value' 2>/dev/null ||
+		warn "python3-libgpiod がありません。LED だけ使えません。" "python3-libgpiod missing: only LEDs are unavailable."
+	ask_yn "$POMERA_PDCHARGE_DEFAULT" "PD ハブ経由の充電と充電 LED を使いますか" "Enable PD hub charging and charge LEDs?"
+	PDCHARGE=$ANSWER
 }

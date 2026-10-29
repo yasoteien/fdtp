@@ -4,6 +4,12 @@ All notable changes to FDTP are recorded in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions have two decimal places (0.01, 0.02, ... 1.00); they do not follow Semantic Versioning.
 
+## [1.12] - 2026-10-29
+
+### Added
+
+- Optional PD hub charging service for the Pomera DM250 with an RK818 charger: raises a low USB input limit to 2 A and optionally controls the charging LED. Configure and Pomera setup offer installation or removal.
+
 ## [1.11] - 2026-10-29
 
 ### Fixed

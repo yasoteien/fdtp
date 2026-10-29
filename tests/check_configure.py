@@ -15,7 +15,10 @@ make install runs with DESTDIR (which also skips the Pomera part).
 pomera/make_pio.py is tried on a small device tree made here; the real
 sha256 values can only be checked on a DM250's SD.
 """
+import contextlib
 import hashlib
+import importlib.util
+import io
 import os
 import re
 import shutil
@@ -23,6 +26,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+from unittest import mock
 
 APP = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIGURE = os.path.join(APP, "configure")
@@ -95,7 +99,7 @@ class Machine:
 
     def configure(self, *args, uname="Linux", uid="1000", probe=None, tty=None, stdin="", lang=None, term=None,
                   pc="libdrm gbm egl glesv2 xcb libjpeg libpng libwebp zlib expat",
-                  libs="gif mupdf uim uim-scm", shell="sh", heif="yes", apt=None, brew=None):
+                  libs="gif mupdf uim uim-scm", shell="sh", heif="yes", apt=None, brew=None, pdcharge_probe=None):
         if os.path.exists(self.out):
             os.remove(self.out)
         env = base_env(FDTP_CONFIG_MK=self.out, FDTP_CONFIGURE_UNAME=uname, FDTP_CONFIGURE_DT=self.dt,
@@ -103,6 +107,8 @@ class Machine:
                        FDTP_CONFIGURE_PROBE=probe if probe is not None else "echo should-not-run; exit 1",
                        FDTP_CONFIGURE_HEIF=heif, FDTP_CONFIGURE_BREW=brew or os.path.join(self.root, "no-brew"),
                        FDTP_CONFIGURE_APT=apt or "echo apt-should-not-run; false")
+        if pdcharge_probe is not None:
+            env["FDTP_CONFIGURE_PDCHARGE_PROBE"] = pdcharge_probe
         if uname == "Darwin":
             env["CC"] = "cc"
         if tty:
@@ -170,7 +176,7 @@ def test_darwin(m):
     code, text, mk = m.configure("--yes", "--no-pomera", "--prefix=/opt/fdtp/", uname="Darwin")
     check(code == 0, "Darwin --yes failed: " + text)
     check(mk == {"FDTP_CONFIGURED": "yes", "PREFIX": "/opt/fdtp", "FDTP_LANGUAGE": "auto", "POMERA_STABILITY": "no",
-                 "POMERA_INTERNAL": "keep", "HAVE_XCB": "no", "HAVE_UIM": "no"}, "Darwin config.mk: %s" % mk)
+                 "POMERA_INTERNAL": "keep", "POMERA_PDCHARGE": "keep", "HAVE_XCB": "no", "HAVE_UIM": "no"}, "Darwin config.mk: %s" % mk)
     check("Wi-Fi" not in text and "pkg-config" not in text, "Darwin asked about the Pomera or pkg-config")
     check("make install is for Linux" in text, "Darwin: no note that make install is for Linux")
     # The Pomera questions never come on the Mac, even with a DM250 tree.
@@ -226,7 +232,7 @@ def test_pomera(m):
     print("== Pomera DM250")
     m.device(POMERA_DT, b"King Jim Pomera DM250\0")
     code, text, mk = m.configure("--yes")
-    check(code == 0 and mk and mk["POMERA_STABILITY"] == "yes" and mk["POMERA_INTERNAL"] == "keep", "DM250 --yes: %s" % mk)
+    check(code == 0 and mk and mk["POMERA_STABILITY"] == "yes" and mk["POMERA_INTERNAL"] == "keep" and mk["POMERA_PDCHARGE"] == "keep", "DM250 --yes: %s" % mk)
     check("Finding the internal memory needs root" in text and "should-not-run" not in text, "not root: probe not skipped")
     i_notes, i_ask = text.find("Notes:"), text.find("Make the Wi-Fi stable? [Y/n]")
     check(0 <= i_notes < i_ask, "Wi-Fi: the notes are not before [Y/n]")
@@ -392,12 +398,14 @@ def test_install(m):
     check(code == 0 and not os.path.exists(rc), "install without config.mk wrote fdtprc")
     # Pomera answers: uninstall tells how to undo them.
     with open(m.out, "a") as f:
-        f.write("POMERA_STABILITY = yes\nPOMERA_INTERNAL = ro\n")
+        f.write("POMERA_STABILITY = yes\nPOMERA_INTERNAL = ro\nPOMERA_PDCHARGE = yes\n")
     code, text = make(["uninstall"] + common, env)
     check("pomera_stability.sh remove" in text and "pomera_dma_pio.sh restore" in text and "unpersist" in text,
           "uninstall: how to undo the Pomera settings")
+    check("pomera_pdcharge.sh remove" in text, "uninstall: how to undo PD charging")
     code, text = run(["make", "-n", "-C", APP, "install"] + common, env=env)
     check("install_pomera.sh" in text, "make -n install: no Pomera part")
+    check(re.search(r'POMERA_PDCHARGE=["\']?yes["\']?', text), "make install did not pass PD answer: " + text)
     # A legacy config containing only the old setting is translated for the installer.
     legacy = os.path.join(m.root, "legacy.mk")
     with open(legacy, "w") as f:
@@ -593,6 +601,18 @@ def test_install_pomera(m):
         code, text = run(["sh", os.path.join(fake_dir, "install_pomera.sh")], env=env)
         args = open(log).read().splitlines() if os.path.exists(log) else []
         check(code == 0 and args == want, "installer %s (persisted %s): %s %s" % (internal, persisted, args, text))
+    # Charging has an explicit keep state: declining removes an earlier service.
+    charge_log = os.path.join(m.root, "pdcharge-args")
+    with open(os.path.join(fake_dir, "pomera_pdcharge.sh"), "w") as f:
+        f.write('#!/bin/sh\necho "$*" >> "$FAKE_CHARGE_LOG"\n')
+    env.update(POMERA_INTERNAL="keep", FAKE_CHARGE_LOG=charge_log)
+    for answer, want in (("yes", ["install"]), ("no", ["remove"]), ("keep", [])):
+        if os.path.exists(charge_log):
+            os.remove(charge_log)
+        env["POMERA_PDCHARGE"] = answer
+        code, text = run(["sh", os.path.join(fake_dir, "install_pomera.sh")], env=env)
+        got = open(charge_log).read().splitlines() if os.path.exists(charge_log) else []
+        check(code == 0 and got == want, "installer PD %s: %s %s" % (answer, got, text))
     m.device()
 
 
@@ -645,6 +665,223 @@ def test_setup(m):
     m.device()
 
 
+def test_pdcharge_questions(m):
+    """Exercise the shared question with a read-only fake hardware probe."""
+    print("== PD charging question (fake probe)")
+    fake = os.path.join(m.root, "charge-questions")
+    os.makedirs(fake, exist_ok=True)
+    with open(os.path.join(fake, "pomera_pdcharge.sh"), "w") as f:
+        f.write('#!/bin/sh\n[ "$1" = probe ] || exit 9\nexit "$FAKE_CHARGE_PROBE"\n')
+    m.device(POMERA_DT)
+    for answer in ("y", "n"):
+        code, text, mk = m.configure("--lang=en", uid="0", probe="echo vfat", pdcharge_probe="exit 0",
+                                     tty="yes", stdin="n\n1\n" + answer + "\n")
+        expected = "yes" if answer == "y" else "no"
+        check(code == 0 and mk and mk.get("POMERA_PDCHARGE") == expected,
+              "configure PD answer %s: %s %s" % (answer, mk, text))
+        check(0 <= text.find("Choice [1/2/3]") < text.find("Enable PD hub charging"),
+              "configure PD question was not after internal memory: " + text)
+    code, text, mk = m.configure("--yes", pdcharge_probe="exit 0")
+    check(code == 0 and mk and mk.get("POMERA_PDCHARGE") == "yes", "configure PD default: %s %s" % (mk, text))
+    code, text, mk = m.configure("--yes", pdcharge_probe="exit 1")
+    check(code == 0 and mk and mk.get("POMERA_PDCHARGE") == "keep", "configure PD skipped: %s %s" % (mk, text))
+    code, text, mk = m.configure("--yes", "--no-pomera", pdcharge_probe="echo probe-should-not-run; exit 0")
+    check(code == 0 and mk and mk.get("POMERA_PDCHARGE") == "keep" and "probe-should-not-run" not in text,
+          "configure --no-pomera probed PD: %s %s" % (mk, text))
+    source = os.path.join(POMERA, "pomera_questions.sh")
+    body = '. "$QUESTION_SOURCE"; msg_init; tty_init "$TEST_YES"; ask_pdcharge; echo "RESULT=$PDCHARGE"'
+    for shell in SHELLS:
+        for probe, tty, yes, answers, expected in (
+                ("0", "no", "1", "", "yes"),
+                ("0", "yes", "0", "n\n", "no"),
+                ("0", "yes", "0", "wrong\ny\n", "yes"),
+                ("1", "yes", "0", "y\n", "keep")):
+            env = base_env(QUESTION_SOURCE=source, PDIR=fake, UID_NOW="0", DT=m.dt,
+                           FDTP_CONFIGURE_TTY=tty, FAKE_CHARGE_PROBE=probe, TEST_YES=yes)
+            code, text = run([shell, "-c", body], env=env, stdin=answers)
+            check(code == 0 and "RESULT=" + expected in text,
+                  "%s PD question probe=%s answer=%r: %s" % (shell, probe, answers, text))
+            if expected == "yes":
+                check("pomera_pdcharge.sh remove" in text and re.search(r"2\.0 ?A", text),
+                      "PD question did not explain current and undo: " + text)
+            if answers.startswith("wrong"):
+                check("Please answer y or n." in text, "PD invalid input was accepted: " + text)
+        env = base_env(QUESTION_SOURCE=source, PDIR=fake, UID_NOW="0", DT=m.dt,
+                       FDTP_CONFIGURE_TTY="no", FAKE_CHARGE_PROBE="0", TEST_YES="1", POMERA_PDCHARGE_DEFAULT="n")
+        code, text = run([shell, "-c", body], env=env)
+        check(code == 0 and "RESULT=no" in text and "[y/N]" in text,
+              "%s PD configured default no: %s" % (shell, text))
+    m.device()
+
+
+def test_pdcharge_setup(m):
+    print("== PD charging setup status and undo (fake helpers)")
+    fake = os.path.join(m.root, "charge-setup")
+    os.makedirs(fake, exist_ok=True)
+    shutil.copy(os.path.join(POMERA, "pomera_questions.sh"), fake)
+    log = os.path.join(m.root, "charge-setup-log")
+    helpers = {
+        "pomera_stability.sh": 'exit 1\n',
+        "pomera_mount_internal.sh": 'exit 1\n',
+        "pomera_dma_pio.sh": 'case "$1" in state) echo original ;; backup-dir) echo /fake ;; *) exit 8 ;; esac\n',
+        "pomera_pdcharge.sh": 'echo "$*" >> "$FAKE_CHARGE_LOG"\ncase "$1" in status) [ "$FAKE_CHARGE_SET" = yes ] ;; probe) exit 0 ;; remove) exit 0 ;; *) exit 8 ;; esac\n',
+    }
+    for name, body in helpers.items():
+        with open(os.path.join(fake, name), "w") as f:
+            f.write("#!/bin/sh\n" + body)
+    m.device(POMERA_DT)
+    env = base_env(FDTP_POMERA_DIR=fake, FDTP_CONFIGURE_DT=m.dt, FDTP_CONFIGURE_UID="0",
+                   FDTP_CONFIGURE_TTY="no", FAKE_CHARGE_LOG=log, FAKE_CHARGE_SET="yes")
+    setup = os.path.join(POMERA, "pomera_setup.sh")
+    code, text = run(["sh", setup, "--status"], env=env)
+    check(code == 0 and "pdcharge" in text.lower(), "setup did not report PD service: " + text)
+    code, text = run(["sh", setup, "--undo", "--yes"], env=env)
+    calls = open(log).read().splitlines()
+    check(code == 0 and calls.count("remove") == 1, "setup did not undo PD service: %s %s" % (calls, text))
+    os.remove(log)
+    env["FAKE_CHARGE_SET"] = "no"
+    code, text = run(["sh", setup, "--status"], env=env)
+    check(code == 1, "setup status found absent PD service: " + text)
+    code, text = run(["sh", setup, "--undo", "--yes"], env=env)
+    calls = open(log).read().splitlines()
+    check(code == 0 and "remove" not in calls, "setup removed absent PD service: %s %s" % (calls, text))
+    m.device()
+
+
+def test_pdcharge_safety(m):
+    """Unsupported hosts never touch services, I2C or GPIO; IDs are read first."""
+    print("== PD charging hardware safety")
+    script = os.path.join(POMERA, "pomera_pdcharge.sh")
+    sysfs = os.path.join(m.root, "charge-sys")
+    os.makedirs(sysfs, exist_ok=True)
+    log = os.path.join(m.root, "charge-systemctl")
+    fakebin = os.path.join(m.root, "charge-bin")
+    os.makedirs(fakebin, exist_ok=True)
+    with open(os.path.join(fakebin, "systemctl"), "w") as f:
+        f.write('#!/bin/sh\necho "$*" >> "$FAKE_SYSTEMCTL_LOG"\nexit 0\n')
+    os.chmod(os.path.join(fakebin, "systemctl"), 0o755)
+    env = base_env(FDTP_CONFIGURE_DT=m.dt, FDTP_PDCHARGE_SYSFS=sysfs,
+                   FAKE_SYSTEMCTL_LOG=log, PATH=fakebin + os.pathsep + os.environ.get("PATH", ""))
+    for device in (b"raspberrypi,4-model-b\0", POMERA_DT):
+        m.device(device)
+        for command in ("probe", "install", "remove", "status"):
+            code, text = run(["sh", script, command], env=env)
+            check(code == 1,
+                  "unsafe PD %s exit %s: %s" % (command, code, text))
+            check(not os.path.exists(log), "unsafe PD %s called systemctl" % command)
+    # Load the module without executing main. A supported DT and driver still
+    # require the RK818 identity before any charger or GPIO writes.
+    spec = importlib.util.spec_from_file_location("test_pdcharge", os.path.join(POMERA, "pdcharge.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    os.makedirs(os.path.join(sysfs, "bus", "platform", "drivers", "rk818-charger"), exist_ok=True)
+    with mock.patch.dict(os.environ, env, clear=True), mock.patch.object(mod, "SYSFS", sysfs):
+        for device, sysroot in ((b"raspberrypi,4-model-b\0", sysfs),
+                                (POMERA_DT, os.path.join(m.root, "missing-driver"))):
+            m.device(device)
+            with mock.patch.object(mod, "SYSFS", sysroot), mock.patch.object(mod.os, "open") as opened:
+                try:
+                    mod.open_checked()
+                    check(False, "PD accepted unsupported hardware before I2C")
+                except mod.UnsafeHardware:
+                    pass
+                check(not opened.called, "PD opened I2C before DT/driver safety passed")
+        m.device(POMERA_DT)
+        for id17, id18, read_error, safe in ((0x81, 0x81, False, True),
+                                            (0x81, 0x8F, False, True),
+                                            (0x00, 0x81, False, False),
+                                            (0x81, 0x90, False, False),
+                                            (0x81, 0x81, True, False)):
+            transfers = []
+
+            def ioctl(fd, request, arg):
+                if request == mod.I2C_SMBUS:
+                    transfers.append((arg.read_write, arg.command))
+                    if read_error:
+                        raise OSError("fake I2C read failed")
+                    arg.data.contents.byte = {0x17: id17, 0x18: id18}.get(arg.command, 0)
+                return 0
+
+            with mock.patch.object(mod.os, "open", return_value=123), \
+                    mock.patch.object(mod.os, "close"), \
+                    mock.patch.object(mod.fcntl, "ioctl", side_effect=ioctl):
+                try:
+                    pmic = mod.open_checked()
+                    got_safe = True
+                except mod.UnsafeHardware:
+                    got_safe = False
+                check(got_safe == safe, "PD identity %02x/%02x read_error=%s" % (id17, id18, read_error))
+                check(transfers and all(rw == mod.I2C_SMBUS_READ for rw, reg in transfers),
+                      "PD identity check wrote an I2C register: %s" % transfers)
+                check(all(reg in (0x17, 0x18) for rw, reg in transfers[:2])
+                      and (safe or all(reg != mod.REG for rw, reg in transfers)),
+                      "PD check accessed charger register before identity: %s" % transfers)
+        with mock.patch.object(mod, "open_checked", side_effect=mod.UnsafeHardware("fake unsafe")), \
+                mock.patch.object(mod, "Leds") as leds, \
+                mock.patch.object(sys, "argv", ["pdcharge.py"]), contextlib.redirect_stdout(io.StringIO()):
+            result = mod.main()
+            check(result in (None, 0), "unsafe normal PD daemon did not exit successfully")
+            check(not leds.called, "unsafe PD daemon initialized GPIO")
+    # Python's entry point also distinguishes an unsafe probe from a quiet
+    # successful daemon skip, on an unsupported DT (no /dev access needed).
+    m.device(b"raspberrypi,4-model-b\0")
+    for args, expected in (([], 0), (["--probe"], 1)):
+        code, text = run([sys.executable, "-B", os.path.join(POMERA, "pdcharge.py")] + args, env=env)
+        check(code == expected and len(text.strip().splitlines()) == 1,
+              "unsafe Python PD %s: %s %s" % (args, code, text))
+    m.device()
+
+
+def test_pdcharge_loop(m):
+    """One daemon iteration plus SIGTERM, with a fake PMIC and no GPIO module."""
+    print("== PD charging current and shutdown (fake PMIC)")
+    spec = importlib.util.spec_from_file_location("loop_pdcharge", os.path.join(POMERA, "pdcharge.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    class Pmic:
+        def __init__(self, value):
+            self.value, self.writes, self.closed = value, [], False
+
+        def read(self):
+            return self.value
+
+        def write(self, value):
+            self.value = value
+            self.writes.append(value)
+
+        def close(self):
+            self.closed = True
+
+    # 0xF0 also checks that the unrelated upper nibble survives both writes.
+    # An initial 2 A limit belongs to somebody else and must not be reset.
+    for initial, online, external, want in ((0xF0, True, None, [0xF7, 0xF0]),
+                                             (0xF7, True, None, []),
+                                             (0xFB, True, None, []),
+                                             (0xF0, False, None, []),
+                                             (0xF0, True, 0xFB, [0xF7])):
+        pmic = Pmic(initial)
+        handlers = {}
+
+        def stop_after_one(interval):
+            if external is not None:
+                pmic.value = external
+            handlers[mod.signal.SIGTERM]()
+
+        with mock.patch.object(mod, "open_checked", return_value=pmic), \
+                mock.patch.object(mod, "usb_online", return_value=online), \
+                mock.patch.object(mod.signal, "signal", side_effect=lambda sig, fn: handlers.update({sig: fn})), \
+                mock.patch.object(mod.time, "sleep", side_effect=stop_after_one), \
+                mock.patch.dict(sys.modules, {"gpiod": None}), \
+                mock.patch.object(sys, "argv", ["pdcharge.py"]), contextlib.redirect_stdout(io.StringIO()) as output:
+            result = mod.main()
+        check(result in (None, 0) and pmic.closed and pmic.writes == want,
+              "PD loop initial=%02x online=%s external=%s writes=%s expected=%s" %
+              (initial, online, external, pmic.writes, want))
+        check("LEDs disabled" in output.getvalue() or "LED は使いません" in output.getvalue(),
+              "PD charging did not continue without gpiod: " + output.getvalue())
+
+
 def test_private(tmp):
     """The checks of tools/make_public.sh on these files (when it is there:
     it is not in the public copy)."""
@@ -681,7 +918,9 @@ def main():
         for test, args in ((test_syntax, ()), (test_deps_cover_makefiles, ()), (test_darwin, (m,)),
                            (test_linux_deps, (m,)), (test_options, (m,)), (test_pomera, (m,)), (test_install, (m,)),
                            (test_make_reads_config, (m,)), (test_make_pio, (tmp,)), (test_install_pomera, (m,)),
-                           (test_setup, (m,)), (test_heif, (m,)), (test_private, (tmp,))):
+                           (test_setup, (m,)), (test_heif, (m,)), (test_pdcharge_questions, (m,)),
+                           (test_pdcharge_setup, (m,)), (test_pdcharge_safety, (m,)), (test_pdcharge_loop, (m,)),
+                           (test_private, (tmp,))):
             try:
                 test(*args)
             except Exception as e:  # a broken step is a failure, the others still run

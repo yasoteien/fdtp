@@ -95,6 +95,8 @@ sudo make install           # sudo make uninstall removes it
    - If you choose read-write, setup explains the risks and asks again. A file being written when the Pomera freezes may not be recoverable.
    - On boot, if the dirty flag is set, `fsck.fat -n` from `dosfstools` checks the memory without writing. It does not repair it automatically. If a problem is found, the memory is mounted read-only and you are notified at login and when FDTP starts.
 
+4. **Only on a Pomera DM250**: improve charging through a powered PD hub (enabled by default). It raises a USB input limit below 2 A to 2 A, uses about 4% CPU, and optionally uses `python3-libgpiod` for the charging LED. To undo: `sudo sh scripts/pomera/pomera_pdcharge.sh remove`. Checked on the ekesete.net D250 Debian 13.7 image (kernel `6.18.41-g653d8276acb7`); a newer image may no longer need it or may not fit, so after updating, first check charging without pdcharge (it warns on another kernel).
+
 Options: `--yes` (take the defaults), `--lang=ja|en|auto`, `--prefix=DIR` (default `/usr/local`), `--no-pomera` (skip the Pomera questions). `sudo make uninstall` does not undo the Pomera settings; it prints how to undo them.
 
 #### Packages for the build

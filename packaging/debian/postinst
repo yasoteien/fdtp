@@ -9,8 +9,8 @@ if [ "$1" = configure ] && [ -z "${2:-}" ] && [ -f "$Q" ]; then
 	. "$Q"
 	if is_dm250 /proc/device-tree; then
 		msg_init
-		say "Pomera DM250 の設定（Wi-Fi の安定化、内蔵メモリの読み取り専用マウント）は、使うなら次で行います:" \
-			"The Pomera DM250 settings (Wi-Fi stabilization, a read-only mount of the internal memory), if you want them:"
+		say "Pomera DM250 の設定（Wi-Fi の安定化、内蔵メモリのマウント、PD ハブ経由の充電）は、使うなら次で行います:" \
+			"The Pomera DM250 settings (Wi-Fi stabilization, internal memory mounting, PD hub charging), if you want them:"
 		echo "  sudo fdtp-pomera-setup"
 	fi
 fi

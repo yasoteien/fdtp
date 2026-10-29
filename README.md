@@ -95,6 +95,8 @@ sudo make install           # 消すときは sudo make uninstall
    - 読み書きを選ぶと、注意を説明してもう一度確認します。止まった時に書いていたファイルは、元に戻らない事があります。
    - 起動時に使用中の印が残っていた時だけ、`dosfstools` の `fsck.fat -n` で点検します。自動修復はしません。問題があれば読み取り専用でつなぎ、ログイン時と FDTP の起動時に知らせます。
 
+4. **ポメラ DM250 の時だけ**: PD ハブ経由の充電を改善します（既定は有効）。USB の入力上限が 2A 未満の時に 2A にします。CPU を約 4% 使用し、充電 LED には任意の `python3-libgpiod` が必要です。やめるには `sudo sh scripts/pomera/pomera_pdcharge.sh remove`。確かめたのは ekesete.net の D250 用 Debian 13.7（カーネル `6.18.41-g653d8276acb7`）です。イメージが新しくなると要らなくなったり合わなくなったりするかもしれないので、入れ替えたらまず pdcharge 無しで充電の様子を確かめてください（版が違うと警告を出します）。
+
 オプション: `--yes`（既定の答えで進む）、`--lang=ja|en|auto`、`--prefix=DIR`（既定は `/usr/local`）、`--no-pomera`（ポメラの質問をしない）。`sudo make uninstall` はポメラの設定を戻しません。戻し方を表示します。
 
 #### ビルドに要る物

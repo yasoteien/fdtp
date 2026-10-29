@@ -1,0 +1,12 @@
+[Unit]
+Description=Pomera RK818 PD hub charging (2 A input limit) and charge LEDs
+Documentation=file:///usr/local/lib/pdcharge/pdcharge.py
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/lib/pdcharge/pdcharge.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

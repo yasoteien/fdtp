@@ -24,6 +24,7 @@ PREFIX ?= /usr/local
 DESTDIR ?=
 FDTPRC ?= /etc/fdtprc
 POMERA_STABILITY ?= no
+POMERA_PDCHARGE ?= keep
 POMERA_INTERNAL_RO ?= no
 # keep: not answered (an old config.mk's POMERA_INTERNAL_RO = no says only
 # that it was not set up then), so an earlier setting is left alone.
@@ -83,8 +84,8 @@ install: $(INSTALL_EXE) $$(LOCALSEND_EXE)
 		fi; \
 		chmod 644 "$$f"; echo "$$f: LANGUAGE=$(FDTP_LANGUAGE)"; \
 	fi
-	@if [ -z "$(DESTDIR)" ] && { [ "$(POMERA_STABILITY)" = yes ] || { [ "$(POMERA_INTERNAL)" = ro ] || [ "$(POMERA_INTERNAL)" = rw ] || [ "$(POMERA_INTERNAL)" = no ]; }; }; then \
-		POMERA_STABILITY="$(POMERA_STABILITY)" POMERA_INTERNAL="$(POMERA_INTERNAL)" FDTP_MSG_LANG="$(INSTALL_MSG_LANG)" \
+	@if [ -z "$(DESTDIR)" ] && { [ "$(POMERA_PDCHARGE)" = yes ] || [ "$(POMERA_PDCHARGE)" = no ] || [ "$(POMERA_STABILITY)" = yes ] || { [ "$(POMERA_INTERNAL)" = ro ] || [ "$(POMERA_INTERNAL)" = rw ] || [ "$(POMERA_INTERNAL)" = no ]; }; }; then \
+		POMERA_PDCHARGE="$(POMERA_PDCHARGE)" POMERA_STABILITY="$(POMERA_STABILITY)" POMERA_INTERNAL="$(POMERA_INTERNAL)" FDTP_MSG_LANG="$(INSTALL_MSG_LANG)" \
 			sh "$(POMERA_SCRIPTS)/install_pomera.sh"; \
 	fi
 	@echo "installed: $(BINDIR)/fdtp$(if $(DESTDIR), (under $(DESTDIR)))"
@@ -101,13 +102,14 @@ uninstall:
 			rm -f "$$f" && echo "removed $$f"; \
 		else echo "$$f is kept (it has settings of its own)"; fi; \
 	fi
-	@if [ "$(POMERA_STABILITY)" = yes ] || { [ "$(POMERA_INTERNAL)" = ro ] || [ "$(POMERA_INTERNAL)" = rw ]; }; then \
+	@if [ "$(POMERA_PDCHARGE)" = yes ] || [ "$(POMERA_STABILITY)" = yes ] || { [ "$(POMERA_INTERNAL)" = ro ] || [ "$(POMERA_INTERNAL)" = rw ]; }; then \
 		echo "The Pomera settings are not undone. To undo them:"; \
 		if [ "$(POMERA_STABILITY)" = yes ]; then \
 			echo "  sudo sh $(POMERA_SCRIPTS)/pomera_stability.sh remove"; \
 			echo "  sudo sh $(POMERA_SCRIPTS)/pomera_dma_pio.sh restore     (if the SD was rewritten)"; \
 		fi; \
 		if { [ "$(POMERA_INTERNAL)" = ro ] || [ "$(POMERA_INTERNAL)" = rw ]; }; then echo "  sudo sh $(POMERA_SCRIPTS)/pomera_mount_internal.sh unpersist"; fi; \
+		if [ "$(POMERA_PDCHARGE)" = yes ]; then echo "  sudo sh $(POMERA_SCRIPTS)/pomera_pdcharge.sh remove"; fi; \
 		echo "and reboot."; \
 	fi
 endif

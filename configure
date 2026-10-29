@@ -27,6 +27,7 @@
 #   FDTP_CONFIGURE_UID      id -u
 #   FDTP_CONFIGURE_PROBE    the internal memory probe (a command printing
 #                           vfat or exfat when found)
+#   FDTP_CONFIGURE_PDCHARGE_PROBE  read-only PD charger probe (test command)
 #   FDTP_CONFIGURE_TTY      yes|no: whether to ask (default: stdin is a terminal)
 #   FDTP_CONFIGURE_HEIF     yes|no: whether libheif is installed
 #   FDTP_CONFIGURE_APT      the apt-get command (installing libheif)
@@ -228,13 +229,15 @@ else
 	ask_heif
 fi
 
-STABILITY=no INTERNAL=keep POMERA=no
+STABILITY=no INTERNAL=keep PDCHARGE=keep POMERA=no
 if [ "$UNAME" = Linux ] && [ "$NOPOMERA" = 0 ] && is_dm250 "$DT"; then POMERA=yes; fi
 if [ "$POMERA" = yes ]; then
 	echo
 	ask_wifi
 	echo
 	ask_internal
+	echo
+	ask_pdcharge
 fi
 
 # ---- 3. config.mk -------------------------------------------------------------------
@@ -247,6 +250,7 @@ tmp=$OUT.tmp.$$
 	echo "FDTP_LANGUAGE = $LANG_ANSWER"
 	echo "POMERA_STABILITY = $STABILITY"
 	echo "POMERA_INTERNAL = $INTERNAL"
+	echo "POMERA_PDCHARGE = $PDCHARGE"
 	echo "HAVE_XCB = $HAVE_XCB"
 	echo "HAVE_UIM = $HAVE_UIM"
 	if [ "$UNAME" != Darwin ] && [ "$HAVE_UIM" = no ]; then echo "NOVEL_IME = ime_none"; fi
@@ -260,6 +264,7 @@ printf '  %s: %s\n' "$(pick "HEIC（libheif）" "HEIC (libheif)")" "$HEIF"
 if [ "$POMERA" = yes ]; then
 	printf '  %s: %s\n' "$(pick "Wi-Fi の安定化" "Wi-Fi stability")" "$STABILITY"
 	printf '  %s: %s\n' "$(pick "内蔵メモリのマウント" "internal memory mount")" "$INTERNAL"
+	printf '  %s: %s\n' "pdcharge" "$PDCHARGE"
 fi
 say "次に:" "Next:"
 if [ "$UNAME" = Darwin ]; then

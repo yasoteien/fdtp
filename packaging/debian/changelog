@@ -1,3 +1,9 @@
+fdtp (1.12-1) trixie; urgency=medium
+
+  * Add optional PD hub charging service and charging LED for the DM250.
+
+ -- yasoteien <263659156+yasoteien@users.noreply.github.com>  Thu, 29 Oct 2026 23:00:00 +0900
+
 fdtp (1.11-1) trixie; urgency=medium
 
   * The source on GitHub builds again (the public .gitignore left out
