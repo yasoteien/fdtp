@@ -93,10 +93,12 @@ int headless_script_step(ScriptRunner *r,App *a,Canvas *c,Cells *cells,double no
     case SCRIPT_REALWAIT: {
         struct timespec start, current;
         clock_gettime(CLOCK_MONOTONIC, &start);
-        for (;;) {
-            app_tick(a, now);
+        for (double elapsed = 0;;) {
+            /* Real time passes here: the screens' ticks see it (the filer's
+             * look for outside changes, child jobs). */
+            app_tick(a, now + elapsed);
             clock_gettime(CLOCK_MONOTONIC, &current);
-            double elapsed = current.tv_sec - start.tv_sec + (current.tv_nsec - start.tv_nsec) / 1e9;
+            elapsed = current.tv_sec - start.tv_sec + (current.tv_nsec - start.tv_nsec) / 1e9;
             if (elapsed >= e.seconds) break;
             struct timespec pause = {0, 10000000};
             nanosleep(&pause, NULL);

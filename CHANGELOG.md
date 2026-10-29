@@ -4,6 +4,18 @@ All notable changes to FDTP are recorded in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions have two decimal places (0.01, 0.02, ... 1.00); they do not follow Semantic Versioning.
 
+## [1.11] - 2026-10-29
+
+### Fixed
+
+- The source on GitHub builds again: the public `.gitignore` left out `mk/config.mk` (it meant only the top-level `config.mk`). The 1.10 .deb files were not affected.
+- The file list follows changes made elsewhere (another window, Finder, LocalSend, a shell): the shown directories are checked every 1.5 seconds and read again when they change, keeping the cursor and the marks of what is still there.
+- Total, Used and Free on the top line use one unit.
+
+### Changed
+
+- Give by browser answers a too long file reference with 403, as receiving does.
+
 ## [1.10] - 2026-10-29
 
 ### Added

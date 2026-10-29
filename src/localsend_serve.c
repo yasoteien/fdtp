@@ -238,7 +238,7 @@ static int unchanged(LsSendFile *f)
 }
 static void download(LsShare *s, LsConn *c, const LsHttp *h, const char *ip)
 {
-    char sid[128], fid[128];
+    char sid[128], fid[1024];   /* as upload's: a long unknown id is refused as unknown (403), not as malformed */
     if (ls_query(h->path, "sessionId", sid, sizeof(sid)) != 1) { ls_http_reply(c, 400, NULL); return; }
     int valid = 0;
     pthread_mutex_lock(&s->lock);

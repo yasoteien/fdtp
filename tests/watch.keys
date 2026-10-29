@@ -1,0 +1,8 @@
+# The filer reads a shown directory again when another program changes it
+# (tests/check_watch.py changes it while this runs).
+DOWN SPC SNAP # before
+REALWAIT:1.5 SNAP # same_time
+WAIT:2 REALWAIT:0.2 SNAP # after
+h REALWAIT:1.5 WAIT:2 REALWAIT:0.2 SNAP # boxed
+ESC SNAP # closed_now
+WAIT:2 REALWAIT:0.2 SNAP # closed

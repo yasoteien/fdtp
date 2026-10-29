@@ -97,6 +97,7 @@ check: i18n-check $(CHECK_EXE)
 	$(if $(FIXENV),DYLD_INSERT_LIBRARIES="$(FIXENV)") CC="$(CC)" FDTP_COMMON="$(COMMON)" FDTP_MODULE_LIBS="$(MODULE_LIBS)" python3 -B $(APP_DIR)/tests/check.py --build $(BUILD) --executable $(CHECK_EXE) $(CHECK_MODE)
 	python3 -B $(APP_DIR)/tests/check_localsend_ui.py --build $(BUILD)
 	python3 -B $(APP_DIR)/tests/check_mouse.py --build $(BUILD)
+	python3 -B $(APP_DIR)/tests/check_watch.py --build $(BUILD)
 	$(if $(LOCALSEND_EXE),python3 -B $(APP_DIR)/tests/check_localsend_browser_e2e.py --build $(BUILD))
 # T1's refactor check against stage 0 (844bd79). The screen has changed on
 # purpose since (gap before sizes, ".." not hidden), so it is run by hand only.

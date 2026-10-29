@@ -5,5 +5,5 @@ build-*/
 *.d
 __pycache__/
 .DS_Store
-config.mk
+/config.mk
 scripts/pomera/rsce-backup-*.bin

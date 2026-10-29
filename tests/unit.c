@@ -11,6 +11,7 @@
 #include "launcher.h"
 #include "noveledit.h"
 #include "font24.h"
+#include "fdscreen.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -114,8 +115,42 @@ static void external_modal_test(const char *fixture) {
  app_key(a,&k); assert(a->widgets.kind==WIDGET_CONFIRM);
  assert(keys_parse("y",&k)); app_key(a,&k); assert(a->quit); app_destroy(a); free(a);
 }
+/* The top row's Total, Used and Free share one unit (FDTM: Free was in
+ * bytes beside Total and Used in K), on the Pomera's 80 and 85 columns and
+ * wider ones, and stay in their fields. */
+static void top_row_units(void) {
+ const int sizes[][2]={{80,25},{85,25},{120,36},{160,45}};
+ const uint64_t cases[][3]={{494384795648ull,382213701632ull,112171094016ull},{1000000ull,400000ull,600000ull},{8ull<<40,(8ull<<40)-1,1}};
+ for(size_t i=0;i<sizeof(sizes)/sizeof(*sizes);++i) for(size_t j=0;j<sizeof(cases)/sizeof(*cases);++j) {
+  fd_set_size(sizes[i][0],sizes[i][1]);
+  DirList list={0}; list.path="/x"; list.total=cases[j][0]; list.used=cases[j][1]; list.free_bytes=cases[j][2];
+  Cells c; cells_init(&c); fdscreen_build(&c,&list,0,2,0);
+  char row[FD_COLS_MAX+1]; for(int x=0;x<FD_COLS;++x) { uint32_t code=c.data[1][x].code; row[x]=code<128&&code>=32 ? (char)code : '|'; } row[FD_COLS]=0;
+  const char *labels[]={"Total:","Used:","Free:"}; char unit[3];
+  for(int k=0;k<3;++k) { const char *at=strstr(row,labels[k]); assert(at); at+=strlen(labels[k]);
+   while(*at==' ') ++at; const char *end=at; while((*end>='0'&&*end<='9')||*end==',') ++end;
+   assert(end>at); unit[k]=(*end=='K'||*end=='M'||*end=='G') ? *end : ' '; }
+  if(unit[0]!=unit[1]||unit[1]!=unit[2]) { fprintf(stderr,"top row %dx%d: %s\n",sizes[i][0],sizes[i][1],row); assert(0); }
+  /* Nothing ran into the next label: the field ends are blank or a divider. */
+  assert(strstr(row,"Total:")&&strstr(row,"Used:")&&strstr(row,"Free:"));
+ }
+ fd_set_size(80,25);
+}
+/* FDTM: a pane notices its directory changing on the disk (filer_stale), and
+ * filer_unmark takes every mark off (after a drag moved them away). */
+static void stale_tests(const char *base) {
+ char dir[4096], file[4200]; assert(snprintf(dir,sizeof(dir),"%s/stale-XXXXXX",base)>0); assert(mkdtemp(dir));
+ snprintf(file,sizeof(file),"%s/a.txt",dir); touch(file);
+ App *a=calloc(1,sizeof(*a)); assert(a); app_init(a); Screen *s=filer_create(dir); assert(s&&!app_push(a,s));
+ assert(!filer_stale(s)); assert(!filer_stale(s));
+ snprintf(file,sizeof(file),"%s/b.txt",dir); touch(file); assert(filer_stale(s)); assert(!filer_stale(s));
+ assert(!unlink(file)); assert(filer_stale(s));
+ filer_reload(s,a); Key k; assert(keys_parse("DOWN",&k)); app_key(a,&k); assert(keys_parse("SPC",&k)); app_key(a,&k); assert(filer_marked(s));
+ filer_unmark(s,a); assert(!filer_marked(s));
+ snprintf(file,sizeof(file),"%s/a.txt",dir); assert(!unlink(file)); assert(!rmdir(dir)); app_destroy(a); free(a);
+}
 int main(int argc, char **argv) {
- assert(argc==3); application_tests(); command_tests(); awake_tests(); external_modal_test(argv[2]);
+ assert(argc==3); application_tests(); top_row_units(); stale_tests(argv[1]); command_tests(); awake_tests(); external_modal_test(argv[2]);
  Key k,a,b; assert(keys_evdev(3,MOD_SHIFT,&k)&&k.ch=='"');
  assert(keys_evdev(26,0,&k)&&k.ch=='@'); assert(keys_evdev(40,MOD_SHIFT,&k)&&k.ch=='*');
  assert(!keys_evdev(58,0,&k)); assert(keys_evdev(30,128,&k)&&k.ch=='a'&&k.mods==0);

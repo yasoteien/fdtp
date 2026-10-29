@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <dirent.h>
 #include <sys/stat.h>
 #define WINDOWS 5
 #define PATH_CAP 4096
@@ -34,6 +35,8 @@ typedef struct {
     size_t *visible, count, cursor;
     int columns, rows, sort, descending, hide, type, links, shift;
     size_t anchor; /* Shift+click's other end (filer_mouse) */
+    /* What filer_stale last saw of the directory (0, -1: not looked yet). */
+    long long stamp; long entries;
     char filter[PATH_CAP], previous[PATH_CAP];
     char *stack[5]; int stacked;
     char *history[DIRECTORY_HISTORY]; int history_count;
@@ -44,6 +47,7 @@ typedef struct {
     Pending pending;
     int search_direction, sort_next;
     const char **selection; size_t selection_capacity;
+    double looked; /* when filer_tick last looked at the directories */
 } Filer;
 static int filer_key(Screen *,App *,const Key *);
 static Window *current(Filer *f) { return &f->windows[f->active]; }
@@ -680,6 +684,59 @@ char *filer_drop_directory(Screen *s,App *a,int col,int row)
     if(e->is_dir && strcmp(e->name,"..")) return join(w->list.path,e->name);
     return strdup(w->list.path);
 }
+/* The directory's modification and change times in nanoseconds (0 when it
+ * cannot be read), and how many names it holds (-1 likewise): FAT keeps
+ * the time in 2-second steps, so two changes in one step show in the count. */
+static long long stamp_of(const char *path)
+{
+    struct stat st;
+    if(!path || stat(path,&st)<0) return 0;
+#ifdef __APPLE__
+    return ((long long)st.st_mtime*1000000000LL+st.st_mtimensec)*3+(long long)st.st_ctime*1000000000LL+st.st_ctimensec;
+#else
+    return ((long long)st.st_mtim.tv_sec*1000000000LL+st.st_mtim.tv_nsec)*3+(long long)st.st_ctim.tv_sec*1000000000LL+st.st_ctim.tv_nsec;
+#endif
+}
+static long entries_of(const char *path)
+{
+    DIR *d=path ? opendir(path) : NULL; long n=0;
+    if(!d) return -1;
+    while(readdir(d)) ++n;   /* the names only: no file is opened or stat'ed */
+    closedir(d); return n;
+}
+int filer_stale(Screen *s)
+{
+    if(!s || s->key!=filer_key) return 0;
+    Filer *f=s->self; int stale=0;
+    for(int i=0;i<f->count;++i) {
+        Window *w=&f->windows[i];
+        long long now=stamp_of(w->list.path); long n=entries_of(w->list.path);
+        if(w->stamp && (now!=w->stamp || n!=w->entries)) stale=1;
+        w->stamp=now; w->entries=n;
+    }
+    return stale;
+}
+/* Another program (another FDTM, the Finder, LocalSend's helper, a command
+ * in a terminal) changed a shown directory: read it again, the cursor's
+ * name and the marks kept (FD reads again only after its own operations and
+ * Ctrl+l). Only with no box or input open; a change meanwhile is seen at the
+ * next look after it closes. stat and the names only, every
+ * FILER_LOOK_SECONDS, so that the Pomera's SD card is not kept busy. */
+static void filer_tick(Screen *s,App *a,double now)
+{
+    Filer *f=s->self;
+    if(now-f->looked<FILER_LOOK_SECONDS && now>=f->looked) return;
+    if((a->widgets.kind!=WIDGET_NONE && a->widgets.kind!=WIDGET_NOTICE) || f->pending!=P_NONE) return;
+    f->looked=now;
+    if(filer_stale(s)) { filer_reload(s,a); filer_stale(s); a->changed=1; }
+}
+void filer_unmark(Screen *s,App *a)
+{
+    if(!s || s->key!=filer_key) return;
+    Filer *f=s->self;
+    for(int i=0;i<f->count;++i) for(size_t j=0;j<f->windows[i].list.count;++j) f->windows[i].list.entries[j].marked=0;
+    a->changed=1;
+}
 static void filer_destroy(Screen *s)
 {
     Filer *f=s->self; for(int i=0;i<f->count;++i) window_free(&f->windows[i]);
@@ -690,6 +747,6 @@ Screen *filer_create(const char *directory)
     Screen *s=calloc(1,sizeof(*s)); Filer *f=calloc(1,sizeof(*f));
     if(!s || !f) { free(s); free(f); return NULL; }
     if(window_init(&f->windows[0],directory)<0) { free(s); free(f); return NULL; }
-    f->count=1; s->self=f; s->key=filer_key; s->draw=filer_draw; s->destroy=filer_destroy;
+    f->count=1; s->self=f; s->key=filer_key; s->draw=filer_draw; s->tick=filer_tick; s->destroy=filer_destroy;
     return s;
 }

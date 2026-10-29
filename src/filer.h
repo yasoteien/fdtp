@@ -42,4 +42,11 @@ int filer_drag_selection(Screen *screen, App *app, int col, int row, FileSelecti
 /* Where a drop at the cell goes (malloc'd): the directory there, else the
  * pane's own directory. NULL when the filer cannot take a drop now. */
 char *filer_drop_directory(Screen *screen, App *app, int col, int row);
+/* 1 when a pane's directory changed on the disk since the last call (its
+ * times or how many names it holds); the first call only takes note. The
+ * filer's tick looks every FILER_LOOK_SECONDS and reads changed ones again. */
+#define FILER_LOOK_SECONDS 1.5
+int filer_stale(Screen *screen);
+/* Takes every mark off (after the marked files were dragged away). */
+void filer_unmark(Screen *screen, App *app);
 #endif

@@ -23,21 +23,30 @@ static void number(char out[32], uint64_t value)
     }
     out[j] = 0;
 }
+/* The unit (0 bytes, 1 K, 2 M, 3 G: units of 1024, rounded down) that
+ * makes value fit in width columns, with its letter. */
+static int unit_for(uint64_t value, int width)
+{
+    char s[32]; number(s,value);
+    int u = 0;
+    for (int w = (int)strlen(s); w > width && u < 3; ++u) { value /= 1024; number(s,value); w = (int)strlen(s)+1; }
+    return u;
+}
+static void number_in(Cells *c, int end, int row, uint64_t value, int unit)
+{
+    static const char units[] = "KMG";
+    char s[32];
+    for (int u = 0; u < unit; ++u) value /= 1024;
+    number(s,value);
+    if (unit) { size_t n = strlen(s); s[n] = units[unit-1]; s[n+1] = 0; }
+    int width = (int)strlen(s);
+    text(c,end-width+1,row,s,WHITE,width);
+}
 void fdscreen_number(Cells *c, int end, int row, uint64_t value, int min_col)
 {
     /* Too wide for its field (from min_col to end): show it in K, M or G
-     * (units of 1024, rounded down) instead of running into the label. */
-    static const char units[] = "KMG";
-    char s[32]; number(s,value);
-    int width = (int)strlen(s);
-    for (int u = 0; width > end-min_col+1 && u < 3; ++u) {
-        value /= 1024;
-        number(s,value);
-        size_t n = strlen(s);
-        s[n] = units[u]; s[n+1] = 0;
-        width = (int)n+1;
-    }
-    text(c,end-width+1,row,s,WHITE,width);
+     * instead of running into the label. */
+    number_in(c,end,row,value,unit_for(value,end-min_col+1));
 }
 const char *fdscreen_program = "FDTP";
 int fdscreen_slots(int columns)
@@ -80,9 +89,15 @@ void fdscreen_build(Cells *cells, const DirList *list, size_t cursor, int column
     snprintf(s,sizeof(s),"Page:%2zu/%2zu",page+1,list->count ? (list->count+per-1)/per : 1);
     text(&next,2,1,s,CYAN,11);
     const int d0 = fd_divider(0), d1 = fd_divider(1), d2 = fd_divider(2);
-    text(&next,d0+2,1,"Total:",CYAN,6); fdscreen_number(&next,d1-2,1,list->total,d0+9);
-    text(&next,d1+2,1,"Used:",CYAN,5); fdscreen_number(&next,d2-2,1,list->used,d1+8);
-    text(&next,d2+2,1,"Free:",CYAN,5); fdscreen_number(&next,FD_COLS-3,1,list->free_bytes,d2+8);
+    /* Total, Used and Free in one unit: the one that fits each of them in
+     * its field (Free in bytes beside Total in K read as a far larger
+     * number). */
+    int unit = unit_for(list->total,d1-2-(d0+9)+1), u;
+    if ((u = unit_for(list->used,d2-2-(d1+8)+1)) > unit) unit = u;
+    if ((u = unit_for(list->free_bytes,FD_COLS-3-(d2+8)+1)) > unit) unit = u;
+    text(&next,d0+2,1,"Total:",CYAN,6); number_in(&next,d1-2,1,list->total,unit);
+    text(&next,d1+2,1,"Used:",CYAN,5); number_in(&next,d2-2,1,list->used,unit);
+    text(&next,d2+2,1,"Free:",CYAN,5); number_in(&next,FD_COLS-3,1,list->free_bytes,unit);
     text(&next,2,3,"Path=",CYAN,5);
     const char *path = list->path ? list->path : "";
     /* ~ for $HOME, "…" and the end when too wide (cells_path). */

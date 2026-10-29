@@ -1,3 +1,11 @@
+fdtp (1.11-1) trixie; urgency=medium
+
+  * The source on GitHub builds again (the public .gitignore left out
+    mk/config.mk).
+  * The file list follows changes made elsewhere; one unit on the top line.
+
+ -- yasoteien <263659156+yasoteien@users.noreply.github.com>  Thu, 29 Oct 2026 22:00:00 +0900
+
 fdtp (1.10-1) trixie; urgency=medium
 
   * LocalSend (Alt+l): send to and receive from the LocalSend apps; give by
