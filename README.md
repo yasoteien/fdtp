@@ -97,6 +97,8 @@ sudo make install           # 消すときは sudo make uninstall
 
 4. **ポメラ DM250 の時だけ**: PD ハブ経由の充電を改善します（既定は有効）。USB の入力上限が 2A 未満の時に 2A にします。CPU を約 4% 使用し、充電 LED には任意の `python3-libgpiod` が必要です。やめるには `sudo sh scripts/pomera/pomera_pdcharge.sh remove`。確かめたのは ekesete.net の D250 用 Debian 13.7（カーネル `6.18.41-g653d8276acb7`）です。イメージが新しくなると要らなくなったり合わなくなったりするかもしれないので、入れ替えたらまず pdcharge 無しで充電の様子を確かめてください（版が違うと警告を出します）。
 
+5. **ポメラ DM250 の時だけ**: CVE-2026-98432 の対策をします（既定は有効）。Linux の IPv4 TCP が IP オプション付き SYN で解放済みのメモリを使う不具合を避けるため、IP オプション付きの IPv4 TCP パケットを nftables で破棄します。通常の通信には IP オプションはなく、RTP-MIDI・mDNS・LocalSend・ssh には影響しません。IGMP は通します。対象の DM250 カーネルの時だけ質問します。nftables パッケージが無ければ入れ、既存のルールを残して専用ファイルを追加します。「いいえ」は前の設定を外します。状態は `sudo sh scripts/pomera/pomera_cve_2026_98432.sh status`、やめるには `sudo sh scripts/pomera/pomera_cve_2026_98432.sh remove` です。このイメージのカーネルが `6.18.56` 以降になれば不要です。Debian 純正カーネルは `apt upgrade` で直りますが、このイメージの作者のカーネルはパッケージがなく、apt では直りません。
+
 オプション: `--yes`（既定の答えで進む）、`--lang=ja|en|auto`、`--prefix=DIR`（既定は `/usr/local`）、`--no-pomera`（ポメラの質問をしない）。`sudo make uninstall` はポメラの設定を戻しません。戻し方を表示します。
 
 #### ビルドに要る物

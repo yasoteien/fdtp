@@ -97,6 +97,8 @@ sudo make install           # sudo make uninstall removes it
 
 4. **Only on a Pomera DM250**: improve charging through a powered PD hub (enabled by default). It raises a USB input limit below 2 A to 2 A, uses about 4% CPU, and optionally uses `python3-libgpiod` for the charging LED. To undo: `sudo sh scripts/pomera/pomera_pdcharge.sh remove`. Checked on the ekesete.net D250 Debian 13.7 image (kernel `6.18.41-g653d8276acb7`); a newer image may no longer need it or may not fit, so after updating, first check charging without pdcharge (it warns on another kernel).
 
+5. **Only on a Pomera DM250**: Mitigate CVE-2026-98432 (enabled by default). To avoid Linux IPv4 TCP using freed memory on a SYN with IP options, nftables drops IPv4 TCP packets carrying IP options. Normal traffic never has them; RTP-MIDI, mDNS, LocalSend and ssh are unaffected. IGMP is allowed. The question is asked only for an affected DM250 kernel. It installs the nftables package if missing and adds a separate file, keeping existing rules. Answering no removes an earlier setting. Check with `sudo sh scripts/pomera/pomera_cve_2026_98432.sh status`; undo with `sudo sh scripts/pomera/pomera_cve_2026_98432.sh remove`. It is no longer needed once this image's kernel reaches `6.18.56` or newer. Debian's own kernels are fixed by `apt upgrade`; the image author's kernel has no package, so apt cannot fix it.
+
 Options: `--yes` (take the defaults), `--lang=ja|en|auto`, `--prefix=DIR` (default `/usr/local`), `--no-pomera` (skip the Pomera questions). `sudo make uninstall` does not undo the Pomera settings; it prints how to undo them.
 
 #### Packages for the build

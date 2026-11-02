@@ -7,7 +7,7 @@
 #   sudo fdtp-pomera-setup [--yes]          the questions of ./configure (Wi-Fi
 #                                           stability, the mount mode of the
 #                                           internal memory, PD hub charging,
-#                                           installing libheif
+#                                           CVE-2026-98432 mitigation, installing libheif
 #                                           for HEIC when it is missing), each
 #                                           after what it does and how to undo
 #                                           it; then the settings answered yes
@@ -62,7 +62,7 @@ fi
 
 # What is set now, one line each in SET (empty: nothing).
 status() {
-	SET= STAB_SET= INT_SET= PIO_SET= PD_SET=
+	SET= STAB_SET= INT_SET= PIO_SET= PD_SET= CVE_SET=
 	if files=$(sh "$PDIR/pomera_stability.sh" present 2>/dev/null); then
 		STAB_SET=1
 		SET="$SET$(pick "Wi-Fi の安定化（省電力・watchdog）:" "Wi-Fi stability (power saving, watchdog):") $(echo $files)
@@ -76,6 +76,11 @@ status() {
 	if sh "$PDIR/pomera_pdcharge.sh" status >/dev/null 2>&1; then
 		PD_SET=1
 		SET="$SET$(pick "PD ハブ経由の充電・充電 LED: pdcharge.service" "PD hub charging and charge LEDs: pdcharge.service")
+"
+	fi
+	if sh "$PDIR/pomera_cve_2026_98432.sh" status >/dev/null 2>&1; then
+		CVE_SET=1
+		SET="$SET$(pick "CVE-2026-98432 の対策: nftables" "CVE-2026-98432 mitigation: nftables")
 "
 	fi
 	pio=$(sh "$PDIR/pomera_dma_pio.sh" state 2>/dev/null) || pio=
@@ -100,14 +105,16 @@ undo)
 	if [ -z "$SET" ]; then say "戻す物はありません。" "Nothing to undo."; exit 0; fi
 	say "今あるもの:" "Set now:"
 	printf '%s' "$SET" | sed 's/^/  /'
-	if [ -n "$STAB_SET$INT_SET$PD_SET" ]; then
+	if [ -n "$STAB_SET$INT_SET$PD_SET$CVE_SET" ]; then
 		say "上の設定のファイルを消します（/etc/fstab の行も）。pdcharge はすぐ止まり、他の設定は再起動後に戻ります。" \
 			"These settings are removed (including the fstab line). pdcharge stops now; other settings revert after reboot."
+		say "CVE-2026-98432 の対策もすぐ外れます。" "The CVE-2026-98432 mitigation is also removed immediately."
 		ask_yn y "戻しますか" "Undo them?"
 		if [ "$ANSWER" = yes ]; then
 			[ -z "$STAB_SET" ] || sh "$PDIR/pomera_stability.sh" remove
 			[ -z "$INT_SET" ] || sh "$PDIR/pomera_mount_internal.sh" unpersist
 			[ -z "$PD_SET" ] || sh "$PDIR/pomera_pdcharge.sh" remove
+			[ -z "$CVE_SET" ] || sh "$PDIR/pomera_cve_2026_98432.sh" remove
 		fi
 	fi
 	if [ -n "$PIO_SET" ]; then
@@ -137,17 +144,19 @@ ask_internal
 echo
 ask_pdcharge
 echo
+ask_cve
+echo
 ask_heif
 echo
 # 3 (do not mount) changes something only when an earlier mount is set up.
 if [ "$INTERNAL" = no ] && ! sh "$PDIR/pomera_mount_internal.sh" persisted 2>/dev/null; then INTERNAL=keep; fi
-if [ "$STABILITY" = no ] && [ "$INTERNAL" = keep ] && [ "$PDCHARGE" = keep ]; then
+if [ "$STABILITY" = no ] && [ "$INTERNAL" = keep ] && [ "$PDCHARGE" = keep ] && [ "$CVE" = keep ]; then
 	say "何も変えませんでした。" "Nothing was changed."
 	exit 0
 fi
 # install_pomera.sh asks before the PIO change only on a terminal.
 if [ "$TTY" = yes ]; then
-	POMERA_STABILITY=$STABILITY POMERA_INTERNAL=$INTERNAL POMERA_PDCHARGE=$PDCHARGE FDTP_MSG_LANG=$MSG FDTP_CONFIGURE_DT=$DT sh "$PDIR/install_pomera.sh"
+	POMERA_STABILITY=$STABILITY POMERA_INTERNAL=$INTERNAL POMERA_PDCHARGE=$PDCHARGE POMERA_CVE=$CVE FDTP_MSG_LANG=$MSG FDTP_CONFIGURE_DT=$DT sh "$PDIR/install_pomera.sh"
 else
-	POMERA_STABILITY=$STABILITY POMERA_INTERNAL=$INTERNAL POMERA_PDCHARGE=$PDCHARGE FDTP_MSG_LANG=$MSG FDTP_CONFIGURE_DT=$DT sh "$PDIR/install_pomera.sh" </dev/null
+	POMERA_STABILITY=$STABILITY POMERA_INTERNAL=$INTERNAL POMERA_PDCHARGE=$PDCHARGE POMERA_CVE=$CVE FDTP_MSG_LANG=$MSG FDTP_CONFIGURE_DT=$DT sh "$PDIR/install_pomera.sh" </dev/null
 fi

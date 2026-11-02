@@ -99,13 +99,13 @@ class Machine:
 
     def configure(self, *args, uname="Linux", uid="1000", probe=None, tty=None, stdin="", lang=None, term=None,
                   pc="libdrm gbm egl glesv2 xcb libjpeg libpng libwebp zlib expat",
-                  libs="gif mupdf uim uim-scm", shell="sh", heif="yes", apt=None, brew=None, pdcharge_probe=None):
+                  libs="gif mupdf uim uim-scm", shell="sh", heif="yes", apt=None, brew=None, pdcharge_probe=None, cve_probe="exit 1"):
         if os.path.exists(self.out):
             os.remove(self.out)
         env = base_env(FDTP_CONFIG_MK=self.out, FDTP_CONFIGURE_UNAME=uname, FDTP_CONFIGURE_DT=self.dt,
                        FDTP_CONFIGURE_UID=uid, PKG_CONFIG=self.pkg_config, CC=self.cc, FAKE_PC=pc, FAKE_LIBS=libs,
                        FDTP_CONFIGURE_PROBE=probe if probe is not None else "echo should-not-run; exit 1",
-                       FDTP_CONFIGURE_HEIF=heif, FDTP_CONFIGURE_BREW=brew or os.path.join(self.root, "no-brew"),
+                       FDTP_CONFIGURE_CVE_PROBE=cve_probe, FDTP_CONFIGURE_HEIF=heif, FDTP_CONFIGURE_BREW=brew or os.path.join(self.root, "no-brew"),
                        FDTP_CONFIGURE_APT=apt or "echo apt-should-not-run; false")
         if pdcharge_probe is not None:
             env["FDTP_CONFIGURE_PDCHARGE_PROBE"] = pdcharge_probe
@@ -176,7 +176,7 @@ def test_darwin(m):
     code, text, mk = m.configure("--yes", "--no-pomera", "--prefix=/opt/fdtp/", uname="Darwin")
     check(code == 0, "Darwin --yes failed: " + text)
     check(mk == {"FDTP_CONFIGURED": "yes", "PREFIX": "/opt/fdtp", "FDTP_LANGUAGE": "auto", "POMERA_STABILITY": "no",
-                 "POMERA_INTERNAL": "keep", "POMERA_PDCHARGE": "keep", "HAVE_XCB": "no", "HAVE_UIM": "no"}, "Darwin config.mk: %s" % mk)
+                 "POMERA_INTERNAL": "keep", "POMERA_PDCHARGE": "keep", "POMERA_CVE": "keep", "HAVE_XCB": "no", "HAVE_UIM": "no"}, "Darwin config.mk: %s" % mk)
     check("Wi-Fi" not in text and "pkg-config" not in text, "Darwin asked about the Pomera or pkg-config")
     check("make install is for Linux" in text, "Darwin: no note that make install is for Linux")
     # The Pomera questions never come on the Mac, even with a DM250 tree.
@@ -398,14 +398,16 @@ def test_install(m):
     check(code == 0 and not os.path.exists(rc), "install without config.mk wrote fdtprc")
     # Pomera answers: uninstall tells how to undo them.
     with open(m.out, "a") as f:
-        f.write("POMERA_STABILITY = yes\nPOMERA_INTERNAL = ro\nPOMERA_PDCHARGE = yes\n")
+        f.write("POMERA_STABILITY = yes\nPOMERA_INTERNAL = ro\nPOMERA_PDCHARGE = yes\nPOMERA_CVE = yes\n")
     code, text = make(["uninstall"] + common, env)
     check("pomera_stability.sh remove" in text and "pomera_dma_pio.sh restore" in text and "unpersist" in text,
           "uninstall: how to undo the Pomera settings")
     check("pomera_pdcharge.sh remove" in text, "uninstall: how to undo PD charging")
+    check("pomera_cve_2026_98432.sh remove" in text, "uninstall: how to undo CVE mitigation")
     code, text = run(["make", "-n", "-C", APP, "install"] + common, env=env)
     check("install_pomera.sh" in text, "make -n install: no Pomera part")
     check(re.search(r'POMERA_PDCHARGE=["\']?yes["\']?', text), "make install did not pass PD answer: " + text)
+    check(re.search(r'POMERA_CVE=["\']?yes["\']?', text), "make install did not pass CVE answer: " + text)
     # A legacy config containing only the old setting is translated for the installer.
     legacy = os.path.join(m.root, "legacy.mk")
     with open(legacy, "w") as f:
@@ -624,7 +626,7 @@ def test_setup(m):
 
     def setup(*args, uid="1000", probe="echo should-not-run; exit 1", tty="no", stdin="", lang=None, heif="yes"):
         env = base_env(FDTP_CONFIGURE_DT=m.dt, FDTP_CONFIGURE_UID=uid, FDTP_CONFIGURE_PROBE=probe, FDTP_CONFIGURE_TTY=tty,
-                       FDTP_CONFIGURE_HEIF=heif, FDTP_CONFIGURE_APT="echo apt-ran")
+                       FDTP_CONFIGURE_HEIF=heif, FDTP_CONFIGURE_CVE_PROBE="exit 1", FDTP_CONFIGURE_APT="echo apt-ran")
         if lang:
             env["LANG"] = lang
         return run(["sh", script] + list(args), env=env, stdin=stdin)
@@ -882,6 +884,213 @@ def test_pdcharge_loop(m):
               "PD charging did not continue without gpiod: " + output.getvalue())
 
 
+def test_cve_questions(m):
+    print("== CVE mitigation question (fake probe)")
+    m.device(POMERA_DT)
+    for answer, expected in (("y", "yes"), ("n", "no")):
+        code, text, mk = m.configure("--lang=en", uid="0", probe="echo vfat", pdcharge_probe="exit 0",
+                                     cve_probe="exit 0", tty="yes", stdin="n\n1\nn\n" + answer + "\n")
+        check(code == 0 and mk and mk.get("POMERA_CVE") == expected,
+              "configure CVE answer %s: %s %s" % (answer, mk, text))
+        check(0 <= text.find("Enable PD hub charging") < text.find("Enable the CVE-2026-98432 mitigation?"),
+              "CVE question was not fourth: " + text)
+    for args, probe, expected in ((["--yes"], "exit 0", "yes"), (["--yes"], "exit 1", "keep"),
+                                  (["--yes", "--no-pomera"], "echo unexpected-cve-probe; exit 0", "keep")):
+        code, text, mk = m.configure(*args, cve_probe=probe)
+        check(code == 0 and mk and mk.get("POMERA_CVE") == expected and "unexpected-cve-probe" not in text,
+              "configure CVE default/skip: %s %s" % (mk, text))
+    body = '. "$QUESTION_SOURCE"; msg_init; tty_init "$TEST_YES"; ask_cve; echo "RESULT=$CVE"'
+    for shell in SHELLS:
+        for lang in ("en", "ja"):
+            for probe, tty, yes, answers, default, expected in (
+                    ("exit 0", "no", "1", "", "y", "yes"),
+                    ("exit 0", "yes", "0", "n\n", "y", "no"),
+                    ("exit 0", "yes", "0", "wrong\ny\n", "y", "yes"),
+                    ("exit 1", "yes", "0", "y\n", "y", "keep"),
+                    ("exit 0", "no", "1", "", "n", "no")):
+                env = base_env(QUESTION_SOURCE=os.path.join(POMERA, "pomera_questions.sh"), PDIR=POMERA,
+                               FDTP_CONFIGURE_CVE_PROBE=probe, FDTP_CONFIGURE_TTY=tty, TEST_YES=yes,
+                               POMERA_CVE_DEFAULT=default, FDTP_MSG_LANG=lang)
+                code, text = run([shell, "-c", body], env=env, stdin=answers)
+                check(code == 0 and "RESULT=" + expected in text, "%s CVE question: %s" % (shell, text))
+                if expected != "keep":
+                    question = "対策をしますか" if lang == "ja" else "Enable the CVE-2026-98432 mitigation?"
+                    check(0 <= text.find("pomera_cve_2026_98432.sh remove") < text.find(question)
+                          and all(s in text for s in ("RTP-MIDI", "mDNS", "LocalSend", "ssh", "nftables", "6.18.56", "apt upgrade")),
+                          "CVE explanation/undo missing: " + text)
+    m.device()
+
+
+def test_cve_setup(m):
+    print("== CVE setup status, undo and answers (fake helpers)")
+    fake = os.path.join(m.root, "cve-setup")
+    os.makedirs(fake, exist_ok=True)
+    shutil.copy(os.path.join(POMERA, "pomera_questions.sh"), fake)
+    log = os.path.join(fake, "calls")
+    helpers = {
+        "pomera_stability.sh": "exit 1\n",
+        "pomera_mount_internal.sh": "exit 1\n",
+        "pomera_dma_pio.sh": 'case "$1" in state) echo original ;; backup-dir) echo /fake ;; *) exit 8 ;; esac\n',
+        "pomera_pdcharge.sh": "exit 1\n",
+        "pomera_cve_2026_98432.sh": 'echo "cve $*" >> "$CVE_LOG"\ncase "$1" in status) [ "$FAKE_CVE_SET" = yes ] ;; probe) exit "$CVE_PROBE" ;; install|remove) exit 0 ;; *) exit 8 ;; esac\n',
+        "install_pomera.sh": 'echo "answers $POMERA_CVE" >> "$CVE_LOG"\n',
+    }
+    for name, body in helpers.items():
+        with open(os.path.join(fake, name), "w") as f:
+            f.write("#!/bin/sh\n" + body)
+    m.device(POMERA_DT)
+    env = base_env(FDTP_POMERA_DIR=fake, FDTP_CONFIGURE_DT=m.dt, FDTP_CONFIGURE_UID="0",
+                   FDTP_CONFIGURE_TTY="yes", FDTP_CONFIGURE_HEIF="yes", CVE_LOG=log, FAKE_CVE_SET="yes", CVE_PROBE="0")
+    setup = os.path.join(POMERA, "pomera_setup.sh")
+    for present in ("yes", "no"):
+        env["FAKE_CVE_SET"] = present
+        code, text = run(["sh", setup, "--status"], env=env)
+        check(code == (0 if present == "yes" else 1) and (present == "no" or "CVE-2026-98432" in text),
+              "setup CVE status: " + text)
+        open(log, "w").close()
+        code, text = run(["sh", setup, "--undo", "--yes"], env=env)
+        calls = open(log).read().splitlines()
+        check(code == 0 and calls.count("cve remove") == (1 if present == "yes" else 0),
+              "setup CVE undo: %s %s" % (calls, text))
+    for answer, expected in (("y", "yes"), ("n", "no")):
+        code, text = run(["sh", setup], env=env, stdin="n\n" + answer + "\n")
+        check(code == 0 and "answers " + expected in open(log).read(), "setup CVE answer: " + text)
+    env["CVE_PROBE"] = "1"
+    code, text = run(["sh", setup], env=env, stdin="n\n")
+    check(code == 0 and "Nothing was changed." in text, "setup skipped CVE: " + text)
+    # Exercise install_pomera itself in isolation, without real services.
+    shutil.copy(os.path.join(POMERA, "install_pomera.sh"), fake)
+    for value, call in (("yes", "install"), ("no", "remove"), ("keep", None)):
+        open(log, "w").close()
+        env.update(POMERA_CVE=value, POMERA_STABILITY="no", POMERA_INTERNAL="keep")
+        # install_pomera uses the real uid; fake it through PATH for this isolated test.
+        with open(os.path.join(fake, "id"), "w") as f:
+            f.write("#!/bin/sh\necho 0\n")
+        os.chmod(os.path.join(fake, "id"), 0o755)
+        env["PATH"] = fake + os.pathsep + os.environ.get("PATH", "")
+        code, text = run(["sh", os.path.join(fake, "install_pomera.sh")], env=env)
+        check(code == 0 and open(log).read() == ("cve " + call + "\n" if call else ""),
+              "install_pomera CVE %s: %s" % (value, text))
+    m.device()
+
+
+def test_cve_kernel(m):
+    print("== CVE kernel version table")
+    script = os.path.join(POMERA, "pomera_cve_2026_98432.sh")
+    m.device(POMERA_DT)
+    cases = [("6.18.41-g653d8276acb7", True), ("6.12.113+deb13-arm64", False),
+             ("6.12.107", True), ("7.3.1", False), ("4.3", False), ("4.4", True),
+             ("6.9.1", True), ("8.0.0", False), ("bad", False), ("6.18.bad", False)]
+    for series, patch in (("5.10", 272), ("5.15", 223), ("6.1", 190), ("6.6", 159),
+                          ("6.12", 113), ("6.18", 56), ("7.2", 10)):
+        cases += [(series + "." + str(patch - 1), True), (series + "." + str(patch), False),
+                  (series + "." + str(patch + 1), False)]
+    for shell in SHELLS:
+        for kernel, affected in cases:
+            code, text = run([shell, script, "probe"], env=base_env(FDTP_CONFIGURE_DT=m.dt, FDTP_CVE_UNAME_R=kernel))
+            check(code == (0 if affected else 1) and (affected or len(text.strip().splitlines()) == 1),
+                  "%s CVE kernel %s: %s %s" % (shell, kernel, code, text))
+    m.device(b"raspberrypi,4-model-b\0")
+    code, text = run(["sh", script, "probe"], env=base_env(FDTP_CONFIGURE_DT=m.dt, FDTP_CVE_UNAME_R="6.18.41"))
+    check(code == 1 and "not a Pomera DM250" in text, "CVE probe accepted another machine: " + text)
+    m.device()
+
+
+def test_cve_rules(m):
+    print("== CVE install/remove/status (fake nft, systemctl and apt)")
+    script = os.path.join(POMERA, "pomera_cve_2026_98432.sh")
+    include = 'include "/etc/nftables.d/fdtp-cve-2026-98432.nft"'
+    user = '#!/usr/sbin/nft -f\n# user rules\ntable inet user { }\n'
+    marker = '# pomera_cve_2026_98432: written by pomera_cve_2026_98432.sh (see the script for why)\n'
+    m.device(POMERA_DT)
+    for shell in SHELLS:
+        for kind, enabled in (("user", "no"), ("user", "yes"), ("marker", "yes"),
+                              ("shebang-marker", "no"), ("marker-no-orig", "no"), ("absent", "no")):
+            with tempfile.TemporaryDirectory(dir=m.root) as root:
+                etc = os.path.join(root, "etc")
+                os.makedirs(etc)
+                conf = os.path.join(etc, "nftables.conf")
+                rule = os.path.join(etc, "nftables.d", "fdtp-cve-2026-98432.nft")
+                flag = os.path.join(root, "var", "lib", "fdtp", "cve-2026-98432-enabled")
+                original = user if kind == "user" else ("#!/usr/sbin/nft -f\n" if kind == "shebang-marker" else "") + marker + "table ip pomera_cve { }\n"
+                if kind != "absent":
+                    with open(conf, "w") as f:
+                        f.write(original)
+                if kind in ("marker", "shebang-marker"):
+                    with open(conf + ".orig", "w") as f:
+                        f.write(user)
+                log = os.path.join(root, "calls")
+                nft = os.path.join(root, "nft")
+                ctl = os.path.join(root, "systemctl")
+                apt = os.path.join(root, "apt")
+                bodies = {
+                    nft: 'echo "nft $*" >> "$CVE_LOG"\n[ "$1" != -c ] || exit "${CVE_CHECK:-0}"\n',
+                    ctl: 'echo "ctl $*" >> "$CVE_LOG"\ncase "$1" in is-enabled) [ -f "$CVE_ENABLED" ] ;; enable) touch "$CVE_ENABLED" ;; disable) rm -f "$CVE_ENABLED" ;; esac\n',
+                    apt: 'echo "apt $*" >> "$CVE_LOG"\ncp "$CVE_NFT_SOURCE" "$FDTP_CVE_NFT"\ntouch "$CVE_ENABLED"\n',
+                }
+                for path, body in bodies.items():
+                    with open(path, "w") as f:
+                        f.write("#!/bin/sh\n" + body)
+                    os.chmod(path, 0o755)
+                # Start without nft once, so apt must supply the fake command.
+                source = nft + "-source"
+                shutil.copy(nft, source)
+                os.remove(nft)
+                env = base_env(FDTP_CVE_ROOT=root, FDTP_CVE_NFT=nft, FDTP_CVE_SYSTEMCTL=ctl,
+                               FDTP_CONFIGURE_APT=apt, FDTP_CONFIGURE_DT=m.dt, FDTP_CONFIGURE_UID="0",
+                               FDTP_CVE_UNAME_R="6.18.41-g653d8276acb7", CVE_LOG=log,
+                               CVE_ENABLED=os.path.join(root, "enabled"), CVE_NFT_SOURCE=source)
+                if enabled == "yes":
+                    open(env["CVE_ENABLED"], "w").close()
+                for attempt in range(2):
+                    code, text = run([shell, script, "install"], env=env)
+                    check(code == 0, "%s CVE install %s: %s" % (shell, kind, text))
+                contents = open(conf).read()
+                check(contents.splitlines().count(include) == 1, "CVE duplicate include: " + contents)
+                if kind in ("user", "marker", "shebang-marker"):
+                    check(contents.startswith(user), "CVE lost user rules: " + contents)
+                if kind != "absent":
+                    check(open(conf + ".bak-fdtp-cve").read() == original, "CVE backup changed")
+                rules = open(rule).read()
+                check(rules.startswith("table ip pomera_cve\ndelete table ip pomera_cve\n")
+                      and "type filter hook prerouting priority raw; policy accept;" in rules
+                      and "ip protocol tcp ip hdrlength != 5 counter drop" in rules
+                      and "flush ruleset" not in rules, "CVE rule: " + rules)
+                calls = open(log).read().splitlines()
+                check(calls.count("apt install -y nftables") == 1
+                      and calls.index("nft -c -f " + conf) < calls.index("ctl enable nftables.service")
+                      and calls.count("nft list table ip pomera_cve") == 2, "CVE install calls: %s" % calls)
+                check(os.path.exists(flag) == (enabled == "no"), "CVE enable ownership wrong")
+                env["CVE_CHECK"] = "1"
+                before = len(calls)
+                code, text = run([shell, script, "install"], env=env)
+                failed_calls = open(log).read().splitlines()[before:]
+                check(code != 0 and "nft -c -f " + conf in failed_calls
+                      and not any(c.startswith(("ctl enable", "ctl restart", "nft list")) for c in failed_calls),
+                      "CVE applied after failed syntax check: %s %s" % (failed_calls, text))
+                del env["CVE_CHECK"]
+                # status/remove must work even with another DT and a fixed kernel.
+                env.update(FDTP_CONFIGURE_DT=os.path.join(root, "no-dt"), FDTP_CVE_UNAME_R="7.3.1",
+                           FDTP_CONFIGURE_UID="1000")
+                code, text = run([shell, script, "status"], env=env)
+                check(code == 0 and "IP options" in text, "CVE status: " + text)
+                code, text = run([shell, script, "remove"], env=env)
+                check(code == 1 and os.path.exists(rule), "CVE remove did not require root")
+                env["FDTP_CONFIGURE_UID"] = "0"
+                code, text = run([shell, script, "remove"], env=env)
+                check(code == 0 and not os.path.exists(rule) and include not in open(conf).read(), "CVE remove: " + text)
+                if kind in ("user", "marker", "shebang-marker"):
+                    check(open(conf).read().startswith(user), "CVE remove lost user rules")
+                calls = open(log).read().splitlines()
+                check(calls.count("ctl disable nftables.service") == (1 if enabled == "no" else 0)
+                      and calls.count("ctl restart nftables.service") == (2 if enabled == "no" else 3)
+                      and "nft delete table ip pomera_cve" in calls and not os.path.exists(flag),
+                      "CVE remove service calls: %s" % calls)
+                code, text = run([shell, script, "status"], env=env)
+                check(code == 1 and "not installed" in text, "CVE status after remove: " + text)
+    m.device()
+
+
 def test_private(tmp):
     """The checks of tools/make_public.sh on these files (when it is there:
     it is not in the public copy)."""
@@ -920,7 +1129,8 @@ def main():
                            (test_make_reads_config, (m,)), (test_make_pio, (tmp,)), (test_install_pomera, (m,)),
                            (test_setup, (m,)), (test_heif, (m,)), (test_pdcharge_questions, (m,)),
                            (test_pdcharge_setup, (m,)), (test_pdcharge_safety, (m,)), (test_pdcharge_loop, (m,)),
-                           (test_private, (tmp,))):
+                           (test_cve_questions, (m,)), (test_cve_setup, (m,)), (test_cve_kernel, (m,)),
+                           (test_cve_rules, (m,)), (test_private, (tmp,))):
             try:
                 test(*args)
             except Exception as e:  # a broken step is a failure, the others still run

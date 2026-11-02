@@ -1,3 +1,9 @@
+fdtp (1.13-1) trixie; urgency=medium
+
+  * Add optional CVE-2026-98432 mitigation as the fourth DM250 question.
+
+ -- yasoteien <263659156+yasoteien@users.noreply.github.com>  Mon, 02 Nov 2026 15:56:16 +0900
+
 fdtp (1.12-1) trixie; urgency=medium
 
   * Add optional PD hub charging service and charging LED for the DM250.

@@ -23,6 +23,8 @@
 #                          question was skipped: the setting is left as it is)
 # ask_pdcharge             PD hub charging: PDCHARGE=yes|no|keep; skipped
 #                          unless the read-only hardware probe passes
+# ask_cve                  CVE-2026-98432: CVE=yes|no|keep; skipped unless
+#                          the DM250 kernel probe passes
 # ask_heif                 libheif for HEIC (iPhone photos), which FDTP reads
 #                          with dlopen when one is opened: when it is missing,
 #                          root is asked to install it with apt; others are
@@ -299,4 +301,36 @@ EOF
 		warn "python3-libgpiod がありません。LED だけ使えません。" "python3-libgpiod missing: only LEDs are unavailable."
 	ask_yn "$POMERA_PDCHARGE_DEFAULT" "PD ハブ経由の充電と充電 LED を使いますか" "Enable PD hub charging and charge LEDs?"
 	PDCHARGE=$ANSWER
+}
+
+POMERA_CVE_DEFAULT=${POMERA_CVE_DEFAULT:-y}
+cve_probe() {
+	if [ -n "${FDTP_CONFIGURE_CVE_PROBE:-}" ]; then
+		(eval "$FDTP_CONFIGURE_CVE_PROBE")
+	else
+		sh "$PDIR/pomera_cve_2026_98432.sh" probe
+	fi
+}
+ask_cve() {
+	CVE=keep
+	say "== CVE-2026-98432 の対策（Pomera DM250 だけ） ==" "== CVE-2026-98432 mitigation (Pomera DM250 only) =="
+	if ! cve_probe; then
+		say "対象の機種・カーネルではないため飛ばします。前の設定は変えません。" "Machine or kernel is outside the affected versions: skipped; earlier settings are kept."
+		return
+	fi
+	say "Linux の IPv4 TCP に、IP オプション付きの SYN を受けると解放済みのメモリを使う不具合があります。" \
+		"Linux IPv4 TCP can use freed memory when it receives a SYN with IP options."
+	say "IPv4 TCP の IP オプション付きパケットを破棄します。通常の通信には IP オプションはありません。" \
+		"Drop IPv4 TCP packets carrying IP options. Normal traffic never has IP options."
+	say "RTP-MIDI・mDNS・LocalSend・ssh には影響しません。IGMP は通します。" \
+		"RTP-MIDI, mDNS, LocalSend and ssh are unaffected. IGMP is allowed."
+	say "nftables パッケージが要ります。無ければ入れます。既存のルールは残します。" \
+		"Needs the nftables package (installed if missing). Existing rules are kept."
+	say "やめるには: sudo sh $PDIR/pomera_cve_2026_98432.sh remove" \
+		"To stop: sudo sh $PDIR/pomera_cve_2026_98432.sh remove"
+	say "このイメージのカーネルが 6.18.56 以降になれば不要です。Debian 純正カーネルは apt upgrade で直ります。" \
+		"No longer needed once this image's kernel reaches 6.18.56 or newer. Debian's own kernels are fixed by apt upgrade."
+	say "「いいえ」は前の設定を外します。" "Answering no removes an earlier setting."
+	ask_yn "$POMERA_CVE_DEFAULT" "CVE-2026-98432 の対策をしますか" "Enable the CVE-2026-98432 mitigation?"
+	CVE=$ANSWER
 }
