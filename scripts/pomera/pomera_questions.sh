@@ -214,6 +214,11 @@ EOF
 		''|1) INTERNAL=ro; return ;;
 		3) INTERNAL=no; return ;;
 		2)
+			# Already read-write: no need to explain and confirm the risk again.
+			if [ "$(sh "$PDIR/pomera_mount_internal.sh" persisted-mode 2>/dev/null)" = rw ]; then
+				say "今も読み書きの設定です。そのまま続けます。" "Read-write is already set; keeping it."
+				INTERNAL=rw; return
+			fi
 			if [ "$MSG" = ja ]; then cat <<EOF
 読み書きを選ぶと Linux から内蔵メモリに書けます。純正のポメラのモードでも同じファイルが見えます。
 Pomera が止まった時に書いていたファイルは、戻らないことがあります。

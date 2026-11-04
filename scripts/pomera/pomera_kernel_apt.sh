@@ -6,6 +6,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # FDTP_KERNEL_APT_ROOT prefixes system paths for tests; POMERA_KERNEL_APT_URL
 # replaces the repository URL and FDTP_CONFIGURE_APT replaces apt-get.
+# FDTP_KERNEL_APT_NEW_FILE: install writes "new" there instead of asking for a reboot.
 set -eu
 DIR=$(cd "$(dirname "$0")" && pwd)
 . "$DIR/pomera_questions.sh"
@@ -70,13 +71,18 @@ if [ "$mode" = install ]; then
 	# What happens after the reboot, step by step (user, 2026-11-04).
 	say "再起動後の流れです。" "What happens after reboot:"
 	say "  1. まず、現在のカーネル（配布元: https://www.ekesete.net/log/?p=9565）で起動します。" "  1. The Pomera first starts with the current kernel (distributed at https://www.ekesete.net/log/?p=9565)."
-	say "  2. 起動の途中で pomera-kernel（試験版）に移ります。画面が一度消えて、また出ます。" \
-		"  2. During that start it switches to pomera-kernel (test release); the screen goes dark once and comes back."
+	say "  2. ログインの画面が一度出ますが、ログインせずに 1 分ほど待ってください。画面が流れ出して pomera-kernel（試験版）が起動し、もう一度ログインの画面が出ます（最初の画面でログインしても、切り替わる時に切れます）。" \
+		"  2. A login prompt appears once; do not log in, wait about a minute. The screen scrolls as pomera-kernel (test release) starts, and the login prompt appears again (a login at the first prompt is cut off by the switch)."
 	say "  正常に起動した場合：約 2 分後に自動で確定し、U-Boot も書き換えます。以後はカーネルと U-Boot の組で起動します。" \
 		"  If it starts normally: it is confirmed by itself about 2 minutes later and U-Boot is rewritten too; from then on the Pomera starts with the kernel and U-Boot as a set."
 	say "    確定したかは sudo pomera-kernel status で確認できます。確定した後に、上の手順で、要らなくなった追加対策を解除してください。" \
 		"    Check confirmation with sudo pomera-kernel status. Once confirmed, remove the workarounds it no longer needs as described above."
 	say "  試し起動に失敗した場合：約 5 分以内に自動で現在のカーネル（配布元: https://www.ekesete.net/log/?p=9565）に戻ります（U-Boot は書き換えません）。" \
 		"  If the trial boot fails: the Pomera returns automatically to the current kernel (distributed at https://www.ekesete.net/log/?p=9565) within about 5 minutes (U-Boot is not rewritten)."
-	say "再起動してください（sudo reboot）。" "Please reboot (sudo reboot)."
+	# install_pomera.sh says "reboot" once at its end; tell it a new kernel is waiting.
+	if [ -n "${FDTP_KERNEL_APT_NEW_FILE:-}" ]; then
+		echo new > "$FDTP_KERNEL_APT_NEW_FILE"
+	else
+		say "再起動してください（sudo reboot）。" "Please reboot (sudo reboot)."
+	fi
 fi

@@ -1381,7 +1381,8 @@ def test_kernel_apt(m):
               and os.stat(source).st_mode & 0o777 == 0o644
               and open(log).read().splitlines() == ["update", "install -y pomera-kernel"]
               and "kept for later boots" in text
-              and "./configure" in text and "sudo make install" in text and "sudo fdtp-pomera-setup" in text, "kernel apt install: " + text)
+              and "./configure" in text and "sudo make install" in text and "sudo fdtp-pomera-setup" in text
+              and text.count("Please reboot (sudo reboot)") == 1, "kernel apt install: " + text)
         # --status and --undo include a source even when nothing else is set.
         for lang, label in (("en", "apt distribution source registration / signature verification key for pomera-kernel (test release)"), ("ja", "pomera-kernel（試験版）を apt で入れるための配布元の登録・署名確認用の鍵")):
             code, text = run([shell, setup, "--status"], env=dict(env, FDTP_MSG_LANG=lang))

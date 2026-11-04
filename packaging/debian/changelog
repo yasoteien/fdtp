@@ -1,3 +1,13 @@
+fdtp (1.16-1) trixie; urgency=medium
+
+  * After installing pomera-kernel, say that a login prompt appears once
+    before the switch to the new kernel, and ask for a reboot only once.
+  * Do not repeat the read-write warning when the internal documents are
+    already set up read-write.
+  * The install note lists all DM250 settings of fdtp-pomera-setup.
+
+ -- yasoteien <263659156+yasoteien@users.noreply.github.com>  Wed, 04 Nov 2026 21:30:00 +0900
+
 fdtp (1.15-1) trixie; urgency=medium
 
   * The DM250 questions can install pomera-kernel (test release: the kernel

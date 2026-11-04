@@ -141,7 +141,11 @@ case $CVE in
  no) sh "$DIR/pomera_cve_2026_98432.sh" remove || true ;;
 esac
 case $KERNEL_APT in
- yes) FDTP_MSG_LANG=$msg_lang sh "$DIR/pomera_kernel_apt.sh" install ;;
+ yes)
+	newf=$(mktemp)
+	FDTP_KERNEL_APT_NEW_FILE=$newf FDTP_MSG_LANG=$msg_lang sh "$DIR/pomera_kernel_apt.sh" install
+	[ -s "$newf" ] && reboot=yes
+	rm -f "$newf" ;;
  source) FDTP_MSG_LANG=$msg_lang sh "$DIR/pomera_kernel_apt.sh" source ;;
 esac
 [ "$reboot" = no ] || say "再起動してください（sudo reboot）。" "Please reboot (sudo reboot)."
