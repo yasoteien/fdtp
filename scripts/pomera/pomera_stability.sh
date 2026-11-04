@@ -27,6 +27,9 @@
 #   sudo sh pomera_stability.sh install   write the files and apply now
 #   sh pomera_stability.sh check          show the state (no root needed)
 #   sudo sh pomera_stability.sh remove    delete the files (takes effect at the next boot)
+#   sudo sh pomera_stability.sh install-ps  only Wi-Fi power saving off, now and on boot
+#   sudo sh pomera_stability.sh remove-ps   only remove that file, power saving on now
+#   sudo sh pomera_stability.sh remove-old  only remove the udev and watchdog files
 #   sh pomera_stability.sh present        print the files that are there; exit 1 if none
 # This file is part of FDTP (File & Directory Tool for Pomera).
 # SPDX-FileCopyrightText: 2026 yasoteien
@@ -51,6 +54,28 @@ pomera() { # the RK3128's DMA and MMC hosts are where this expects them
 }
 
 case ${1:-check} in
+install-ps)
+	[ "$(id -u)" = 0 ] || { echo "run with sudo" >&2; exit 1; }
+	pomera || { echo "$DMA or the MMC hosts are missing: not a Pomera DM250 on Debian 13; nothing done" >&2; exit 1; }
+	mkdir -p /etc/NetworkManager/conf.d
+	cat > $NM <<'EOF'
+# pomera_stability.sh: brcmfmac's power saving off (2 = disable).
+[connection]
+wifi.powersave = 2
+EOF
+	/usr/sbin/iw dev wlan0 set power_save off 2>/dev/null || true
+	systemctl reload NetworkManager 2>/dev/null || true
+	;;
+remove-ps)
+	[ "$(id -u)" = 0 ] || { echo "run with sudo" >&2; exit 1; }
+	rm -f $NM
+	/usr/sbin/iw dev wlan0 set power_save on 2>/dev/null || true
+	systemctl reload NetworkManager 2>/dev/null || true
+	;;
+remove-old)
+	[ "$(id -u)" = 0 ] || { echo "run with sudo" >&2; exit 1; }
+	rm -f $UDEV $WD
+	;;
 install)
 	[ "$(id -u)" = 0 ] || { echo "run with sudo" >&2; exit 1; }
 	pomera || { echo "$DMA or the MMC hosts are missing: not a Pomera DM250 on Debian 13; nothing done" >&2; exit 1; }

@@ -25,7 +25,11 @@
 # The backup directory is this script's own, or /var/lib/fdtp when the
 # script is under /usr (the .deb puts it in /usr/share/fdtp/pomera, which
 # is the package's and not to be written); FDTP_POMERA_BACKUP_DIR replaces it.
+# pomera-kernel (test release) refuses wifi/install/restore: boot data belongs
+# to the kernel and U-Boot set. Use sudo pomera-kernel rollback to restore
+# the previous kernel and U-Boot together, then reboot.
 # If the Pomera does not boot afterwards: rescue_rsce.sh on another Linux machine.
+# FDTP_CONFIGURE_OWNKERNEL=yes|no overrides kernel detection for tests.
 # This file is part of FDTP (File & Directory Tool for Pomera).
 # SPDX-FileCopyrightText: 2026 yasoteien
 # SPDX-License-Identifier: AGPL-3.0-or-later
@@ -48,6 +52,17 @@ case $DIR in /usr/*) BACKUP_DIR=/var/lib/fdtp ;; *) BACKUP_DIR=$DIR ;; esac
 BACKUP_DIR=${FDTP_POMERA_BACKUP_DIR:-$BACKUP_DIR}
 [ "${1:-}" != backup-dir ] || { printf '%s\n' "$BACKUP_DIR"; exit 0; }
 
+own_kernel() {
+	case ${FDTP_CONFIGURE_OWNKERNEL:-} in yes) return 0 ;; no) return 1 ;; esac
+	[ -d "/usr/lib/pomera-kernel/$(uname -r)" ]
+}
+case ${1:-check} in wifi|install|restore)
+	if own_kernel; then
+		die "pomera-kernel（試験版）は、カーネルと U-Boot を組で管理します。組に含まれる起動用データ（RSCE）だけを個別に書き戻すことはしません。前の組に戻すには sudo pomera-kernel rollback を実行し、再起動してください。" \
+			"pomera-kernel (test release) manages the kernel and U-Boot as a set. Boot data (RSCE) within the set is not restored separately. To restore the previous set, run sudo pomera-kernel rollback and reboot."
+	fi ;;
+esac
+
 [ "$(id -u)" = 0 ] || die "sudo を付けて流してください" "run with sudo"
 [ "$(findmnt -n -o SOURCE /)" = ${DEV}p2 ] ||
 	die "/ が ${DEV}p2 にありません（DM250 の SD から起動した Debian ではない）: 何もしません" \
@@ -58,8 +73,8 @@ state() { case $(now) in $ORIG) echo original ;; $WIFI) echo wifi-pio ;; $PIO) e
 write() { # FILE SHA256
 	dd if="$1" of=$DEV bs=512 seek=$SEEK count=2048 conv=fsync,notrunc 2>/dev/null
 	sync
-	[ "$(now)" = "$2" ] || die "書いた後の読み直しが合いません。再起動せずに、すぐ restore を流してください" \
-		"read back differs: run restore now, do not reboot"
+	[ "$(now)" = "$2" ] || die "書き込んだ内容を確認できませんでした。再起動せず、次のコマンドで元に戻してください: sudo sh $DIR/pomera_dma_pio.sh restore" \
+		"Could not verify the written data. Do not reboot. Restore it with: sudo sh $DIR/pomera_dma_pio.sh restore"
 }
 
 case ${1:-check} in
@@ -116,5 +131,5 @@ restore)
 	write "$src" "$ORIG"
 	say "元に戻して読み直しました（${src}）。再起動してください。" "Restored and read back ($src). Reboot to use it."
 	;;
-*) sed -n '2,28p' "$0"; exit 2 ;;
+*) sed -n '2,31p' "$0"; exit 2 ;;
 esac

@@ -35,9 +35,12 @@ POMERA = next((d for d in (os.path.join(APP, "scripts", "pomera"), os.path.join(
               os.path.join(APP, "pomera"))
 SHELLS = [s for s in ("sh", "dash") if shutil.which(s)]
 FAILS = []
+CHECKS = 0
 
 
 def check(cond, what):
+    global CHECKS
+    CHECKS += 1
     if not cond:
         FAILS.append(what)
         print("  NG:", what)
@@ -53,6 +56,7 @@ def base_env(**extra):
     env = {k: v for k, v in os.environ.items()
            if not k.startswith(("LC_", "FDTP_", "POMERA_")) and k not in ("LANG", "LANGUAGE", "TERM", "PKG_CONFIG", "CC",
                                                                           "MAKEFLAGS", "MFLAGS", "MAKELEVEL", "PREFIX", "DESTDIR")}
+    env.update(FDTP_CONFIGURE_OWNKERNEL="no", FDTP_CONFIGURE_ADJTIME="/nonexistent/fdtp-adjtime")
     env.update(extra)
     return env
 
@@ -99,11 +103,14 @@ class Machine:
 
     def configure(self, *args, uname="Linux", uid="1000", probe=None, tty=None, stdin="", lang=None, term=None,
                   pc="libdrm gbm egl glesv2 xcb libjpeg libpng libwebp zlib expat",
-                  libs="gif mupdf uim uim-scm", shell="sh", heif="yes", apt=None, brew=None, pdcharge_probe=None, cve_probe="exit 1"):
+                  libs="gif mupdf uim uim-scm", shell="sh", heif="yes", apt=None, brew=None, pdcharge_probe=None, cve_probe="exit 1", ownkernel="no", adjtime=None, wifi_default=None, kernel_root=None):
         if os.path.exists(self.out):
             os.remove(self.out)
         env = base_env(FDTP_CONFIG_MK=self.out, FDTP_CONFIGURE_UNAME=uname, FDTP_CONFIGURE_DT=self.dt,
-                       FDTP_CONFIGURE_UID=uid, PKG_CONFIG=self.pkg_config, CC=self.cc, FAKE_PC=pc, FAKE_LIBS=libs,
+                       FDTP_CONFIGURE_UID=uid, FDTP_CONFIGURE_OWNKERNEL=ownkernel,
+                       FDTP_KERNEL_APT_ROOT=kernel_root or os.path.join(self.root, "no-kernel-source"),
+                       FDTP_CONFIGURE_ADJTIME=adjtime or os.path.join(self.root, "no-adjtime"),
+                       POMERA_WIFI_PS_DEFAULT=wifi_default or "y", PKG_CONFIG=self.pkg_config, CC=self.cc, FAKE_PC=pc, FAKE_LIBS=libs,
                        FDTP_CONFIGURE_PROBE=probe if probe is not None else "echo should-not-run; exit 1",
                        FDTP_CONFIGURE_CVE_PROBE=cve_probe, FDTP_CONFIGURE_HEIF=heif, FDTP_CONFIGURE_BREW=brew or os.path.join(self.root, "no-brew"),
                        FDTP_CONFIGURE_APT=apt or "echo apt-should-not-run; false")
@@ -176,7 +183,8 @@ def test_darwin(m):
     code, text, mk = m.configure("--yes", "--no-pomera", "--prefix=/opt/fdtp/", uname="Darwin")
     check(code == 0, "Darwin --yes failed: " + text)
     check(mk == {"FDTP_CONFIGURED": "yes", "PREFIX": "/opt/fdtp", "FDTP_LANGUAGE": "auto", "POMERA_STABILITY": "no",
-                 "POMERA_INTERNAL": "keep", "POMERA_PDCHARGE": "keep", "POMERA_CVE": "keep", "HAVE_XCB": "no", "HAVE_UIM": "no"}, "Darwin config.mk: %s" % mk)
+                 "POMERA_INTERNAL": "keep", "POMERA_PDCHARGE": "keep", "POMERA_CVE": "keep", "POMERA_WIFI_PS": "keep",
+                 "POMERA_CLEAN_OLD": "keep", "POMERA_RTC": "keep", "POMERA_KERNEL_APT": "keep", "HAVE_XCB": "no", "HAVE_UIM": "no"}, "Darwin config.mk: %s" % mk)
     check("Wi-Fi" not in text and "pkg-config" not in text, "Darwin asked about the Pomera or pkg-config")
     check("make install is for Linux" in text, "Darwin: no note that make install is for Linux")
     # The Pomera questions never come on the Mac, even with a DM250 tree.
@@ -234,7 +242,7 @@ def test_pomera(m):
     code, text, mk = m.configure("--yes")
     check(code == 0 and mk and mk["POMERA_STABILITY"] == "yes" and mk["POMERA_INTERNAL"] == "keep" and mk["POMERA_PDCHARGE"] == "keep", "DM250 --yes: %s" % mk)
     check("Finding the internal memory needs root" in text and "should-not-run" not in text, "not root: probe not skipped")
-    i_notes, i_ask = text.find("Notes:"), text.find("Make the Wi-Fi stable? [Y/n]")
+    i_notes, i_ask = text.find("Notes:"), text.find("Set up Wi-Fi freeze workarounds?\nIf yes: disable power saving and enable automatic restart on a freeze; SD rewriting is confirmed separately\nIf no: keep existing settings\nAnswer: [Y/n]")
     check(0 <= i_notes < i_ask, "Wi-Fi: the notes are not before [Y/n]")
     check("pomera/pomera_dma_pio.sh restore" in text and "24 MiB" in text, "Wi-Fi: undo or what is rewritten not told")
     # Only the model, upper case.
@@ -247,7 +255,7 @@ def test_pomera(m):
     # Root: the probe finds the FAT.
     code, text, mk = m.configure("--yes", uid="0", probe="echo vfat")
     check(mk and mk["POMERA_INTERNAL"] == "ro", "root, vfat found: %s" % mk)
-    i_notes, i_ask = text.find("To stop either setting:"), text.find("Choice [1/2/3]")
+    i_notes, i_ask = text.find("To stop either setting:"), text.find("How should Linux use the Pomera internal documents (1 read only, default on Enter / 2 edit and save too / 3 remove automatic access at boot)? [1/2/3]")
     check(0 <= i_notes < i_ask and "unpersist" in text and "/etc/fstab" in text, "internal: undo instructions not before choice")
     code, text, mk = m.configure("--yes", uid="0", probe="echo ext4")
     check(mk and mk["POMERA_INTERNAL"] == "keep" and "Mount the internal memory" not in text and "skipped" in text,
@@ -259,21 +267,21 @@ def test_pomera(m):
     check(code == 0 and mk and mk["FDTP_LANGUAGE"] == "ja" and mk["POMERA_STABILITY"] == "no" and mk["POMERA_INTERNAL"] == "ro",
           "interactive ja: %s %s" % (mk, text))
     check("== Wi-Fi の安定化（Pomera DM250 だけ） ==" in text and "1・2・3 のどれかで" in text, "ja messages")
-    i_notes, i_ask = text.find("注意:"), text.find("Wi-Fi を安定させますか [Y/n]")
+    i_notes, i_ask = text.find("注意:"), text.find("Wi-Fi が固まる不具合への対策を設定しますか？\nはいの場合：省電力オフ・停止時の自動再起動を設定、SD の書き換えは別途確認\nいいえの場合：既存設定を変更しない\n入力: [Y/n]")
     check(0 <= i_notes < i_ask, "ja: notes not before [Y/n]")
-    check(0 <= text.find("設定をやめるには:") < text.find("選択 [1/2/3]"), "ja internal: undo instructions after choice")
+    check(0 <= text.find("設定をやめるには:") < text.find("ポメラの内蔵文書を Linux でどう使いますか（1 読むだけ〈Enter 時の既定〉／2 編集・保存も行う／3 起動時に自動で使う設定を解除する）[1/2/3]"), "ja internal: undo instructions after choice")
     # Choose rw, decline its warning, and choose no; confirm rw; reject invalid input.
     for answers, expected in (("2\nn\n3\n", "no"), ("2\ny\n", "rw"), ("x\n1\n", "ro")):
         code, text, mk = m.configure("--lang=en", uid="0", probe="echo vfat", tty="yes", stdin="n\n" + answers)
         check(code == 0 and mk and mk.get("POMERA_INTERNAL") == expected,
               "interactive internal %r: %s %s" % (answers, mk, text))
         if answers.startswith("2"):
-            check("fsck.fat -n" in text and "Mount it read-write anyway? [y/N]" in text,
+            check("fsck.fat -n" in text and "Allow Linux to edit and save internal documents?\nIf yes: allow read-write access\nIf no: return to the access choices\nAnswer: [y/N]" in text,
                   "read-write warning missing: " + text)
             if expected == "no":
-                check(text.count("Choice [1/2/3]") >= 2, "declined read-write did not return to choice: " + text)
+                check(text.count("How should Linux use the Pomera internal documents (1 read only, default on Enter / 2 edit and save too / 3 remove automatic access at boot)? [1/2/3]") >= 2, "declined read-write did not return to choice: " + text)
         if answers.startswith("x"):
-            check("Please answer 1, 2 or 3." in text and text.count("Choice [1/2/3]") >= 2, "invalid internal choice: " + text)
+            check("Please answer 1, 2 or 3." in text and text.count("How should Linux use the Pomera internal documents (1 read only, default on Enter / 2 edit and save too / 3 remove automatic access at boot)? [1/2/3]") >= 2, "invalid internal choice: " + text)
     # y/n: a wrong answer is asked again; EOF takes the default.
     code, text, mk = m.configure(tty="yes", stdin="2\nmaybe\nn\n")
     check(mk and mk["FDTP_LANGUAGE"] == "en" and mk["POMERA_STABILITY"] == "no" and "Please answer y or n." in text,
@@ -285,7 +293,7 @@ def test_pomera(m):
     check(mk and mk["POMERA_STABILITY"] == "yes" and "端末ではない" in text, "not a terminal")
     # The Linux console cannot show Japanese.
     code, text, mk = m.configure("--yes", lang="ja_JP.UTF-8", term="linux")
-    check("Make the Wi-Fi stable?" in text and "cannot show Japanese" in text, "TERM=linux not in English")
+    check("Set up Wi-Fi freeze workarounds?\nIf yes: disable power saving and enable automatic restart on a freeze; SD rewriting is confirmed separately\nIf no: keep existing settings\nAnswer:" in text and "cannot show Japanese" in text, "TERM=linux not in English")
     for sh in SHELLS:
         code, text, mk = m.configure("--yes", uid="0", probe="echo vfat", lang="ja_JP.UTF-8", shell=sh)
         check(code == 0 and mk and mk["POMERA_INTERNAL"] == "ro", "%s: %s" % (sh, text))
@@ -313,12 +321,12 @@ def test_heif(m):
     if os.path.exists(log):
         os.remove(log)
     code, text, mk = m.configure("--yes", heif="no", uid="0", apt=fake_apt)
-    i_notes, i_ask = text.find("To remove it: sudo apt remove"), text.find("Opening HEIC needs libheif. Install it? [Y/n]")
+    i_notes, i_ask = text.find("To remove it: sudo apt remove"), text.find("Install libheif to open HEIC photos?\nIf yes: install through apt\nIf no: skip installation; HEIC cannot be opened\nAnswer: [Y/n]")
     check(code == 0 and 0 <= i_notes < i_ask and "HEIC (libheif): yes" in text, "heif root --yes: " + text)
     check(os.path.exists(log) and open(log).read() == "install -y libheif1 libheif-plugin-libde265\n", "heif: apt not run as expected")
     os.remove(log)
     code, text, mk = m.configure("--lang=en", heif="no", uid="0", apt=fake_apt, tty="yes", stdin="n\n", lang="ja_JP.UTF-8")
-    check(code == 0 and "HEIC を開くには libheif が要ります。入れますか [Y/n]" in text and "あとで入れるには: sudo apt install" in text
+    check(code == 0 and "HEIC の写真を開く部品 libheif を入れますか？\nはいの場合：apt で導入\nいいえの場合：導入せず HEIC は開けない\n入力: [Y/n]" in text and "あとで入れるには: sudo apt install" in text
           and not os.path.exists(log), "heif root, answered no (ja): " + text)
     env_fail = dict(FAKE_APT_FAIL="1")
     os.environ.update(env_fail)
@@ -416,6 +424,16 @@ def test_install(m):
                       "INSTALL_EXE=" + fake, "UNAME=Linux"], env=env)
     check(code == 0 and re.search(r'POMERA_INTERNAL=["\']?ro["\']?', text) and "install_pomera.sh" in text,
           "legacy config did not pass ro to installer: " + text)
+    # New answers are forwarded even when they are the only requested action.
+    for key, value in (("POMERA_WIFI_PS", "off"), ("POMERA_WIFI_PS", "on"),
+                       ("POMERA_CLEAN_OLD", "yes"), ("POMERA_RTC", "yes"),
+                       ("POMERA_KERNEL_APT", "yes"), ("POMERA_KERNEL_APT", "source")):
+        with open(legacy, "w") as f:
+            f.write(key + " = " + value + "\n")
+        code, text = run(["make", "-n", "-C", APP, "install", "FDTP_CONFIG_MK=" + legacy,
+                          "INSTALL_EXE=" + fake, "UNAME=Linux"], env=env)
+        check(code == 0 and key + '="' + value + '"' in text,
+              "make did not forward %s: %s" % (key, text))
     if sys.platform == "darwin":
         code, text = make(["install", "FDTP_CONFIG_MK=" + m.out, "DESTDIR=" + root], env)
         check(code != 0 and "for Linux" in text, "make install on macOS not refused")
@@ -645,20 +663,20 @@ def test_setup(m):
     check(code == 1 and "needs root" in text and "Wi-Fi" not in text, "setup, DM250 without root: " + text)
     # (Fake) root, both answered no: instructions precede the questions, nothing run.
     code, text = setup(uid="0", probe="echo vfat", tty="yes", stdin="n\n3\n")
-    check(code == 0 and "Nothing was changed." in text, "setup n 3: " + text)
-    i_notes, i_ask = text.find("Notes:"), text.find("Make the Wi-Fi stable? [Y/n]")
+    check(code == 0 and "Pomera-specific additional settings were not changed." in text, "setup n 3: " + text)
+    i_notes, i_ask = text.find("Notes:"), text.find("Set up Wi-Fi freeze workarounds?\nIf yes: disable power saving and enable automatic restart on a freeze; SD rewriting is confirmed separately\nIf no: keep existing settings\nAnswer: [Y/n]")
     check(0 <= i_notes < i_ask and "pomera_dma_pio.sh restore" in text and "fdtp-pomera-setup --undo" in text
           and "asked once more" in text and "sudo make install" not in text, "setup: Wi-Fi notes: " + text)
-    check(0 <= text.find("To stop either setting:") < text.find("Choice [1/2/3]") and "unpersist" in text,
+    check(0 <= text.find("To stop either setting:") < text.find("How should Linux use the Pomera internal documents (1 read only, default on Enter / 2 edit and save too / 3 remove automatic access at boot)? [1/2/3]") and "unpersist" in text,
           "setup: internal undo instructions not before choice")
     # libheif missing: asked after the internal memory; n keeps it out.
-    code, text = setup(uid="0", probe="echo vfat", tty="yes", stdin="n\n3\nn\n", heif="no")
-    check(code == 0 and 0 <= text.find("Choice [1/2/3]") < text.find("Opening HEIC needs libheif. Install it? [Y/n]")
+    code, text = setup(uid="0", probe="echo vfat", tty="yes", stdin="n\n3\nn\nn\n", heif="no")
+    check(code == 0 and 0 <= text.find("How should Linux use the Pomera internal documents (1 read only, default on Enter / 2 edit and save too / 3 remove automatic access at boot)? [1/2/3]") < text.find("Install libheif to open HEIC photos?\nIf yes: install through apt\nIf no: skip installation; HEIC cannot be opened\nAnswer: [Y/n]")
           and "apt-ran" not in text and "sudo apt install libheif1 libheif-plugin-libde265" in text, "setup heif n: " + text)
     code, text = setup(uid="0", probe="echo vfat", tty="no", heif="no")
     check("apt-ran install -y libheif1 libheif-plugin-libde265" in text, "setup heif default yes: " + text)
     code, text = setup(uid="0", probe="echo vfat", tty="yes", stdin="n\n3\n", lang="ja_JP.UTF-8")
-    check(code == 0 and "何も変えませんでした。" in text and "書き換える直前にもう一度聞きます" in text, "setup ja: " + text)
+    check(code == 0 and "Pomera 固有の追加設定は変更しませんでした。" in text and "書き換える直前にもう一度聞きます" in text, "setup ja: " + text)
     # The backup directory: beside the scripts here, /var/lib/fdtp under /usr.
     code, text = run(["sh", os.path.join(POMERA, "pomera_dma_pio.sh"), "backup-dir"], env=base_env())
     check(code == 0 and text.strip() in (POMERA, os.path.realpath(POMERA)), "backup-dir: " + text)
@@ -681,7 +699,7 @@ def test_pdcharge_questions(m):
         expected = "yes" if answer == "y" else "no"
         check(code == 0 and mk and mk.get("POMERA_PDCHARGE") == expected,
               "configure PD answer %s: %s %s" % (answer, mk, text))
-        check(0 <= text.find("Choice [1/2/3]") < text.find("Enable PD hub charging"),
+        check(0 <= text.find("How should Linux use the Pomera internal documents (1 read only, default on Enter / 2 edit and save too / 3 remove automatic access at boot)? [1/2/3]") < text.find("Enable FDTP PD hub charging"),
               "configure PD question was not after internal memory: " + text)
     code, text, mk = m.configure("--yes", pdcharge_probe="exit 0")
     check(code == 0 and mk and mk.get("POMERA_PDCHARGE") == "yes", "configure PD default: %s %s" % (mk, text))
@@ -736,7 +754,7 @@ def test_pdcharge_setup(m):
                    FDTP_CONFIGURE_TTY="no", FAKE_CHARGE_LOG=log, FAKE_CHARGE_SET="yes")
     setup = os.path.join(POMERA, "pomera_setup.sh")
     code, text = run(["sh", setup, "--status"], env=env)
-    check(code == 0 and "pdcharge" in text.lower(), "setup did not report PD service: " + text)
+    check(code == 0 and "Additional PD hub charging program: configured (charge LED availability not checked)" in text, "setup did not report PD service: " + text)
     code, text = run(["sh", setup, "--undo", "--yes"], env=env)
     calls = open(log).read().splitlines()
     check(code == 0 and calls.count("remove") == 1, "setup did not undo PD service: %s %s" % (calls, text))
@@ -892,7 +910,7 @@ def test_cve_questions(m):
                                      cve_probe="exit 0", tty="yes", stdin="n\n1\nn\n" + answer + "\n")
         check(code == 0 and mk and mk.get("POMERA_CVE") == expected,
               "configure CVE answer %s: %s %s" % (answer, mk, text))
-        check(0 <= text.find("Enable PD hub charging") < text.find("Enable the CVE-2026-98432 mitigation?"),
+        check(0 <= text.find("Enable FDTP PD hub charging") < text.find("Enable the network vulnerability CVE-2026-98432 mitigation?\nIf yes: block affected data\nIf no: remove earlier mitigation too\nAnswer:"),
               "CVE question was not fourth: " + text)
     for args, probe, expected in ((["--yes"], "exit 0", "yes"), (["--yes"], "exit 1", "keep"),
                                   (["--yes", "--no-pomera"], "echo unexpected-cve-probe; exit 0", "keep")):
@@ -914,7 +932,7 @@ def test_cve_questions(m):
                 code, text = run([shell, "-c", body], env=env, stdin=answers)
                 check(code == 0 and "RESULT=" + expected in text, "%s CVE question: %s" % (shell, text))
                 if expected != "keep":
-                    question = "対策をしますか" if lang == "ja" else "Enable the CVE-2026-98432 mitigation?"
+                    question = "通信の脆弱性 CVE-2026-98432 への対策を有効にしますか" if lang == "ja" else "Enable the network vulnerability CVE-2026-98432 mitigation?\nIf yes: block affected data\nIf no: remove earlier mitigation too\nAnswer:"
                     check(0 <= text.find("pomera_cve_2026_98432.sh remove") < text.find(question)
                           and all(s in text for s in ("RTP-MIDI", "mDNS", "LocalSend", "ssh", "nftables", "6.18.56", "apt upgrade")),
                           "CVE explanation/undo missing: " + text)
@@ -957,7 +975,7 @@ def test_cve_setup(m):
         check(code == 0 and "answers " + expected in open(log).read(), "setup CVE answer: " + text)
     env["CVE_PROBE"] = "1"
     code, text = run(["sh", setup], env=env, stdin="n\n")
-    check(code == 0 and "Nothing was changed." in text, "setup skipped CVE: " + text)
+    check(code == 0 and "Pomera-specific additional settings were not changed." in text, "setup skipped CVE: " + text)
     # Exercise install_pomera itself in isolation, without real services.
     shutil.copy(os.path.join(POMERA, "install_pomera.sh"), fake)
     for value, call in (("yes", "install"), ("no", "remove"), ("keep", None)):
@@ -1091,6 +1109,507 @@ def test_cve_rules(m):
     m.device()
 
 
+def test_own_kernel(m):
+    print("== own kernel questions, RTC and defaults")
+    m.device(POMERA_DT)
+    adj = os.path.join(m.root, "adjtime")
+    for shell in SHELLS:
+        for lang in ("en", "ja"):
+            for value, rtc in (("LOCAL", "yes"), ("UTC", "keep"), (None, "keep")):
+                if value is None:
+                    os.remove(adj)
+                else:
+                    with open(adj, "w") as f:
+                        f.write("0.0 0 0.0\n0\n" + value + "\n")
+                code, text, mk = m.configure("--yes", "--lang=" + lang, shell=shell, ownkernel="yes",
+                                             adjtime=adj, lang=lang, uid="0", probe="echo vfat",
+                                             pdcharge_probe="echo UNEXPECTED-PD; exit 0",
+                                             cve_probe="echo UNEXPECTED-CVE; exit 0")
+                check(code == 0 and all(mk.get(k) == v for k, v in {
+                    "POMERA_STABILITY": "no", "POMERA_PDCHARGE": "keep", "POMERA_CVE": "keep",
+                    "POMERA_WIFI_PS": "on", "POMERA_CLEAN_OLD": "keep", "POMERA_RTC": rtc,
+                    "POMERA_INTERNAL": "ro"}.items()), "own configure: %s %s" % (mk, text))
+                question = "時刻のずれを直すため、内蔵時計を UTC として読み取る設定に変えますか？\nはいの場合：変更\nいいえの場合：現在の設定を残す\n入力:" if lang == "ja" else "Read the hardware clock as UTC to correct the time shift?\nIf yes: change\nIf no: keep the current setting\nAnswer:"
+                check((question in text) == (rtc == "yes") and "UNEXPECTED" not in text
+                      and "Set up Wi-Fi freeze workarounds?\nIf yes: disable power saving and enable automatic restart on a freeze; SD rewriting is confirmed separately\nIf no: keep existing settings\nAnswer:" not in text and "Wi-Fi が固まる不具合への対策を設定しますか？\nはいの場合：省電力オフ・停止時の自動再起動を設定、SD の書き換えは別途確認\nいいえの場合：既存設定を変更しない\n入力:" not in text,
+                      "own configure skipped questions: " + text)
+            # Default remains a release-time choice.
+            code, text, mk = m.configure("--yes", ownkernel="yes", wifi_default="n")
+            check(code == 0 and mk.get("POMERA_WIFI_PS") == "off", "wifi default n: " + text)
+    # Author kernel also asks RTC, after the unchanged four questions.
+    with open(adj, "w") as f:
+        f.write("0\n0\nLOCAL\n")
+    code, text, mk = m.configure("--lang=en", uid="0", probe="echo vfat", pdcharge_probe="exit 0",
+                                 cve_probe="exit 0", tty="yes", adjtime=adj, stdin="n\n1\nn\nn\nn\n")
+    check(code == 0 and mk.get("POMERA_RTC") == "keep"
+          and text.find("Enable the network vulnerability CVE-2026-98432 mitigation?\nIf yes: block affected data\nIf no: remove earlier mitigation too\nAnswer:") < text.find("Read the hardware clock as UTC to correct the time shift?\nIf yes: change\nIf no: keep the current setting\nAnswer:"),
+          "author RTC question: " + text)
+    m.device()
+
+
+def test_own_setup_install(m):
+    print("== own setup leftovers and install (fake helpers and commands)")
+    fake = os.path.join(m.root, "own-setup")
+    os.makedirs(fake, exist_ok=True)
+    for name in ("pomera_questions.sh", "install_pomera.sh"):
+        shutil.copy(os.path.join(POMERA, name), fake)
+    log = os.path.join(fake, "calls")
+    helpers = {
+        "pomera_kernel_apt.sh": '[ "$1" = status ]\n',
+        "pomera_stability.sh": 'case "$1" in present) printf "%s\\n" /etc/NetworkManager/conf.d/90-pomera-wifi-powersave.conf; if [ "$LEFT" = yes ]; then printf "%s\\n" /etc/udev/rules.d/92-pomera-dma.rules /etc/systemd/system.conf.d/90-pomera-watchdog.conf; fi ;; *) echo "stability $*" >> "$OWN_LOG" ;; esac\n',
+        "pomera_pdcharge.sh": 'case "$1" in status) [ "$LEFT" = yes ] ;; *) echo "pd $*" >> "$OWN_LOG" ;; esac\n',
+        "pomera_cve_2026_98432.sh": 'case "$1" in status) [ "$LEFT" = yes ] ;; *) echo "cve $*" >> "$OWN_LOG" ;; esac\n',
+        "pomera_dma_pio.sh": 'case "$1" in state) echo wifi-pio ;; *) echo "UNEXPECTED pio $*" >> "$OWN_LOG"; exit 8 ;; esac\n',
+        "pomera_mount_internal.sh": 'case "$1" in fstype|persisted) exit 1 ;; *) echo "UNEXPECTED mount $*" >> "$OWN_LOG"; exit 8 ;; esac\n',
+        "id": 'echo 0\n',
+        "timedatectl": 'echo "rtc $*" >> "$OWN_LOG"\n',
+    }
+    for name, body in helpers.items():
+        with open(os.path.join(fake, name), "w") as f:
+            f.write("#!/bin/sh\n" + body)
+        os.chmod(os.path.join(fake, name), 0o755)
+    adj = os.path.join(fake, "adjtime")
+    with open(adj, "w") as f:
+        f.write("0\n0\nLOCAL\n")
+    env = base_env(FDTP_POMERA_DIR=fake, FDTP_CONFIGURE_DT=m.dt, FDTP_CONFIGURE_UID="0",
+                   FDTP_CONFIGURE_OWNKERNEL="yes", FDTP_CONFIGURE_ADJTIME=adj,
+                   FDTP_CONFIGURE_TTY="yes", FDTP_CONFIGURE_HEIF="yes", FDTP_MSG_LANG="en",
+                   OWN_LOG=log, LEFT="yes", PATH=fake + os.pathsep + os.environ.get("PATH", ""))
+    m.device(POMERA_DT)
+    # A tiny source tree lets configure use the same fake present/status helpers.
+    project = os.path.join(fake, "source")
+    os.makedirs(os.path.join(project, "mk"), exist_ok=True)
+    open(os.path.join(project, "mk", "install.mk"), "w").close()
+    os.symlink(fake, os.path.join(project, "pomera"))
+    shutil.copy(CONFIGURE, os.path.join(project, "configure"))
+    with mock.patch(__name__ + ".CONFIGURE", os.path.join(project, "configure")), \
+            mock.patch.dict(os.environ, {"LEFT": "yes", "OWN_LOG": log}):
+        for answers, args, expected in (("", ["--yes"], "yes"), ("n\nn\n", ["--lang=en"], "no")):
+            code, text, mk = m.configure(*args, ownkernel="yes", tty="yes", stdin=answers)
+            check(code == 0 and mk.get("POMERA_CLEAN_OLD") == expected
+                  and "pomera-kernel (test release) does not need these additional workarounds for the current kernel (distributed at https://www.ekesete.net/log/?p=9565):" in text, "configure leftovers: %s %s" % (mk, text))
+    setup = os.path.join(POMERA, "pomera_setup.sh")
+    for shell in SHELLS:
+        for left, args, answers, want in (
+                ("yes", ["--yes"], "", ["stability remove-ps", "stability remove-old", "pd remove", "cve remove", "rtc set-local-rtc 0"]),
+                ("yes", [], "n\nn\nn\n", ["stability install-ps"]),
+                ("no", ["--yes"], "", ["stability remove-ps", "rtc set-local-rtc 0"])):
+            env["LEFT"] = left
+            open(log, "w").close()
+            code, text = run([shell, setup] + args, env=env, stdin=answers)
+            check(code == 0 and open(log).read().splitlines() == want,
+                  "own setup calls: %s %s" % (open(log).read(), text))
+            check(("Remove these workarounds?\nIf yes: remove the listed additional workarounds.\nIf no: keep the listed additional workarounds.\nEither way, keep the Wi-Fi power-saving setting just selected.\nAnswer:" in text) == (left == "yes"),
+                  "leftovers question: " + text)
+            if left == "yes":
+                check("92-pomera-dma.rules" in text and "90-pomera-watchdog.conf" in text
+                      and "90-pomera-wifi-powersave.conf" not in text and "pdcharge.service" in text,
+                      "leftovers list: " + text)
+        open(log, "w").close()
+        code, text = run([shell, setup, "--undo", "--yes"], env=env)
+        check(code == 0 and "Restore the SD boot settings from the original backup to undo PIO?\nIf yes: restore\nIf no: keep the current settings\nAnswer:" not in text
+              and "pomera-kernel rollback" in text and "pio" not in open(log).read(), "own undo: " + text)
+        # Stale answers cannot reapply the author's workarounds.
+        open(log, "w").close()
+        stale = dict(env, POMERA_STABILITY="yes", POMERA_PDCHARGE="yes", POMERA_CVE="yes")
+        code, text = run([shell, os.path.join(fake, "install_pomera.sh")], env=stale)
+        check(code == 0 and not open(log).read(), "stale own install: " + text)
+        for name, value, want in (("POMERA_WIFI_PS", "off", "stability install-ps\n"),
+                                  ("POMERA_WIFI_PS", "on", "stability remove-ps\n"),
+                                  ("POMERA_CLEAN_OLD", "yes", "stability remove-old\npd remove\ncve remove\n"),
+                                  ("POMERA_RTC", "yes", "rtc set-local-rtc 0\n")):
+            open(log, "w").close()
+            code, text = run([shell, os.path.join(fake, "install_pomera.sh")], env=dict(env, **{name: value}))
+            check(code == 0 and open(log).read() == want, "isolated install %s: %s" % (name, text))
+    m.device()
+
+
+def test_own_safety(m):
+    print("== own kernel refuses RSCE/charging before hardware access")
+    fake = os.path.join(m.root, "own-safety")
+    os.makedirs(fake, exist_ok=True)
+    log = os.path.join(fake, "calls")
+    for name in ("dd", "findmnt", "id", "systemctl", "timedatectl"):
+        path = os.path.join(fake, name)
+        with open(path, "w") as f:
+            f.write('#!/bin/sh\necho UNEXPECTED >> "$OWN_LOG"\nexit 99\n')
+        os.chmod(path, 0o755)
+    env = base_env(FDTP_CONFIGURE_OWNKERNEL="yes", FDTP_MSG_LANG="en", OWN_LOG=log,
+                   PATH=fake + os.pathsep + os.environ.get("PATH", ""))
+    for shell in SHELLS:
+        for script, modes in (("pomera_dma_pio.sh", ("wifi", "install", "restore")),
+                              ("pomera_pdcharge.sh", ("probe", "install"))):
+            for mode in modes:
+                code, text = run([shell, os.path.join(POMERA, script), mode], env=env)
+                check(code == 1 and "pomera-kernel (test release)" in text and not os.path.exists(log),
+                      "own safety %s %s: %s" % (script, mode, text))
+    spec = importlib.util.spec_from_file_location("own_pdcharge", os.path.join(POMERA, "pdcharge.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    with mock.patch.dict(os.environ, {"FDTP_CONFIGURE_OWNKERNEL": "yes"}), \
+            mock.patch.object(mod, "open_checked", side_effect=AssertionError("hardware accessed")), \
+            contextlib.redirect_stdout(io.StringIO()) as output:
+        check(mod.main() == 0 and "pomera-kernel (test release)" in output.getvalue(), "own daemon did not stop")
+    code, text = run([sys.executable, "-B", os.path.join(POMERA, "pdcharge.py")], env=env)
+    check(code == 0 and "pomera-kernel (test release)" in text, "own daemon subprocess: " + text)
+    # Directory test (not just existence), and explicit no overriding detection.
+    with mock.patch.dict(os.environ, {"FDTP_CONFIGURE_OWNKERNEL": ""}), \
+            mock.patch.object(mod.os.path, "isdir", return_value=True) as isdir:
+        check(mod.own_kernel(), "own daemon directory detection")
+        isdir.assert_called_once_with("/usr/lib/pomera-kernel/" + os.uname().release)
+    with mock.patch.dict(os.environ, {"FDTP_CONFIGURE_OWNKERNEL": "no"}), \
+            mock.patch.object(mod.os.path, "isdir", side_effect=AssertionError("override ignored")):
+        check(not mod.own_kernel(), "own daemon no override")
+
+
+def test_stability_parts(m):
+    print("== stability selective files (sandbox copy, fake iw/systemctl)")
+    root = os.path.join(m.root, "stability")
+    os.makedirs(root, exist_ok=True)
+    source = open(os.path.join(POMERA, "pomera_stability.sh")).read()
+    # Rewrite paths only in a temporary copy; none can address the host.
+    source = source.replace("/etc/", root + "/etc/").replace("/sys/", root + "/sys/")
+    source = source.replace("/usr/sbin/iw", root + "/iw")
+    script = os.path.join(root, "stability.sh")
+    with open(script, "w") as f:
+        f.write(source)
+    for dev in ("20078000.dma-controller", "1021c000.mmc", "10214000.mmc", "10218000.mmc"):
+        os.makedirs(root + "/sys/devices/platform/" + dev)
+    log = root + "/calls"
+    for name, body in (("id", "echo 0"), ("iw", 'echo "iw $*" >> "$OWN_LOG"'),
+                       ("systemctl", 'echo "ctl $*" >> "$OWN_LOG"')):
+        with open(root + "/" + name, "w") as f:
+            f.write("#!/bin/sh\n" + body + "\n")
+        os.chmod(root + "/" + name, 0o755)
+    env = base_env(PATH=root + os.pathsep + os.environ.get("PATH", ""), OWN_LOG=log)
+    paths = [root + "/etc/" + p for p in ("udev/rules.d/92-pomera-dma.rules",
+              "NetworkManager/conf.d/90-pomera-wifi-powersave.conf", "systemd/system.conf.d/90-pomera-watchdog.conf")]
+    for shell in SHELLS:
+        for p in paths:
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            with open(p, "w") as f:
+                f.write("sentinel\n")
+        open(log, "w").close()
+        code, text = run([shell, script, "install-ps"], env=env)
+        check(code == 0 and "wifi.powersave = 2" in open(paths[1]).read()
+              and all(open(p).read() == "sentinel\n" for p in (paths[0], paths[2])), "install-ps files: " + text)
+        code, text = run([shell, script, "remove-old"], env=env)
+        check(code == 0 and os.path.isfile(paths[1]) and not any(os.path.exists(p) for p in (paths[0], paths[2])),
+              "remove-old files: " + text)
+        # remove-ps must also preserve old files if they still exist.
+        for p in (paths[0], paths[2]):
+            with open(p, "w") as f:
+                f.write("sentinel\n")
+        code, text = run([shell, script, "remove-ps"], env=env)
+        check(code == 0 and not os.path.exists(paths[1])
+              and all(open(p).read() == "sentinel\n" for p in (paths[0], paths[2])), "remove-ps files: " + text)
+        check(open(log).read().splitlines() == ["iw dev wlan0 set power_save off", "ctl reload NetworkManager",
+                                               "iw dev wlan0 set power_save on", "ctl reload NetworkManager"],
+              "selective stability commands: " + open(log).read())
+
+
+def test_kernel_apt(m):
+    print("== kernel apt questions, source/install/remove/status and key validation")
+    m.device(POMERA_DT)
+    fake = os.path.join(m.root, "kernel-apt")
+    os.makedirs(fake)
+    for name in ("pomera_questions.sh", "pomera_kernel_apt.sh", "pomera-kernel.asc", "install_pomera.sh"):
+        shutil.copy(os.path.join(POMERA, name), fake)
+    # macOS mktemp -d can choose its OS-managed temp directory even with TMPDIR.
+    # Keep gpg's throwaway directory inside this test's sandbox on every platform.
+    helper_copy = os.path.join(fake, "pomera_kernel_apt.sh")
+    with open(helper_copy) as f:
+        helper_source = f.read()
+    with open(helper_copy, "w") as f:
+        f.write(helper_source.replace('gpghome=$(mktemp -d)',
+                                     'gpghome=$(mktemp -d "$FDTP_KERNEL_APT_ROOT/../gpg.XXXXXXXX")'))
+    log = os.path.join(fake, "calls")
+    root = os.path.join(fake, "root")
+    os.makedirs(root)
+    key = os.path.join(root, "usr/share/keyrings/pomera-kernel.asc")
+    source = os.path.join(root, "etc/apt/sources.list.d/pomera-kernel.sources")
+    for name, body in {
+        "id": "echo 0\n",
+        "apt": 'echo "$*" >> "$APT_LOG"; exit "${APT_FAIL:-0}"\n',
+        "pomera_stability.sh": 'case "$1" in remove-ps|install) exit 0 ;; *) exit 1 ;; esac\n',
+        "pomera_mount_internal.sh": 'exit 1\n',
+        "pomera_pdcharge.sh": 'exit 1\n',
+        "pomera_cve_2026_98432.sh": 'exit 1\n',
+        "pomera_dma_pio.sh": 'case "$1" in backup-dir) echo /fake ;; *) exit 1 ;; esac\n',
+    }.items():
+        path = os.path.join(fake, name)
+        with open(path, "w") as f:
+            f.write("#!/bin/sh\n" + body)
+        os.chmod(path, 0o755)
+    env = base_env(FDTP_POMERA_DIR=fake, FDTP_KERNEL_APT_ROOT=root, FDTP_CONFIGURE_UID="0",
+                   FDTP_CONFIGURE_DT=m.dt, FDTP_CONFIGURE_TTY="yes", FDTP_CONFIGURE_HEIF="yes",
+                   FDTP_CONFIGURE_PROBE="exit 1", FDTP_CONFIGURE_APT=os.path.join(fake, "apt"),
+                   FDTP_CONFIGURE_PDCHARGE_PROBE="exit 1", FDTP_CONFIGURE_CVE_PROBE="exit 1",
+                   POMERA_KERNEL_APT_URL="http://apt.example.invalid/kernel/", APT_LOG=log,
+                   FDTP_MSG_LANG="en", PATH=fake + os.pathsep + os.environ.get("PATH", ""))
+    setup = os.path.join(POMERA, "pomera_setup.sh")
+    helper = os.path.join(fake, "pomera_kernel_apt.sh")
+    installer = os.path.join(fake, "install_pomera.sh")
+    bundled = open(os.path.join(fake, "pomera-kernel.asc"), "rb").read()
+    expected = ("Types: deb\nURIs: http://apt.example.invalid/kernel/\nSuites: stable\n"
+                "Components: main\nArchitectures: armhf\nSigned-By: /usr/share/keyrings/pomera-kernel.asc\n")
+    for shell in SHELLS:
+        # Configure persists the default and explicit yes; it never installs.
+        for lang in ("en", "ja"):
+            question = ("pomera-kernel（試験版、カーネルと U-Boot の組）を apt で入れ、次回起動で試しますか？\nはいの場合：導入\nいいえの場合：導入しない、既存設定を残す\n入力:" if lang == "ja" else
+                        "Install pomera-kernel (test release, the kernel and U-Boot as a set) through apt and try it on the next boot?\nIf yes: install\nIf no: do not install; keep existing settings\nAnswer:")
+            code, text, mk = m.configure("--yes", "--lang=" + lang, shell=shell, lang=lang)
+            check(code == 0 and mk.get("POMERA_KERNEL_APT") == "no" and question + " [y/N]" in text,
+                  "kernel apt configure default: " + text)
+            code, text, mk = m.configure("--lang=" + lang, tty="yes", stdin="n\ny\n", shell=shell,
+                                         pdcharge_probe="exit 1", lang=lang)
+            check(code == 0 and mk.get("POMERA_KERNEL_APT") == "yes" and question in text,
+                  "kernel apt configure yes: " + text)
+        question_body = '. "$PDIR/pomera_questions.sh"; msg_init; tty_init 1; ask_kernel_apt; echo "RESULT=$KERNEL_APT"'
+        code, text = run([shell, "-c", question_body], env=dict(env, PDIR=fake, POMERA_KERNEL_APT_DEFAULT="y"))
+        check(code == 0 and "[Y/n]" in text and "RESULT=yes" in text and not os.path.exists(key),
+              "kernel apt default override: " + text)
+        for mode in ("no", "keep"):
+            code, text = run([shell, installer], env=dict(env, POMERA_KERNEL_APT=mode))
+            check(code == 0 and not os.path.exists(log) and not os.path.exists(key), "kernel apt no/keep: " + text)
+        code, text = run([shell, setup, "--yes"], env=env)
+        check(code == 0 and "[y/N]" in text and not os.path.exists(key) and not os.path.exists(log),
+              "kernel apt setup default did something: " + text)
+        code, text = run([shell, setup], env=env, stdin="n\ny\n")
+        check(code == 0 and os.path.exists(key) and open(key, "rb").read() == bundled
+              and open(source).read() == expected and os.stat(key).st_mode & 0o777 == 0o644
+              and os.stat(source).st_mode & 0o777 == 0o644
+              and open(log).read().splitlines() == ["update", "install -y pomera-kernel"]
+              and "kept for later boots" in text
+              and "./configure" in text and "sudo make install" in text and "sudo fdtp-pomera-setup" in text, "kernel apt install: " + text)
+        # --status and --undo include a source even when nothing else is set.
+        for lang, label in (("en", "apt distribution source registration / signature verification key for pomera-kernel (test release)"), ("ja", "pomera-kernel（試験版）を apt で入れるための配布元の登録・署名確認用の鍵")):
+            code, text = run([shell, setup, "--status"], env=dict(env, FDTP_MSG_LANG=lang))
+            check(code == 0 and label in text, "kernel apt setup status: " + text)
+        code, text = run([shell, setup, "--undo", "--yes"], env=env)
+        check(code == 0 and "kernel stays installed" in text and not os.path.exists(key)
+              and not os.path.exists(source), "kernel apt undo: " + text)
+        os.remove(log)
+        own = dict(env, FDTP_CONFIGURE_OWNKERNEL="yes")
+        for want in ("source", "keep"):
+            code, text, mk = m.configure("--yes", ownkernel="yes", kernel_root=root, shell=shell)
+            check(code == 0 and mk.get("POMERA_KERNEL_APT") == want
+                  and "Install pomera-kernel (test release) through apt and try" not in text, "own apt configure: " + text)
+            question_body = '. "$PDIR/pomera_questions.sh"; msg_init; tty_init 1; ask_kernel_apt; echo "RESULT=$KERNEL_APT"'
+            code, text = run([shell, "-c", question_body], env=dict(own, PDIR=fake))
+            check(code == 0 and text == "RESULT=" + want + "\n", "own apt question: " + text)
+            code, text = run([shell, setup, "--yes"], env=own)
+            check(code == 0 and os.path.exists(key) and not os.path.exists(log)
+                  and "Install pomera-kernel (test release) through apt and try" not in text, "own apt setup: " + text)
+        # Either file alone means status=true, as specified.
+        os.remove(key)
+        code, text = run([shell, helper, "status"], env=env)
+        check(code == 0, "kernel source-only status: " + text)
+        code, text = run([shell, helper, "source"], env=env)
+        os.remove(source)
+        code, text = run([shell, helper, "status"], env=env)
+        check(code == 0, "kernel key-only status: " + text)
+        code, text = run([shell, helper, "remove"], env=env)
+        code, text = run([shell, helper, "status"], env=env)
+        check(code == 1, "kernel apt empty status: " + text)
+        # Missing gpg must stop before placing either file or calling apt.
+        nogpg = os.path.join(fake, "nogpg")
+        os.makedirs(nogpg, exist_ok=True)
+        if not os.path.exists(os.path.join(nogpg, "dirname")):
+            os.symlink(shutil.which("dirname"), os.path.join(nogpg, "dirname"))
+        code, text = run([shutil.which(shell), helper, "source"], env=dict(env, PATH=nogpg))
+        check(code == 1 and "needs gpg" in text and not os.path.exists(key)
+              and not os.path.exists(source) and not os.path.exists(log), "kernel apt missing gpg: " + text)
+        code, text = run([shell, helper, "source"], env=dict(env, POMERA_KERNEL_APT_URL=""))
+        check(code == 0 and "URIs: https://yasoteien.github.io/pomera-kernel-apt/\n" in open(source).read()
+              and not os.path.exists(log), "kernel apt default URL: " + text)
+        code, text = run([shell, helper, "remove"], env=env)
+        # Fake gpg reports a different primary fingerprint without importing keys.
+        badbin = os.path.join(fake, "badbin")
+        os.makedirs(badbin, exist_ok=True)
+        with open(os.path.join(badbin, "gpg"), "w") as f:
+            f.write("#!/bin/sh\nprintf 'pub::::::::::\\nfpr:::::::::0000000000000000000000000000000000000000:\\n'\n")
+        os.chmod(os.path.join(badbin, "gpg"), 0o755)
+        bad = dict(env, PATH=badbin + os.pathsep + env["PATH"])
+        for mode in ("source", "install"):
+            code, text = run([shell, helper, mode], env=bad)
+            check(code == 1 and "fingerprint mismatch" in text and not os.path.exists(key)
+                  and not os.path.exists(source) and not os.path.exists(log), "kernel apt wrong fingerprint: " + text)
+        # Unreadable key and failed apt update must stop before installation.
+        with open(os.path.join(fake, "pomera-kernel.asc"), "w") as f:
+            f.write("invalid public key\n")
+        code, text = run([shell, helper, "install"], env=env)
+        check(code != 0 and not os.path.exists(key) and not os.path.exists(log), "kernel apt invalid key: " + text)
+        with open(os.path.join(fake, "pomera-kernel.asc"), "wb") as f:
+            f.write(bundled)
+        code, text = run([shell, installer], env=dict(env, POMERA_KERNEL_APT="yes", APT_FAIL="9"))
+        check(code != 0 and open(log).read() == "update\n" and "kept for later boots" not in text,
+              "kernel apt update failure not propagated: " + text)
+        code, text = run([shell, helper, "remove"], env=env)
+        os.remove(log)
+        check(not any(f.endswith((".gpg", ".kbx")) for f in os.listdir(fake)), "gpg wrote a keyring/trustdb")
+    m.device()
+
+
+
+def test_wording_regressions(m):
+    print("== wording: configured ro/rw, clock-only undo, declined undo, reboot and post-kernel instructions")
+    fake = os.path.join(m.root, "wording")
+    os.makedirs(fake)
+    shutil.copy(os.path.join(POMERA, "pomera_questions.sh"), fake)
+    source = open(os.path.join(POMERA, "pomera_mount_internal.sh")).read()
+    source = source.replace("/etc/", fake + "/etc/")
+    # The original helper requires root and an eMMC device even for persisted.
+    # Remove only those two guards in the sandbox copy; exercise the real readers.
+    source = source.replace('[ "$(id -u)" = 0 ] || { echo "run with sudo" >&2; exit 1; }', ':')
+    source = source.replace('[ -b $DEV ] || { echo "$DEV is missing: no internal eMMC here" >&2; exit 1; }', ':')
+    with open(os.path.join(fake, "pomera_mount_internal.sh"), "w") as f:
+        f.write(source)
+    os.makedirs(os.path.join(fake, "etc/systemd/system"))
+    fstab = os.path.join(fake, "etc/fstab")
+    unit = os.path.join(fake, "etc/systemd/system/pomera-internal.service")
+    with open(fstab, "w") as f:
+        f.write("/dev/fake /mnt/pomera-internal vfat ro 0 0\n")
+    log = os.path.join(fake, "calls")
+    helpers = {
+        "pomera_stability.sh": 'case "$1" in present) [ "$STAB" = yes ] || exit 1; printf "%s\\n" /etc/NetworkManager/conf.d/90-pomera-wifi-powersave.conf /etc/systemd/system.conf.d/90-pomera-watchdog.conf ;; remove) echo stability >> "$WORD_LOG"; exit "${REMOVE_FAIL:-0}" ;; *) exit 1 ;; esac\n',
+        "pomera_pdcharge.sh": 'exit 1\n',
+        "pomera_cve_2026_98432.sh": 'exit 1\n',
+        "pomera_kernel_apt.sh": 'case "$1" in status) [ "$APT_SET" = yes ] ;; remove) echo apt >> "$WORD_LOG" ;; *) exit 1 ;; esac\n',
+        "pomera_dma_pio.sh": 'case "$1" in state) echo "$PIO" ;; backup-dir) echo /fake ;; restore) echo restore >> "$WORD_LOG"; exit "${RESTORE_FAIL:-0}" ;; *) exit 1 ;; esac\n',
+    }
+    for name, body in helpers.items():
+        with open(os.path.join(fake, name), "w") as f:
+            f.write("#!/bin/sh\n" + body)
+    adj = os.path.join(fake, "adjtime")
+    with open(adj, "w") as f:
+        f.write("0\n0\nLOCAL\n")
+    m.device(POMERA_DT)
+    env = base_env(FDTP_POMERA_DIR=fake, FDTP_CONFIGURE_DT=m.dt, FDTP_CONFIGURE_UID="0",
+                   FDTP_CONFIGURE_ADJTIME=adj, FDTP_CONFIGURE_TTY="yes", WORD_LOG=log,
+                   STAB="no", PIO="original", APT_SET="no")
+    setup = os.path.join(POMERA, "pomera_setup.sh")
+    mount = os.path.join(fake, "pomera_mount_internal.sh")
+    for shell in SHELLS:
+        for lang, ro, rw, clock, none in (
+                ("ja", "内蔵文書：読み取り専用で使う設定", "内蔵文書：読み書きで使う設定", "時計の読み取り設定は対象外", "このコマンドで解除できる追加設定はありません"),
+                ("en", "Internal documents: read-only access configured", "Internal documents: read-write access configured", "Hardware clock interpretation is outside", "There are no additional settings this command can remove")):
+            env["FDTP_MSG_LANG"] = lang
+            for mode, want, absent in (("ro", ro, rw), ("rw", rw, ro)):
+                if mode == "rw":
+                    open(unit, "w").close()
+                code, text = run([shell, mount, "persisted-mode"], env=env)
+                check(code == 0 and text.strip() == mode, "real configured-mode reader: " + text)
+                code, text = run([shell, setup, "--status"], env=env)
+                check(code == 0 and want in text and absent not in text, "configured status %s: %s" % (mode, text))
+            os.remove(unit)
+            # Read-write service alone is sufficient, independently of fstab.
+            content = open(fstab).read()
+            open(fstab, "w").close()
+            open(unit, "w").close()
+            code, text = run([shell, setup, "--status"], env=env)
+            check(code == 0 and rw in text and ro not in text, "service-only rw status: " + text)
+            os.remove(unit)
+            code, text = run([shell, setup, "--undo", "--yes"], env=env)
+            check(code == 0 and clock in text and none in text and "sudo reboot" not in text,
+                  "clock-only undo: " + text)
+            with open(fstab, "w") as f:
+                f.write(content)
+            # Both removal questions declined: no writes and no reboot advice.
+            open(log, "w").close()
+            code, text = run([shell, setup, "--undo"], env=dict(env, STAB="yes", PIO="wifi-pio"), stdin="n\nn\n")
+            check(code == 0 and "sudo reboot" not in text and not open(log).read(), "declined undo: " + text)
+            check(text.count("大文字の方を選びます" if lang == "ja" else "Press Enter without typing") == 1,
+                  "hint not shown exactly once: " + text)
+            # Isolate each successful, failed, or immediate-only change.
+            open(fstab, "w").close()
+            for extra, answers, calls, reboot in (
+                    ({"STAB": "yes"}, "y\n", "stability\n", True),
+                    ({"STAB": "yes", "REMOVE_FAIL": "8"}, "y\n", "stability\n", False),
+                    ({"PIO": "wifi-pio"}, "y\n", "restore\n", True),
+                    ({"PIO": "wifi-pio", "RESTORE_FAIL": "8"}, "y\n", "restore\n", False),
+                    ({"APT_SET": "yes"}, "y\n", "apt\n", False)):
+                open(log, "w").close()
+                code, text = run([shell, setup, "--undo"], env=dict(env, **extra), stdin=answers)
+                check(code == 0 and open(log).read() == calls and ("sudo reboot" in text) == reboot,
+                      "conditional reboot %s: %s" % (extra, text))
+            for pio, label in (("wifi-pio", "Wi-Fi だけ" if lang == "ja" else "Only Wi-Fi"),
+                               ("pio", "Wi-Fi 以外も" if lang == "ja" else "Wi-Fi and other devices")):
+                code, text = run([shell, setup, "--status"], env=dict(env, PIO=pio))
+                check(code == 0 and label in text and "PIO" in text, "PIO status label: " + text)
+            with open(fstab, "w") as f:
+                f.write(content)
+    m.device()
+
+
+
+def test_review2_wording(m):
+    print("== review 2: USB conditions, standalone removal list, login mount state and public help")
+    m.device(POMERA_DT)
+    for lang, required in (
+            ("ja", ("USB 接続中、充電に使う入力電流の上限が 2.0 A 未満なら 2.0 A に引き上げます。",
+                    "すでに 2.0 A 以上なら変えません。ハブの有無は判別しません。",
+                    "有効な間は、PC の USB ポートなど給電能力の低い接続先では使わないでください。")),
+            ("en", ("While USB is connected, raise the charging input current limit to 2.0 A if it is below 2.0 A.",
+                    "If it is already 2.0 A or higher, leave it unchanged. The program does not detect whether a hub is present.",
+                    "While enabled, do not use connections with low power capacity, such as a PC USB port."))):
+        code, text, mk = m.configure("--yes", "--lang=" + lang, uid="0", probe="echo vfat",
+                                     pdcharge_probe="exit 0", cve_probe="exit 0", lang=lang)
+        check(code == 0 and all(part in text for part in required), "USB conditions / warning " + lang + ": " + text)
+        summary = text.split("== 設定（" if lang == "ja" else "== Settings (", 1)[1]
+        check(("起動時に読み取り専用で自動利用" if lang == "ja" else "automatic read-only access at boot") in summary
+              and ("既存設定を変更しない" if lang == "ja" else "keep existing settings") in summary,
+              "summary meanings " + lang + ": " + summary)
+    fake = os.path.join(m.root, "review2")
+    os.makedirs(fake)
+    helpers = {
+        "pomera_stability.sh": 'case "$1" in present) case "$LEFT" in dma|all) echo /etc/udev/rules.d/92-pomera-dma.rules ;; esac; case "$LEFT" in watchdog|all) echo /etc/systemd/system.conf.d/90-pomera-watchdog.conf ;; esac ;; esac\n',
+        "pomera_pdcharge.sh": '[ "$LEFT" = pd ] || [ "$LEFT" = all ]\n',
+        "pomera_cve_2026_98432.sh": '[ "$LEFT" = cve ] || [ "$LEFT" = all ]\n',
+    }
+    for name, body in helpers.items():
+        with open(os.path.join(fake, name), "w") as f:
+            f.write("#!/bin/sh\n" + body)
+    labels = {
+        "ja": ("機器の省電力に関する旧対策", "停止時の自動再起動", "PD ハブ充電の旧対策", "通信の脆弱性への旧対策（通信を遮断する部品 nftables）"),
+        "en": ("Old device power-saving workaround", "Automatic restart on a freeze", "Old PD hub charging workaround", "Old network vulnerability workaround (nftables traffic filter)"),
+    }
+    script = '. "$QUESTIONS"; msg_init; TTY=yes; WIFI_PS=off; ask_leftovers; printf "\\nCLEAN=%s WIFI=%s\\n" "$CLEAN_OLD" "$WIFI_PS"'
+    for shell in SHELLS:
+        for lang in ("ja", "en"):
+            for left, indexes in (("dma", (0,)), ("watchdog", (1,)), ("pd", (2,)), ("cve", (3,)), ("all", (0, 1, 2, 3))):
+                env = base_env(QUESTIONS=os.path.join(POMERA, "pomera_questions.sh"), PDIR=fake,
+                               FDTP_MSG_LANG=lang, LEFT=left)
+                code, text = run([shell, "-c", script], env=env, stdin="n\n")
+                question = text.split("向けの次の追加対策は、" if lang == "ja" else "pomera-kernel (test release) does not need these additional workarounds", 1)[1]
+                check(code == 0 and all((label in question) == (i in indexes) for i, label in enumerate(labels[lang]))
+                      and ("直前に選んだ Wi-Fi の省電力設定は残します。" if lang == "ja" else "keep the Wi-Fi power-saving setting just selected.") in question
+                      and "CLEAN=no WIFI=off" in text, "standalone removal targets %s %s: %s" % (lang, left, text))
+    source = open(os.path.join(POMERA, "pomera_mount_internal.sh")).read()
+    profile = source.split("cat > $PROFILE <<'PROFILE_END'\n", 1)[1].split("\nPROFILE_END", 1)[0]
+    statefile = os.path.join(fake, "check")
+    profile = profile.replace("/var/lib/pomera-internal/check", statefile)
+    for shell in SHELLS:
+        for lang in ("ja", "en"):
+            for mount, expected, absent in (
+                    ("ro", "読み取り専用で利用できます。" if lang == "ja" else "Available read-only.", "現在は利用できません。" if lang == "ja" else "Currently unavailable."),
+                    ("none", "現在は利用できません。" if lang == "ja" else "Currently unavailable.", "読み取り専用で利用できます。" if lang == "ja" else "Available read-only.")):
+                with open(statefile, "w") as f:
+                    f.write("state=damaged\nmount=" + mount + "\n")
+                code, text = run([shell, "-c", profile], env=base_env(LANG=lang))
+                check(code == 0 and expected in text and absent not in text
+                      and ("読み書きできることを確認できませんでした。" if lang == "ja" else "could not confirm that internal documents") in text,
+                      "login mount state %s %s: %s" % (lang, mount, text))
+        code, help_text = run([shell, os.path.join(POMERA, "pomera_setup.sh"), "--help"])
+        # Usage is reached after hardware guards: inspect the exact excerpt without accessing hardware.
+        source = open(os.path.join(POMERA, "pomera_dma_pio.sh")).read()
+        first, last = map(int, re.search(r"sed -n '(\d+),(\d+)p'", source).groups())
+        usage_text = "\n".join(source.splitlines()[first - 1:last])
+        for kind, text in (("help", help_text), ("usage", usage_text)):
+            check("pomera-kernel (test release)" in text and "previous kernel and U-Boot together" in text
+                  and not re.search(r"own kernel|自前|作者|FDTP_CONFIGURE_", text, re.I), "public " + kind + ": " + text)
+    m.device()
+
 def test_private(tmp):
     """The checks of tools/make_public.sh on these files (when it is there:
     it is not in the public copy)."""
@@ -1130,7 +1649,8 @@ def main():
                            (test_setup, (m,)), (test_heif, (m,)), (test_pdcharge_questions, (m,)),
                            (test_pdcharge_setup, (m,)), (test_pdcharge_safety, (m,)), (test_pdcharge_loop, (m,)),
                            (test_cve_questions, (m,)), (test_cve_setup, (m,)), (test_cve_kernel, (m,)),
-                           (test_cve_rules, (m,)), (test_private, (tmp,))):
+                           (test_cve_rules, (m,)), (test_own_kernel, (m,)), (test_own_setup_install, (m,)),
+                           (test_kernel_apt, (m,)), (test_wording_regressions, (m,)), (test_review2_wording, (m,)), (test_own_safety, (m,)), (test_stability_parts, (m,)), (test_private, (tmp,))):
             try:
                 test(*args)
             except Exception as e:  # a broken step is a failure, the others still run
@@ -1140,7 +1660,7 @@ def main():
     if FAILS:
         print("check_configure: %d failure(s)" % len(FAILS))
         return 1
-    print("check_configure: ok")
+    print("check_configure: ok (%d checks)" % CHECKS)
     return 0
 
 

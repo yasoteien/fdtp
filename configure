@@ -16,6 +16,8 @@
 #    Pomera DM250 only, the Wi-Fi stability settings and the read-only mount
 #    of the internal memory, PD hub charging and the CVE-2026-98432 mitigation.
 #    Enter takes the default; --yes, or no terminal, takes every default.
+#    Own kernels skip the three workarounds; ask about Wi-Fi power saving
+#    and removing old workarounds instead. LOCAL RTC is offered UTC on any DM250.
 # 3. Writes the answers to config.mk, which mk/install.mk reads.
 # Messages are in Japanese when LC_ALL, LC_MESSAGES or LANG (the first one
 # set) is ja* (not on the Linux console, which cannot show Japanese).
@@ -24,6 +26,8 @@
 #   FDTP_CONFIG_MK          the file written (default config.mk here)
 #   FDTP_CONFIGURE_UNAME    uname -s
 #   FDTP_CONFIGURE_DT       /proc/device-tree (its compatible and model)
+#   FDTP_CONFIGURE_OWNKERNEL yes|no: own-kernel directory detection
+#   FDTP_CONFIGURE_ADJTIME  /etc/adjtime (third line LOCAL asks about UTC)
 #   FDTP_CONFIGURE_UID      id -u
 #   FDTP_CONFIGURE_PROBE    the internal memory probe (a command printing
 #                           vfat or exfat when found)
@@ -189,6 +193,7 @@ EOF
 fi
 
 # ---- 2. questions -----------------------------------------------------------------
+question_hint
 case $locale_now in ja*) lang_auto=$(pick "日本語" "Japanese") ;; *) lang_auto=English ;; esac
 echo
 if [ -n "$LANG_ANSWER" ]; then
@@ -231,17 +236,11 @@ else
 	ask_heif
 fi
 
-STABILITY=no INTERNAL=keep PDCHARGE=keep CVE=keep POMERA=no
+STABILITY=no INTERNAL=keep PDCHARGE=keep CVE=keep WIFI_PS=keep CLEAN_OLD=keep RTC=keep KERNEL_APT=keep POMERA=no
 if [ "$UNAME" = Linux ] && [ "$NOPOMERA" = 0 ] && is_dm250 "$DT"; then POMERA=yes; fi
 if [ "$POMERA" = yes ]; then
 	echo
-	ask_wifi
-	echo
-	ask_internal
-	echo
-	ask_pdcharge
-	echo
-	ask_cve
+	ask_pomera
 fi
 
 # ---- 3. config.mk -------------------------------------------------------------------
@@ -256,6 +255,10 @@ tmp=$OUT.tmp.$$
 	echo "POMERA_INTERNAL = $INTERNAL"
 	echo "POMERA_PDCHARGE = $PDCHARGE"
 	echo "POMERA_CVE = $CVE"
+	echo "POMERA_WIFI_PS = $WIFI_PS"
+	echo "POMERA_CLEAN_OLD = $CLEAN_OLD"
+	echo "POMERA_RTC = $RTC"
+	echo "POMERA_KERNEL_APT = $KERNEL_APT"
 	echo "HAVE_XCB = $HAVE_XCB"
 	echo "HAVE_UIM = $HAVE_UIM"
 	if [ "$UNAME" != Darwin ] && [ "$HAVE_UIM" = no ]; then echo "NOVEL_IME = ime_none"; fi
@@ -267,10 +270,43 @@ printf '  %s: %s\n' "PREFIX" "$PREFIX"
 printf '  %s: %s\n' "$(pick "言語" "language")" "$LANG_ANSWER"
 printf '  %s: %s\n' "$(pick "HEIC（libheif）" "HEIC (libheif)")" "$HEIF"
 if [ "$POMERA" = yes ]; then
-	printf '  %s: %s\n' "$(pick "Wi-Fi の安定化" "Wi-Fi stability")" "$STABILITY"
-	printf '  %s: %s\n' "$(pick "内蔵メモリのマウント" "internal memory mount")" "$INTERNAL"
-	printf '  %s: %s\n' "pdcharge" "$PDCHARGE"
-	printf '  %s: %s\n' "CVE-2026-98432" "$CVE"
+	case $STABILITY in
+	 yes) printf '  %s: %s\n' "$(pick "Wi-Fi の安定化" "Wi-Fi stability")" "$(pick "省電力オフ・停止時の自動再起動を設定（SD の書き換えは別途確認）" "disable power saving and enable automatic restart on a freeze (SD rewriting confirmed separately)")" ;;
+	 no) printf '  %s: %s\n' "$(pick "Wi-Fi の安定化" "Wi-Fi stability")" "$(pick "既存設定を変更しない" "keep existing settings")" ;;
+	esac
+	case $INTERNAL in
+	 ro) printf '  %s: %s\n' "$(pick "内蔵文書の利用設定" "internal document access")" "$(pick "起動時に読み取り専用で自動利用" "automatic read-only access at boot")" ;;
+	 rw) printf '  %s: %s\n' "$(pick "内蔵文書の利用設定" "internal document access")" "$(pick "起動時に点検して読み書きで自動利用" "check and allow automatic read-write access at boot")" ;;
+	 no) printf '  %s: %s\n' "$(pick "内蔵文書の利用設定" "internal document access")" "$(pick "起動時の自動利用を解除" "remove automatic access at boot")" ;;
+	 keep) printf '  %s: %s\n' "$(pick "内蔵文書の利用設定" "internal document access")" "$(pick "既存設定を変更しない" "keep existing settings")" ;;
+	esac
+	case $PDCHARGE in
+	 yes) printf '  %s: %s\n' "$(pick "PD ハブ充電・充電 LED" "PD hub charging / charge LEDs")" "$(pick "追加の充電制御を有効にする（充電 LED は部品がある場合のみ）" "enable additional charging control (charge LEDs only if the component is available)")" ;;
+	 no) printf '  %s: %s\n' "$(pick "PD ハブ充電・充電 LED" "PD hub charging / charge LEDs")" "$(pick "以前の充電・充電 LED 設定を解除" "remove earlier charging and charge LED settings")" ;;
+	 keep) printf '  %s: %s\n' "$(pick "PD ハブ充電・充電 LED" "PD hub charging / charge LEDs")" "$(pick "既存設定を変更しない" "keep existing settings")" ;;
+	esac
+	case $CVE in
+	 yes) printf '  %s: %s\n' "CVE-2026-98432" "$(pick "対象の通信データを遮断する対策を有効にする" "enable mitigation to block affected network data")" ;;
+	 no) printf '  %s: %s\n' "CVE-2026-98432" "$(pick "以前の対策を解除" "remove earlier mitigation")" ;;
+	 keep) printf '  %s: %s\n' "CVE-2026-98432" "$(pick "既存設定を変更しない" "keep existing settings")" ;;
+	esac
+	if own_kernel; then
+		case $WIFI_PS in
+		 on) printf '  %s: %s\n' "$(pick "Wi-Fi の省電力" "Wi-Fi power saving")" "$(pick "オン（以前の省電力オフ設定を解除）" "on (remove earlier power-saving-off settings)")" ;;
+		 off) printf '  %s: %s\n' "$(pick "Wi-Fi の省電力" "Wi-Fi power saving")" "$(pick "オフにする" "turn off")" ;;
+		 keep) printf '  %s: %s\n' "$(pick "Wi-Fi の省電力" "Wi-Fi power saving")" "$(pick "既存設定を変更しない" "keep existing settings")" ;;
+		esac
+		case $CLEAN_OLD in
+		 yes) printf '  %s: %s\n' "$(pick "古い回避策の削除" "remove old workarounds")" "$(pick "一覧の旧対策を解除（Wi-Fi の省電力設定は残す）" "remove listed old workarounds (keep Wi-Fi power-saving setting)")" ;;
+		 no|keep) printf '  %s: %s\n' "$(pick "古い回避策の削除" "remove old workarounds")" "$(pick "既存設定を変更しない" "keep existing settings")" ;;
+		esac
+	fi
+	case $KERNEL_APT in
+	 yes) printf '  %s: %s\n' "$(pick "pomera-kernel（試験版）の apt 配布元" "apt distribution source for pomera-kernel (test release)")" "$(pick "pomera-kernel（試験版、カーネルと U-Boot の組）を導入して次回起動で試す" "install pomera-kernel (test release, the kernel and U-Boot as a set) and try it on next boot")" ;;
+	 source) printf '  %s: %s\n' "$(pick "pomera-kernel（試験版）の apt 配布元" "apt distribution source for pomera-kernel (test release)")" "$(pick "配布元の登録のみ（署名確認用の鍵も登録）" "register distribution source only (including signature verification key)")" ;;
+	 no|keep) printf '  %s: %s\n' "$(pick "pomera-kernel（試験版）の apt 配布元" "apt distribution source for pomera-kernel (test release)")" "$(pick "既存設定を変更しない" "keep existing settings")" ;;
+	esac
+	if [ "$RTC" = yes ]; then printf '  RTC (UTC): %s\n' "$RTC"; fi
 fi
 say "次に:" "Next:"
 if [ "$UNAME" = Darwin ]; then

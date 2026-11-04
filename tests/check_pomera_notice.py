@@ -50,7 +50,7 @@ def main():
     check.write_text(damaged)
     start, closed = run(build, base, check, seen)
     text = body(start)
-    require('破損が見つかりました' in text and '読み取り専用' in text and 'fsck.txt' in text and 'fsck.fat-r' in text,
+    require('読み書きできることを確認できませんでした' in text and '読み取り専用' in text and 'fsck.txt' in text and 'fsck.fat-r' in text,
             f'damaged: the box says it: {text}')
     require(not popup_rows(closed), 'ESC closes it')
     require(seen.read_text().strip() == 'b1', 'the boot_id is kept')
@@ -61,7 +61,7 @@ def main():
     check.write_text(damaged.replace('b1', 'b2').replace('mount=ro', 'mount=none'))
     start, _ = run(build, base, check, seen, 'en')
     text = body(start)
-    require('founddamage' in text and 'Notmounted' in text, f'next boot, English: {text}')
+    require('couldnotconfirmthatinternaldocumentscanbereadandwritten' in text and 'Notmounted' in text, f'next boot, English: {text}')
 
     for state in ('clean', 'known_only'):
         seen.unlink(missing_ok=True)

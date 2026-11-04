@@ -1,3 +1,15 @@
+fdtp (1.15-1) trixie; urgency=medium
+
+  * The DM250 questions can install pomera-kernel (test release: the kernel
+    and U-Boot as a set) through a signed apt source, with a disclaimer.
+  * With pomera-kernel, the workarounds for the current kernel are not
+    added, and the leftovers can be removed.
+  * Wi-Fi power saving and hardware clock (UTC) questions; every question
+    says what yes and no do.
+  * fdtp-pomera-setup --status and --undo show only what is set.
+
+ -- yasoteien <263659156+yasoteien@users.noreply.github.com>  Wed, 04 Nov 2026 18:00:00 +0900
+
 fdtp (1.13-1) trixie; urgency=medium
 
   * Add optional CVE-2026-98432 mitigation as the fourth DM250 question.

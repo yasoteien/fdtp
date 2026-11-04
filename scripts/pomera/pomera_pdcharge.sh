@@ -1,5 +1,7 @@
 #!/bin/sh
 # Install/remove/status the RK818 PD hub charger. probe only reads hardware.
+# Own kernels refuse probe/install; status/remove still work.
+# FDTP_CONFIGURE_OWNKERNEL=yes|no overrides kernel detection for tests.
 # FDTP_PDCHARGE_SYSFS and FDTP_CONFIGURE_DT replace hardware paths in tests.
 # This file is part of FDTP (File & Directory Tool for Pomera).
 # SPDX-FileCopyrightText: 2026 yasoteien
@@ -15,6 +17,11 @@ case $mode in install|remove|status|probe) ;; *) echo "usage: sh $0 install|remo
 # remove and status only touch what install put there, so they skip the
 # hardware checks: after a new image changes the driver it can still be removed.
 if [ "$mode" = install ] || [ "$mode" = probe ]; then
+if own_kernel; then
+	say "追加充電プログラム: pomera-kernel（試験版）では充電をカーネルが扱うので使いません。RK818 には書きません。" \
+		"Additional charging program: pomera-kernel (test release) handles charging; RK818 is not written."
+	exit 1
+fi
 is_dm250 "${FDTP_CONFIGURE_DT:-/proc/device-tree}" || {
 	say "pdcharge: Pomera DM250 ではありません。" "pdcharge: not a Pomera DM250."; exit 1;
 }
@@ -46,7 +53,7 @@ if [ "$mode" = remove ]; then
 	rm -f "$UNIT" "$LIB/pdcharge.py"
 	[ ! -d "$LIB" ] || rmdir "$LIB"
 	systemctl daemon-reload
-	say "pdcharge を外しました。上限はドライバが 1.5 秒以内に戻します。" "pdcharge removed; the driver restores the limit within 1.5 seconds."
+	say "追加の充電制御プログラムを削除しました。充電電流の上限は、カーネル側の制御に戻ります。" "Removed the additional charging control program. The charging current limit returns to kernel control."
 	exit 0
 fi
 # A running installed service can be updated; do not compete with a manual copy.

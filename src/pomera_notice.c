@@ -55,7 +55,7 @@ void pomera_notice_start(App *a, int headless)
 
     const char *names[] = { T("結果"), T("つなぎ方"), T("点検の時刻"), T("点検の出力"), T("直し方") };
     const char *values[] = {
-        T("Pomera の起動時の点検で、内蔵メモリに破損が見つかりました"),
+        T("Pomera の起動時の点検で、内蔵文書を読み書きできることを確認できませんでした"),
         !strcmp(mount, "ro") ? T("読み取り専用（/mnt/pomera-internal）") : T("つないでいません"),
         *when ? when : "-",
         *output ? output : "-",

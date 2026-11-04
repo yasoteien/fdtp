@@ -155,9 +155,19 @@ UNIT_END
 # pomera_mount_internal.sh: say so at login when the internal memory looked damaged
 if [ -r /var/lib/pomera-internal/check ] && grep -q '^state=damaged' /var/lib/pomera-internal/check; then
 	case ${LANG:-} in
-	ja*) echo "注意: 起動時の点検で、内蔵メモリ（/mnt/pomera-internal）に破損が見つかりました。読み取り専用でつないでいます。"
+	ja*) echo "注意: 起動時の点検で、内蔵文書（/mnt/pomera-internal）を読み書きできることを確認できませんでした。"
+	     if grep -q '^mount=ro$' /var/lib/pomera-internal/check; then
+	         echo "      読み取り専用で利用できます。"
+	     else
+	         echo "      現在は利用できません。"
+	     fi
 	     echo "      点検の結果: /var/lib/pomera-internal/fsck.txt（自動修復はしていません）" ;;
-	*) echo "Note: the boot check found damage on the internal memory (/mnt/pomera-internal): it is mounted read-only."
+	*) echo "Note: the boot check could not confirm that internal documents (/mnt/pomera-internal) can be read and written."
+	   if grep -q '^mount=ro$' /var/lib/pomera-internal/check; then
+	       echo "      Available read-only."
+	   else
+	       echo "      Currently unavailable."
+	   fi
 	   echo "      The check's output: /var/lib/pomera-internal/fsck.txt (nothing was repaired)" ;;
 	esac
 fi
@@ -201,6 +211,12 @@ unpersist)
 	systemctl daemon-reload
 	echo "$done (still mounted until umount or reboot)"
 	;;
+# Read configured access, not the current runtime mount state.
+persisted-mode)
+	if [ -f "$UNIT" ]; then echo rw
+	elif grep -q "$MNT" /etc/fstab; then echo ro
+	else exit 1
+	fi ;;
 persisted) grep -q "$MNT" /etc/fstab || [ -f $UNIT ] ;;
 boot)
 	# What pomera-internal.service runs: check (read only), then mount.

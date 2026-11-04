@@ -26,6 +26,10 @@ FDTPRC ?= /etc/fdtprc
 POMERA_STABILITY ?= no
 POMERA_PDCHARGE ?= keep
 POMERA_CVE ?= keep
+POMERA_WIFI_PS ?= keep
+POMERA_CLEAN_OLD ?= keep
+POMERA_RTC ?= keep
+POMERA_KERNEL_APT ?= keep
 POMERA_INTERNAL_RO ?= no
 # keep: not answered (an old config.mk's POMERA_INTERNAL_RO = no says only
 # that it was not set up then), so an earlier setting is left alone.
@@ -85,8 +89,8 @@ install: $(INSTALL_EXE) $$(LOCALSEND_EXE)
 		fi; \
 		chmod 644 "$$f"; echo "$$f: LANGUAGE=$(FDTP_LANGUAGE)"; \
 	fi
-	@if [ -z "$(DESTDIR)" ] && { [ "$(POMERA_CVE)" = yes ] || [ "$(POMERA_PDCHARGE)" = yes ] || [ "$(POMERA_CVE)" = no ] || [ "$(POMERA_PDCHARGE)" = no ] || [ "$(POMERA_STABILITY)" = yes ] || { [ "$(POMERA_INTERNAL)" = ro ] || [ "$(POMERA_INTERNAL)" = rw ] || [ "$(POMERA_INTERNAL)" = no ]; }; }; then \
-		POMERA_CVE="$(POMERA_CVE)" POMERA_PDCHARGE="$(POMERA_PDCHARGE)" POMERA_STABILITY="$(POMERA_STABILITY)" POMERA_INTERNAL="$(POMERA_INTERNAL)" FDTP_MSG_LANG="$(INSTALL_MSG_LANG)" \
+	@if [ -z "$(DESTDIR)" ] && { [ "$(POMERA_KERNEL_APT)" = yes ] || [ "$(POMERA_KERNEL_APT)" = source ] || [ "$(POMERA_WIFI_PS)" = off ] || [ "$(POMERA_WIFI_PS)" = on ] || [ "$(POMERA_CLEAN_OLD)" = yes ] || [ "$(POMERA_RTC)" = yes ] || [ "$(POMERA_CVE)" = yes ] || [ "$(POMERA_PDCHARGE)" = yes ] || [ "$(POMERA_CVE)" = no ] || [ "$(POMERA_PDCHARGE)" = no ] || [ "$(POMERA_STABILITY)" = yes ] || { [ "$(POMERA_INTERNAL)" = ro ] || [ "$(POMERA_INTERNAL)" = rw ] || [ "$(POMERA_INTERNAL)" = no ]; }; }; then \
+		POMERA_KERNEL_APT="$(POMERA_KERNEL_APT)" POMERA_WIFI_PS="$(POMERA_WIFI_PS)" POMERA_CLEAN_OLD="$(POMERA_CLEAN_OLD)" POMERA_RTC="$(POMERA_RTC)" POMERA_CVE="$(POMERA_CVE)" POMERA_PDCHARGE="$(POMERA_PDCHARGE)" POMERA_STABILITY="$(POMERA_STABILITY)" POMERA_INTERNAL="$(POMERA_INTERNAL)" FDTP_MSG_LANG="$(INSTALL_MSG_LANG)" \
 			sh "$(POMERA_SCRIPTS)/install_pomera.sh"; \
 	fi
 	@echo "installed: $(BINDIR)/fdtp$(if $(DESTDIR), (under $(DESTDIR)))"

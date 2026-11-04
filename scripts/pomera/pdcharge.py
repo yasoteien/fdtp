@@ -24,6 +24,9 @@ back to 450 mA every time. This polls more often and raises it again.
   positive) = red, full (status Full or capacity 100) = green, plugged in but
   discharging = blinking red.
 
+Own kernels stop before any hardware access (FDTP_CONFIGURE_OWNKERNEL=yes|no
+overrides directory detection in tests).
+
 Run as root: sudo python3 pdcharge.py [-v]
 """
 import ctypes
@@ -207,7 +210,18 @@ def open_checked():
         raise UnsafeHardware(f"I2C 点検失敗: {exc}", f"I2C check failed: {exc}") from exc
 
 
+def own_kernel():
+    override = os.environ.get("FDTP_CONFIGURE_OWNKERNEL")
+    if override in ("yes", "no"):
+        return override == "yes"
+    return os.path.isdir("/usr/lib/pomera-kernel/" + os.uname().release)
+
+
 def main():
+    if own_kernel():
+        log("pomera-kernel（試験版）では充電をカーネルが扱うので止まります。RK818 には書きません。",
+            "pomera-kernel (test release) handles charging; stopping without writing RK818.")
+        return 0
     verbose = "-v" in sys.argv[1:]
     try:
         pmic = open_checked()
