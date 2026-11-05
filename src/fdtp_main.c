@@ -17,6 +17,7 @@
 #include <GLES2/gl2.h>
 #include <linux/input-event-codes.h>
 #include <errno.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -120,6 +121,8 @@ static int init_platform(rmp_platform_options *options)
     options->resizable=1;
     /* The X window's name and icon (revision 1 item 23; KMS ignores them). */
     options->title="FDTP"; options->wm_instance="fdtp"; options->wm_class="FDTP";
+    /* Another FDTP window (Ctrl+N) opens apart from the others: drop targets stay in view (item 15). */
+    options->place_apart=1;
     options->icon=fdtp_icon; options->icon_words=sizeof fdtp_icon/sizeof fdtp_icon[0];
     if(options->output==RMP_OUTPUT_AUTO) {
         const char *display=getenv("DISPLAY");
@@ -227,11 +230,218 @@ static int fit_screen(App *a,int cols,int rows,Texture *texture,Canvas *canvas,C
     canvas_init(canvas); cells_invalidate(cells); a->changed=1; rmp_frame_invalidate_all();
     return 0;
 }
+/* ---- The X window's mouse, drag and drop and Ctrl+N (revision 1 item 15;
+ * as FDTM, docs/FDTP_MACOS.md, through the same filer functions). The Mac's
+ * Cmd is Ctrl here. Copy and move follow the X convention, as Thunar: Ctrl
+ * copies, Shift moves, otherwise the same file system moves and another
+ * copies. KMS has no pointer and no drag and drop: none of this happens. */
+#define DOUBLE_CLICK 0.4    /* seconds, GTK's default */
+#define DRAG_START 4        /* display pixels before a press becomes a drag */
+static App *mouse_app;      /* the one App, for the drag and drop callbacks */
+static Screen *filer_screen(void) { return mouse_app && mouse_app->depth ? mouse_app->screens[0] : NULL; }
+static void reload_filers(App *a) { for(int i=0;i<a->depth;++i) filer_reload(a->screens[i],a); a->changed=1; }
+/* The display pixel (the canvas, rmp_poll_pointer) to the cell under it. */
+static int cell_at(int x,int y,int *col,int *row)
+{
+    int gx=x-CANVAS_GRID_X;
+    if(gx<0 || y<0) return 0;
+    *col=gx/12; *row=y/24;
+    return *col<FD_COLS && *row<FD_ROWS;
+}
+static struct {
+    int pressed, dragging, deselect, col, row, x, y;   /* the press on an entry */
+    double last_click; int last_col, last_row;          /* for a double click */
+} mouse;
+/* A drop waits for the loop (it comes inside the platform's event handling). */
+static struct { char *directory, *destination, **names; size_t count; int move; } drop;
+static char *parent_of(const char *path)
+{
+    size_t n=strlen(path);
+    while(n>1 && path[n-1]=='/') --n;   /* a directory may come with a slash */
+    size_t cut=n; while(cut>0 && path[cut-1]!='/') --cut;
+    if(cut==0 || cut==n) return NULL;   /* relative, or the root */
+    char *p=malloc(cut+1); if(!p) return NULL;
+    memcpy(p,path,cut); p[cut]=0;
+    if(cut>1) p[cut-1]=0;               /* no slash at the end, but for "/" */
+    return p;
+}
+static char *name_of(const char *path)
+{
+    size_t n=strlen(path); while(n>1 && path[n-1]=='/') --n;
+    size_t cut=n; while(cut>0 && path[cut-1]!='/') --cut;
+    char *p=malloc(n-cut+1); if(!p) return NULL;
+    memcpy(p,path+cut,n-cut); p[n-cut]=0; return p;
+}
+/* What a drop of paths at display (x,y) does (RMP_DND_*), and where it goes
+ * (*dest, malloc'd, when asked and not NONE). As FDTM: into the directory
+ * under the cell, else the pane's; all from one directory, none into
+ * itself or into the directory it is in. want: the action already chosen
+ * (the drop), or NONE to choose by the keys and the file systems. paths
+ * NULL: the list is not here yet, the keys alone decide. *mixed (may be
+ * NULL) is set when the only fault is that the files come from more than
+ * one directory (a Thunar search, the desktop and a folder together). */
+static int drop_decide(App *a,int x,int y,const char *const *paths,size_t count,unsigned mods,unsigned allowed,int want,char **dest_out,int *mixed)
+{
+    if(dest_out) *dest_out=NULL;
+    if(mixed) *mixed=0;
+    int c,r; Screen *s=filer_screen();
+    if(drop.destination || !s || app_top(a)!=s || !cell_at(x,y,&c,&r)) return RMP_DND_NONE;
+    char *dest=filer_drop_directory(s,a,c,r);
+    if(!dest) return RMP_DND_NONE;
+    int op=want ? want : (mods & RMP_MOD_CTRL) ? RMP_DND_COPY : (mods & RMP_MOD_SHIFT) ? RMP_DND_MOVE : RMP_DND_COPY;
+    if(paths) {
+        char target[PATH_MAX],from[PATH_MAX];
+        char *parent=count ? parent_of(paths[0]) : NULL;
+        int ok=parent && realpath(dest,target) && realpath(parent,from) && strcmp(from,target);
+        free(parent);
+        for(size_t i=0;ok && i<count;++i) {
+            char *p=parent_of(paths[i]),*n=name_of(paths[i]),here[PATH_MAX],self[PATH_MAX*2];
+            ok=p && n && *n && realpath(p,here);
+            if(ok && strcmp(here,from)) { ok=0; if(mixed) *mixed=1; }   /* one directory at a time */
+            if(ok) {   /* not into itself: the target is not it, nor below it */
+                snprintf(self,sizeof self,"%s/%s",strcmp(from,"/") ? from : "",n);
+                size_t sl=strlen(self);
+                ok=strncmp(target,self,sl) || (target[sl]!=0 && target[sl]!='/');
+            }
+            free(p); free(n);
+        }
+        if(!ok) { free(dest); return RMP_DND_NONE; }
+        struct stat sa,sb;
+        if(!want && !(mods & (RMP_MOD_CTRL | RMP_MOD_SHIFT)))
+            op=stat(from,&sa)==0 && stat(target,&sb)==0 && sa.st_dev==sb.st_dev ? RMP_DND_MOVE : RMP_DND_COPY;
+    }
+    if(!(allowed & (unsigned)op)) op=(allowed & RMP_DND_COPY) ? RMP_DND_COPY : (allowed & RMP_DND_MOVE) ? RMP_DND_MOVE : RMP_DND_NONE;
+    if(dest_out && op!=RMP_DND_NONE) *dest_out=dest; else free(dest);
+    return op;
+}
+/* Files from several directories are taken as far as the drop, which then
+ * says why nothing was done (rather than a silent refusal or a part done). */
+static int dnd_over(void *ctx,int x,int y,const char *const *paths,size_t count,unsigned mods,unsigned allowed)
+{
+    int mixed, op=drop_decide(ctx,x,y,paths,count,mods,allowed,RMP_DND_NONE,NULL,&mixed);
+    if(mixed) op=(allowed & RMP_DND_COPY) ? RMP_DND_COPY : RMP_DND_MOVE;
+    return op;
+}
+static int dnd_drop(void *ctx,int x,int y,const char *const *paths,size_t count,int action)
+{
+    char *dest; int mixed;
+    int op=drop_decide(ctx,x,y,paths,count,0,(unsigned)action,action,&dest,&mixed);
+    if(mixed) app_notice(ctx,T("別々のディレクトリの物は一度に落とせません"));
+    if(op==RMP_DND_NONE) return op;
+    drop.names=calloc(count,sizeof *drop.names); drop.directory=parent_of(paths[0]);
+    int ok=drop.names && drop.directory;
+    for(size_t i=0;ok && i<count;++i) ok=(drop.names[i]=name_of(paths[i]))!=NULL;
+    drop.count=count;
+    if(!ok) {
+        for(size_t i=0;drop.names && i<count;++i) free(drop.names[i]);
+        free(drop.names); free(drop.directory); free(dest); memset(&drop,0,sizeof drop);
+        return RMP_DND_NONE;
+    }
+    drop.destination=dest; drop.move=op==RMP_DND_MOVE;
+    return op;
+}
+/* Drags the press's entry (or every marked one with it) out. */
+static void start_drag(App *a)
+{
+    FileSelection sel;
+    if(filer_drag_selection(filer_screen(),a,mouse.col,mouse.row,&sel)<0) { mouse.pressed=0; return; }
+    char **paths=calloc(sel.count,sizeof *paths); size_t n=0;
+    for(;paths && n<sel.count;++n) {
+        size_t dl=strlen(sel.directory),nl=strlen(sel.names[n]);
+        if(!(paths[n]=malloc(dl+nl+2))) break;
+        memcpy(paths[n],sel.directory,dl); paths[n][dl]='/'; memcpy(paths[n]+dl+(dl && sel.directory[dl-1]=='/' ? 0 : 1),sel.names[n],nl+1);
+    }
+    if(paths && n==sel.count && rmp_dnd_drag((const char *const *)paths,n)==0) mouse.dragging=1;
+    else mouse.pressed=0;   /* the button came up already: its release is still to come */
+    for(size_t i=0;paths && i<n;++i) free(paths[i]);
+    free(paths);
+}
+/* Clicks as FDTM (the Finder's): a click selects the entry alone, Ctrl+click
+ * marks or unmarks it, Shift+click marks the range, a double click opens
+ * (Return), the wheel moves the cursor. A plain click on a marked entry keeps
+ * the marks until the button comes up without a drag, so that they can be
+ * dragged together. */
+static void pointer_events(App *a)
+{
+    rmp_pointer_event ev[32]; int n=rmp_poll_pointer(ev,32);
+    for(int i=0;i<n;++i) {
+        const rmp_pointer_event *e=&ev[i]; Screen *s=filer_screen(); int col=0,row=0;
+        int in=cell_at(e->x,e->y,&col,&row);
+        if(e->type==RMP_POINTER_PRESS && e->button==1) {
+            mouse.pressed=mouse.dragging=mouse.deselect=0;
+            if(!in || !s || app_top(a)!=s) { mouse.last_click=0; continue; }
+            int marked=filer_mouse_marked(s,a,col,row);
+            int action=(e->mods & RMP_MOD_CTRL) ? FILER_TOGGLE : (e->mods & RMP_MOD_SHIFT) ? FILER_RANGE : marked ? FILER_POINT : FILER_SELECT;
+            if(!filer_mouse(s,a,col,row,action)) { mouse.last_click=0; continue; }
+            mouse.pressed=1; mouse.deselect=action==FILER_POINT; mouse.col=col; mouse.row=row; mouse.x=e->x; mouse.y=e->y;
+            int plain=action!=FILER_TOGGLE && action!=FILER_RANGE;
+            if(plain && mouse.last_click>0 && e->time-mouse.last_click<DOUBLE_CLICK && col==mouse.last_col && row==mouse.last_row) {
+                mouse.pressed=0; mouse.last_click=0;
+                Key k={KRET,0,0}; app_key(a,&k);
+            } else { mouse.last_click=plain ? e->time : 0; mouse.last_col=col; mouse.last_row=row; }
+        } else if(e->type==RMP_POINTER_RELEASE && e->button==1) {
+            if(mouse.pressed && mouse.deselect && !mouse.dragging) filer_mouse(s,a,mouse.col,mouse.row,FILER_SELECT);
+            if(!mouse.dragging) mouse.pressed=0;
+        } else if(e->type==RMP_POINTER_MOTION) {
+            if(mouse.pressed && !mouse.dragging && (abs(e->x-mouse.x)>=DRAG_START || abs(e->y-mouse.y)>=DRAG_START)) {
+                mouse.last_click=0; start_drag(a);
+            }
+        } else if(e->type==RMP_POINTER_WHEEL) {
+            if(!s || app_top(a)!=s || (a->widgets.kind!=WIDGET_NONE && a->widgets.kind!=WIDGET_NOTICE)) continue;
+            Key k={e->wheel<0 ? KUP : KDOWN,0,0}; app_key(a,&k);
+        }
+        if(a->external.pending || a->quit) break;
+    }
+    int result=rmp_dnd_take_result();
+    if(result>=0) {
+        mouse.pressed=mouse.dragging=0;
+        /* Taken: the marks are done with. The other side may still be moving
+         * them one by one, which the filer's look at the directory catches. */
+        if(result!=RMP_DND_NONE) { filer_unmark(filer_screen(),a); reload_filers(a); }
+    }
+}
+/* Ctrl+N: another FDTP at this pane's directory. Another process, as FDTM's
+ * Cmd+N: the screen size is one per process. The platform places its
+ * window apart from the others (place_apart). */
+static void new_window(App *a,const char *directory,int cols,int rows)
+{
+    char exe[PATH_MAX]; ssize_t n=readlink("/proc/self/exe",exe,sizeof exe-1);
+    pid_t child=n>0 ? fork() : -1;
+    if(child==0) {
+        setsid();
+        if(fork()==0) {
+            exe[n]=0;
+            /* The tests' and the trace's variables are this window's. */
+            unsetenv("FDTP_TEST_KEYS"); unsetenv("FDTP_SNAPSHOT_PREFIX"); unsetenv("FDTP_TRACE");
+            char size[32],dir[PATH_MAX+2]; char *args[8]; int k=0;
+            args[k++]="fdtp"; args[k++]="--x11";
+            if(cols>0 && rows>0) { snprintf(size,sizeof size,"%dx%d",cols,rows); args[k++]="--size"; args[k++]=size; }
+            snprintf(dir,sizeof dir,"%s%s",directory[0]=='-' ? "./" : "",directory);
+            args[k++]=dir; args[k]=NULL;
+            execv(exe,args); _exit(127);
+        }
+        _exit(0);
+    }
+    if(child>0) waitpid(child,NULL,0);
+    else app_notice(a,T("外部コマンドを起動できません"));
+}
+static void take_drop(App *a)
+{
+    if(!drop.destination) return;
+    if(app_top(a)==filer_screen() && (a->widgets.kind==WIDGET_NONE || a->widgets.kind==WIDGET_NOTICE)) {
+        if(a->widgets.kind==WIDGET_NOTICE) a->widgets.kind=WIDGET_NONE;
+        FileSelection sel={drop.directory,drop.names[0],(const char *const *)drop.names,drop.count};
+        fileops_transfer_to(a,&sel,drop.destination,drop.move);
+    }
+    for(size_t i=0;i<drop.count;++i) free(drop.names[i]);
+    free(drop.names); free(drop.directory); free(drop.destination); memset(&drop,0,sizeof drop);
+}
 int main(int argc,char **argv)
 {
     /* --headless must work on machines with no DRM device, tty or GL context. */
     for(int i=1;i<argc;++i) if(!strcmp(argv[i],"--headless")) return headless_main(argc,argv);
     rmp_platform_options options; rmp_platform_default_options(&options);
+    options.close_key=16; /* KEY_Q: the X11 close button asks to quit (q); F10 is Unpack here */
     const char *directory="."; int have_directory=0,size_cols=-1,size_rows=-1;
     for(int i=1;i<argc;++i) {
         if(!strcmp(argv[i],"-v")) { puts("FDTP Version " FDTP_VERSION); return 0; }
@@ -257,6 +467,7 @@ int main(int argc,char **argv)
     canvas_init(canvas);
     if(init_platform(&options)<0) { free(canvas); app_destroy(&a); return 1; }
     a.output=options.output==RMP_OUTPUT_X11 ? "X" : "KMS";   /* the system information (item 31) */
+    mouse_app=&a; rmp_dnd_accept(dnd_over,dnd_drop,&a);   /* -1 on KMS: nothing to take */
     a.is_fullscreen=rmp_platform_is_fullscreen;
     a.set_fullscreen=rmp_platform_set_fullscreen;
     if(fit_screen(&a,size_cols,size_rows,&texture,canvas,&cells)<0) { result=1; goto done; }
@@ -303,9 +514,16 @@ int main(int argc,char **argv)
             app_modifiers(&a,mods);   /* the filer's Shift band (revision 1 §2) */
             if(trace) { fprintf(trace,"%.3f key %d %d mods %d\n",rmp_now_seconds(),events[i].code,events[i].value,mods); if(events[i].value) key_at=rmp_now_seconds(); }
             if(events[i].value) { awake_key=rmp_now_seconds(); a.last_key=(double)time(NULL); }
-            Key key; if(events[i].value && keys_evdev(events[i].code,mods,&key)) app_key(&a,&key);
+            Key key; if(!events[i].value || !keys_evdev(events[i].code,mods,&key)) continue;
+            if(options.output==RMP_OUTPUT_X11 && key.key==KCHAR && key.ch=='n' && key.mods==MOD_CTRL) {
+                /* Ctrl+N in the filer (item 15); elsewhere, and on KMS, Ctrl+n is what it was. */
+                Screen *s=filer_screen(); char *here=s && app_top(&a)==s ? filer_drop_directory(s,&a,-1,-1) : NULL;
+                if(here) { new_window(&a,here,size_cols,size_rows); free(here); continue; }
+            }
+            app_key(&a,&key);
             if(a.external.pending || a.quit) break;
         }
+        if(!a.external.pending && !a.quit) { pointer_events(&a); take_drop(&a); }
         if(script && !runner.ended && !a.external.pending && !a.quit) {
             unsigned snapshots=runner.snapshots;
             int step=headless_script_step(&runner,&a,canvas,&cells,rmp_now_seconds());

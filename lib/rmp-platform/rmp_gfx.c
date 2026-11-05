@@ -35,6 +35,17 @@ struct rmp_layer {
     int w, h;
 };
 
+/* What differs between the windows of one GL context (rmp_gfx_select_output):
+ * the display size and the scaled-output texture. The selected one lives in
+ * G's fields, the others here. */
+typedef struct {
+    GLuint screen_fbo, screen_tex;
+    int out_w, out_h;
+    rmp_rect dst;
+    int sharp;
+    int display_w, display_h;
+} gfx_output;
+
 static struct {
     int ready;
     GLuint programs[PROGRAMS];
@@ -53,6 +64,8 @@ static struct {
     int out_w, out_h;
     rmp_rect dst;
     int sharp;                    /* rmp_gfx_set_display: nearest at whole scales */
+    gfx_output outputs[RMP_GFX_OUTPUTS];   /* the windows not selected */
+    int output;                   /* the selected one */
     int need_clear;
     unsigned clear_rgb;
     size_t count;
@@ -460,6 +473,11 @@ fail:
 
 void rmp_gfx_shutdown(void)
 {
+    for (int i = 0; i < RMP_GFX_OUTPUTS; i++) {
+        if (i == G.output) continue;
+        if (G.outputs[i].screen_fbo) glDeleteFramebuffers(1, &G.outputs[i].screen_fbo);
+        if (G.outputs[i].screen_tex) glDeleteTextures(1, &G.outputs[i].screen_tex);
+    }
     if (G.screen_fbo) glDeleteFramebuffers(1, &G.screen_fbo);
     if (G.screen_tex) glDeleteTextures(1, &G.screen_tex);
     if (G.font) glDeleteTextures(1, &G.font);
@@ -531,6 +549,12 @@ static void drop_screen(void)
     target(0, G.display_w, G.display_h);
 }
 
+rmp_rect rmp_gfx_display_rect(void)
+{
+    if (G.screen_fbo) return G.dst;
+    return (rmp_rect){ 0, 0, G.display_w, G.display_h };
+}
+
 int rmp_gfx_set_output(int out_w, int out_h)
 {
     if (!G.ready || out_w <= 0 || out_h <= 0) return -1;
@@ -580,6 +604,50 @@ int rmp_gfx_set_display(int display_w, int display_h, int sharp)
     G.sharp = sharp != 0;
     target(0, display_w, display_h);
     return 0;
+}
+
+void rmp_gfx_select_output(int slot)
+{
+    if (!G.ready || slot < 0 || slot >= RMP_GFX_OUTPUTS || slot == G.output) return;
+    flush();
+    G.outputs[G.output] = (gfx_output){ G.screen_fbo, G.screen_tex, G.out_w, G.out_h, G.dst, G.sharp,
+                                        G.display_w, G.display_h };
+    const gfx_output o = G.outputs[slot];
+    G.screen_fbo = o.screen_fbo;
+    G.screen_tex = o.screen_tex;
+    G.out_w = o.out_w;
+    G.out_h = o.out_h;
+    G.dst = o.dst;
+    G.sharp = o.sharp;
+    G.display_w = o.display_w;
+    G.display_h = o.display_h;
+    G.outputs[slot] = (gfx_output){ 0 };
+    G.output = slot;
+    G.bound_texture = (GLuint)-1;
+    G.mode = -1;
+    G.target = (GLuint)-1;   /* the caller binds the new surface, then rmp_gfx_invalidate_state */
+}
+
+void rmp_gfx_release_output(void)
+{
+    if (!G.ready) return;
+    if (G.screen_fbo) drop_screen();
+    G.display_w = G.display_h = 0;
+    G.out_w = G.out_h = 0;
+}
+
+void rmp_gfx_output_rect(int slot, rmp_rect *dst, int *display_w, int *display_h)
+{
+    if (slot == G.output || slot < 0 || slot >= RMP_GFX_OUTPUTS) {
+        *dst = rmp_gfx_display_rect();
+        *display_w = G.display_w;
+        *display_h = G.display_h;
+        return;
+    }
+    const gfx_output *o = &G.outputs[slot];
+    *dst = o->screen_fbo ? o->dst : (rmp_rect){ 0, 0, o->display_w, o->display_h };
+    *display_w = o->display_w;
+    *display_h = o->display_h;
 }
 
 rmp_layer *rmp_layer_create(int w, int h)

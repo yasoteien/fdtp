@@ -27,7 +27,7 @@ PLATFORM_PKGS := libdrm gbm egl glesv2
 # (libxcb1-dev); without them the binary is KMS only. RMP_X11=0 leaves it out.
 RMP_X11 ?= $(shell $(PKG_CONFIG) --exists xcb 2>/dev/null && echo 1 || echo 0)
 ifeq ($(RMP_X11),1)
-PLATFORM_SRCS += $(PLATFORM_DIR)/rmp_x11.c
+PLATFORM_SRCS += $(PLATFORM_DIR)/rmp_x11.c $(PLATFORM_DIR)/rmp_xdnd.c $(PLATFORM_DIR)/rmp_uri.c
 PLATFORM_PKGS += xcb
 endif
 # C11 sources: compile them with $(CC) -std=c11 (headers are C++-safe).

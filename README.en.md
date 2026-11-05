@@ -51,6 +51,14 @@ The screens are in English or Japanese:
 - On the Pomera's 1024x600 screen, FDTP shows 85 columns by 25 rows. On larger screens, use `--size auto` or `--size 160x45`.
 - In an X11 window, Alt+Enter or F11 switches to full screen (or start with `--fullscreen`).
 
+**Mouse, more windows, drag and drop in the X11 window** (since 1.17)
+
+The X11 mode now works with the mouse. It also has FDTM's (the macOS version's) multiple windows and drag and drop, though on the Pomera's small screen these may be hard to use (they are useful when FDTP runs on an ordinary Debian 13).
+
+- Click selects, double click opens, Ctrl+click marks or unmarks, Shift+click marks a range, the wheel moves up and down.
+- Ctrl+n starts another FDTP in the current directory (another window; the second goes to the right edge of the screen, the third to the left). In the filer of an X11 window, Ctrl+n does this instead of narrowing the pane.
+- Drag and drop between FDTP windows, file managers (such as Thunar) and the desktop, both ways. Dragging a marked line takes all marked files; another line, just that one. Dropped on a directory's line, files go into it. Within one file system they are moved, otherwise copied; Ctrl copies, Shift moves (as in X file managers). One drop takes files from one directory only.
+
 ```
 fdtp [--kms|--x11] [--fullscreen] [--size auto|COLSxROWS] [DIRECTORY]
 fdtp -v      # print the version

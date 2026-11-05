@@ -25,7 +25,7 @@ endif
 # headers test_x11 and the rmp_x11.c syntax check are skipped.
 XCB_H := $(firstword $(wildcard /opt/homebrew/include/xcb/xcb.h /usr/local/include/xcb/xcb.h /opt/X11/include/xcb/xcb.h /usr/include/xcb/xcb.h))
 XCB_INC := $(if $(XCB_H),-I$(patsubst %/xcb/xcb.h,%,$(XCB_H)))
-TESTS = $(OUT)/test_damage $(OUT)/test_pacing $(OUT)/test_kms $(OUT)/test_input $(OUT)/test_frame $(if $(XCB_H),$(OUT)/test_x11)
+TESTS = $(OUT)/test_damage $(OUT)/test_pacing $(OUT)/test_kms $(OUT)/test_input $(OUT)/test_frame $(OUT)/test_uri $(if $(XCB_H),$(OUT)/test_x11)
 .PHONY: test check clean
 test: $(TESTS)
 	@for t in $(TESTS); do echo "== $$t"; $$t || exit 1; done
@@ -45,6 +45,11 @@ $(OUT)/test_kms: test_kms.c ../rmp_kms.c ../rmp_kms.h | $(OUT)
 $(OUT)/test_input: test_input.c ../rmp_input.c ../rmp_input.h | $(OUT)
 	$(CC) $(WARN) -O0 -g -Imock/include -I.. test_input.c -o $@
 FRAME_SRCS = test_frame.c platform_harness.c mock_gl.c ../rmp_gfx.c ../rmp_gfx_assets.c ../rmp_paint.c ../rmp_damage.c ../rmp_pacing.c
+$(OUT)/test_uri: test_uri.c ../rmp_uri.c ../rmp_uri.h | $(OUT)
+	$(CC) $(WARN) $(CFLAGS) -I.. test_uri.c ../rmp_uri.c -o $@
+# A hand test on a real X server (not run by make test): xdnd_source.c.
+$(OUT)/xdnd_source: xdnd_source.c ../rmp_x11.c ../rmp_xdnd.c ../rmp_uri.c ../rmp_xdnd.h ../rmp_x11.h | $(OUT)
+	$(CC) $(WARN) -O0 -g $(XCB_INC) -I.. xdnd_source.c ../rmp_x11.c ../rmp_xdnd.c ../rmp_uri.c -o $@ -lxcb
 $(OUT)/test_x11: test_x11.c ../rmp_x11.c ../rmp_x11.h ../rmp_platform.h | $(OUT)
 	$(CC) $(WARN) -O0 -g $(XCB_INC) -I.. test_x11.c -o $@
 $(OUT)/test_frame: $(FRAME_SRCS) ../rmp_platform.c $(wildcard ../*.h) $(wildcard *.h) | $(OUT) $(GLH)
@@ -54,7 +59,8 @@ check: | $(OUT) $(GLH)
 	$(CC) $(WARN) -fsyntax-only $(GLINC) -Imock/include -I.. ../rmp_platform.c ../rmp_gfx.c ../rmp_kms.c ../rmp_input.c
 	$(CC) $(WARN) -fsyntax-only $(GLINC) -I.. -DRMP_GFX_USE_VBO=1 ../rmp_gfx.c
 	$(CC) $(WARN) -fsyntax-only -I.. $(PLATFORM_PORTABLE_SRCS)
-	$(if $(XCB_H),$(CC) $(WARN) -fsyntax-only $(XCB_INC) -I.. ../rmp_x11.c,@echo "SKIP rmp_x11.c: no xcb/xcb.h")
+	$(if $(XCB_H),$(CC) $(WARN) -fsyntax-only $(XCB_INC) -I.. ../rmp_x11.c ../rmp_xdnd.c,@echo "SKIP rmp_x11.c rmp_xdnd.c: no xcb/xcb.h")
+	$(CC) $(WARN) -fsyntax-only -I.. ../rmp_uri.c
 	$(if $(XCB_H),$(CC) $(WARN) -fsyntax-only $(GLINC) $(XCB_INC) -Imock/include -I.. -DRMP_WITH_X11=1 ../rmp_platform.c)
 	@echo "PASS check: platform sources compile with -Wall -Wextra -Werror (device headers mocked on $(UNAME))"
 clean:

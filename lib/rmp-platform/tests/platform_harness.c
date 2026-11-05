@@ -129,7 +129,7 @@ void rmp_kms_close(RmpKms *k) { (void)k; h_closed = 1; mock_log_external(X_CLOSE
 static rmp_key_event keys[256];
 static int key_n;
 static unsigned char down[1024];
-void h_key(int code, int value) { keys[key_n++] = (rmp_key_event){ code, value }; }
+void h_key(int code, int value) { keys[key_n++] = (rmp_key_event){ code, value, 0 }; }
 void rmp_input_open(int grab, double now) { (void)grab; (void)now; }
 void rmp_input_close(void) { key_n = 0; }
 int rmp_input_fd(void) { return h_keyboard ? 7 : -1; }

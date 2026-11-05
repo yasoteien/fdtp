@@ -63,11 +63,43 @@ typedef struct {
     const char *wm_instance, *wm_class;
     const uint32_t *icon;
     size_t icon_words;
+    /* X11: 1 = place the window apart from the other windows of the same
+     * WM_CLASS so that they stay in view (drag and drop): the first in the
+     * middle of the work area, the second at its right, the third at its
+     * left, then the middle again 48 dots lower, and so on. 0: the window
+     * manager places it. */
+    int place_apart;
+    /* X11: the key (KEY_*) the window's close button is queued as, a press
+     * and a release. 0: KEY_F10 (rmp-jukebox's quit with confirmation).
+     * FDTP gives KEY_Q: its F10 is Unpack (2026-11-05, the close button
+     * started an unpack). */
+    int close_key;
+    /* X11: the window's first size, kept at the display's w:h. 0 x 0: the
+     * display's size (both as before). Shrunk to the work area like the
+     * display size. */
+    int window_w, window_h;
+    /* X11: positioned 1 = put the window's frame (title bar included) at
+     * x, y of the screen (USPosition; wins over place_apart). 0: as before. */
+    int positioned, x, y;
+    /* X11: 1 = _NET_WM_USER_TIME 0, so that the window manager does not
+     * give the window the keyboard focus when it is mapped (a later
+     * rmp_window_raise still does). Windows of rmp_window_open have it. */
+    int map_unfocused;
 } rmp_platform_options;
 
 /* Defaults: auto, windowed, card0, grab 1, terminal 1, signals 1, log_stats 0,
- * display 0 x 0 (1024 x 600), resizable 0, rmp-jukebox's name, no icon. */
+ * display 0 x 0 (1024 x 600), resizable 0, rmp-jukebox's name, no icon,
+ * place_apart 0, close_key 0 (F10), window 0 x 0, positioned 0, map_unfocused 0. */
 void rmp_platform_default_options(rmp_platform_options *options);
+/* Before rmp_platform_init: where would the display go with these options
+ * (NULL: defaults)? RMP_OUTPUT_X11, with the X screen's size (the root
+ * window, every monitor) in *screen_w x *screen_h and the work area
+ * (_NET_WORKAREA; the whole screen when the window manager gives none) in
+ * *work; or RMP_OUTPUT_KMS (nothing set). Connects to the X server and
+ * leaves again. Any pointer may be NULL. */
+int  rmp_platform_probe(const rmp_platform_options *options, int *screen_w, int *screen_h, rmp_rect *work);
+/* After rmp_platform_init: RMP_OUTPUT_X11 or RMP_OUTPUT_KMS (0: not initialised). */
+int  rmp_platform_output(void);
 /* NULL options = defaults. 0 on success. A missing keyboard is not an error
  * (it is looked for again once per second). */
 int  rmp_platform_init(const rmp_platform_options *options);
@@ -175,14 +207,119 @@ rmp_frame_stats rmp_get_frame_stats(void);
 
 /* ---- Keyboard (evdev) -------------------------------------------------- */
 /* code: linux/input-event-codes.h (KEY_*). value: 0 release, 1 press,
- * 2 autorepeat. When the device disappears every held key gets a release. */
-typedef struct { int code; int value; } rmp_key_event;
+ * 2 autorepeat. When the device disappears every held key gets a release.
+ * window: the X11 window that had the focus (0: the first one, and always
+ * on KMS; see "Several windows" below). */
+typedef struct { int code; int value; int window; } rmp_key_event;
 /* Non-blocking. Returns the number of events written (<= max); the rest
  * stay queued for the next call. */
 int  rmp_poll_keys(rmp_key_event *out, int max);
 /* Current state (1 = held) as of the events returned so far. */
 int  rmp_key_down(int code);
 int  rmp_keyboard_connected(void);
+
+/* ---- Pointer (X11 only; KMS returns none) -------------------------------
+ * Button presses and releases, motion while a button is held, and the
+ * wheel, in display coordinates (the app's rmp_display_width x height,
+ * after the window's scaling and centring). A point on the bars around a
+ * scaled display lies outside 0..w-1 / 0..h-1. button: 1 left, 2 middle,
+ * 3 right. wheel: -1 up, +1 down (type RMP_POINTER_WHEEL). mods: the
+ * RMP_MOD_* held at the event. time: rmp_now_seconds() when it was read
+ * (for double clicks). rmp_wait returns as for a key when one is queued.
+ * window: the window it happened in; x, y are in that window's display. */
+enum { RMP_POINTER_PRESS = 1, RMP_POINTER_RELEASE = 2, RMP_POINTER_MOTION = 3, RMP_POINTER_WHEEL = 4 };
+enum { RMP_MOD_SHIFT = 1, RMP_MOD_CTRL = 2, RMP_MOD_ALT = 4 };
+typedef struct { int type; int x, y; int button; int wheel; unsigned mods; double time; int window; } rmp_pointer_event;
+/* Non-blocking, like rmp_poll_keys. */
+int  rmp_poll_pointer(rmp_pointer_event *out, int max);
+
+/* ---- Drag and drop of files (X11 XDND, text/uri-list; KMS: none) --------
+ * Between this window and other programs (file managers, the desktop, other
+ * windows of the app), both ways. Paths are absolute local paths; x, y are
+ * display coordinates as for the pointer. The callbacks run inside the
+ * platform's event handling (rmp_wait, rmp_poll_keys, rmp_poll_pointer,
+ * rmp_frame_ready), never inside a frame.
+ * over: files are dragged over the window. paths is NULL (count 0) until the
+ * source has sent them; mods the RMP_MOD_* held; allowed the RMP_DND_COPY /
+ * RMP_DND_MOVE bits the source permits. Returns the action a drop there
+ * would take, or RMP_DND_NONE.
+ * drop: the files were dropped; action is what over returned for that
+ * place. Returns the action taken (the app may copy or move them later,
+ * the paths are only lent for the call), or RMP_DND_NONE when refused. */
+enum { RMP_DND_NONE = 0, RMP_DND_COPY = 1, RMP_DND_MOVE = 2 };
+typedef int (*rmp_dnd_over_fn)(void *ctx, int x, int y, const char *const *paths, size_t count,
+                               unsigned mods, unsigned allowed);
+typedef int (*rmp_dnd_drop_fn)(void *ctx, int x, int y, const char *const *paths, size_t count, int action);
+/* Takes drops from now on (the window becomes XdndAware); kept across a
+ * re-initialisation. NULL callbacks: no more. 0, or -1 when the output is
+ * not X11. */
+int  rmp_dnd_accept(rmp_dnd_over_fn over, rmp_dnd_drop_fn drop, void *ctx);
+/* Drags the files out of the window: call it while button 1 is held after
+ * a press in the window. The platform holds the pointer until the button
+ * comes up (or Esc): no pointer event reaches the app meanwhile, and the
+ * press gets no release. Over this window itself the callbacks above are
+ * called, with copy and move allowed. 0 started, -1 not possible (KMS, no
+ * button held, another drag on). */
+int  rmp_dnd_drag(const char *const *paths, size_t count);
+/* After a drag: once, the RMP_DND_* the target took (RMP_DND_NONE: refused
+ * or cancelled). -1 while a drag goes on or none ended. */
+int  rmp_dnd_take_result(void);
+
+/* ---- Several windows (X11 only; docs/RMP_MULTIWINDOW.md) ------------------
+ * Window 0 is the one rmp_platform_init opens. More windows share its GL
+ * context (layers, textures and the painters work in all of them) and the
+ * frame pacing. Exactly one window is SELECTED at a time (0 after init):
+ * everything per display above - rmp_display_width/height, rmp_output_size,
+ * rmp_set_display_size, rmp_frame_damage / invalidate_all / begin / clip /
+ * is_full / end, rmp_set_frame_interval, full screen - acts on it. An app
+ * that never opens a window is not affected by any of this.
+ *
+ * The loop with several windows (all frames of one pass are shown at the
+ * same vblank; each window keeps its own rmp_set_frame_interval, the pacing
+ * runs at the fastest shown one):
+ *   if (!rmp_frame_ready()) continue;
+ *   if (rmp_frames_begin() == 1) {
+ *       for each shown window w {
+ *           rmp_window_select(w);
+ *           ...update...  n = rmp_frame_begin(...); ...draw...  rmp_frame_end();
+ *       }
+ *       rmp_window_select(0);
+ *       rmp_frames_end();
+ *   }
+ * Keys and pointer events carry the window (rmp_key_event.window). */
+#define RMP_WINDOWS_MAX 8
+typedef struct {
+    int display_w, display_h;   /* what the app draws in it (1..4096 each) */
+    int window_w, window_h;     /* the window's first size, kept at display_w:display_h (0: the display's) */
+    int positioned, x, y;       /* 1: its frame at x, y (USPosition); 0: the window manager places it */
+    const char *title;          /* WM_NAME and _NET_WM_NAME (NULL: window 0's); class and icon are window 0's */
+} rmp_window_options;
+/* Opens a window, not shown yet (rmp_window_show). Not inside a frame.
+ * Returns its number (1 .. RMP_WINDOWS_MAX - 1), or -1 (KMS, no slot, X or
+ * EGL failure). Its close button does not queue a key: see
+ * rmp_window_take_close. */
+int  rmp_window_open(const rmp_window_options *options);
+/* Closes a window opened above (its GL surface and X window). Not inside a
+ * frame. Selects window 0 when it was selected. */
+void rmp_window_close(int window);
+/* Selects a window (see above). Not inside a frame. 0, or -1 (no such window). */
+int  rmp_window_select(int window);
+int  rmp_window_selected(void);
+/* Maps (1) or withdraws (0) a window. Window 0 starts shown. A hidden window
+ * still draws if the app asks, but does not count for the pacing. */
+void rmp_window_show(int window, int show);
+int  rmp_window_shown(int window);
+/* Shows the window, brings it to the front and gives it the keyboard focus
+ * (_NET_ACTIVE_WINDOW; the window manager may refuse). */
+void rmp_window_raise(int window);
+/* 1 once after the close button of a window opened by rmp_window_open was
+ * pressed (the app decides: hide it, usually). rmp_wait returns for it. */
+int  rmp_window_take_close(int window);
+/* One pass of the loop above: 1 = build a frame for each window now, 0 = not
+ * due yet (no pass), -1 = error or KMS. rmp_frames_end closes the pass: once
+ * per pass that returned 1. */
+int  rmp_frames_begin(void);
+int  rmp_frames_end(void);
 
 /* ---- Misc -------------------------------------------------------------- */
 double rmp_now_seconds(void);           /* CLOCK_MONOTONIC, seconds */

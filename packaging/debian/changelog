@@ -1,3 +1,13 @@
+fdtp (1.17-1) trixie; urgency=medium
+
+  * X11 window: the mouse (click, Ctrl+click, Shift+click, double click,
+    wheel), Ctrl+n for another window at the current directory, and drag
+    and drop of files (XDND, text/uri-list) between FDTP windows, file
+    managers and the desktop, both ways. Same file system moves, otherwise
+    copies; Ctrl copies, Shift moves. The DRM/KMS console is unchanged.
+
+ -- yasoteien <263659156+yasoteien@users.noreply.github.com>  Thu, 05 Nov 2026 22:00:00 +0900
+
 fdtp (1.16-1) trixie; urgency=medium
 
   * After installing pomera-kernel, say that a login prompt appears once

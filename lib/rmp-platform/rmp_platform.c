@@ -30,6 +30,7 @@
 #include "rmp_pacing.h"
 #if RMP_WITH_X11
 #include "rmp_x11.h"
+#include "rmp_xdnd.h"
 #else
 /* Built without libxcb: the X11 output is never opened, so these are never
  * reached past rmp_x11_open. */
@@ -57,6 +58,27 @@ static int rmp_x11_take_exposed(RmpX11 *x) { (void)x; return 0; }
 static int rmp_x11_keys_pending(const RmpX11 *x) { (void)x; return 0; }
 static int rmp_x11_poll_key(RmpX11 *x, rmp_key_event *out) { (void)x; (void)out; return 0; }
 static int rmp_x11_key_down(const RmpX11 *x, int code) { (void)x; (void)code; return 0; }
+static int rmp_x11_pointer_pending(const RmpX11 *x) { (void)x; return 0; }
+static int rmp_x11_poll_pointer(RmpX11 *x, rmp_pointer_event *out) { (void)x; (void)out; return 0; }
+static void rmp_x11_hide(RmpX11 *x) { (void)x; }
+static void rmp_x11_activate(RmpX11 *x) { (void)x; }
+static int rmp_x11_take_close(RmpX11 *x) { (void)x; return 0; }
+static int rmp_x11_close_pending(const RmpX11 *x) { (void)x; return 0; }
+typedef struct RmpXdnd RmpXdnd;
+typedef int (*rmp_xdnd_over_fn)(void *, int, int, const char *const *, size_t, unsigned, unsigned);
+typedef int (*rmp_xdnd_drop_fn)(void *, int, int, const char *const *, size_t, int);
+static RmpXdnd *rmp_xdnd_open(RmpX11 *x) { (void)x; return NULL; }
+static void rmp_xdnd_close(RmpXdnd *d) { (void)d; }
+static void rmp_xdnd_set_target(RmpXdnd *d, rmp_xdnd_over_fn over, rmp_xdnd_drop_fn drop, void *ctx)
+{
+    (void)d; (void)over; (void)drop; (void)ctx;
+}
+static int rmp_xdnd_drag(RmpXdnd *d, const char *const *paths, size_t count)
+{
+    (void)d; (void)paths; (void)count;
+    return -1;
+}
+static int rmp_xdnd_take_result(RmpXdnd *d) { (void)d; return -1; }
 #endif
 
 #ifndef EGL_PLATFORM_GBM_KHR
@@ -81,15 +103,36 @@ enum { FRAME_NONE, FRAME_ACTIVE, FRAME_SKIP_IDLE, FRAME_SKIP_TIME };
 static volatile sig_atomic_t quit_flag;
 static int atexit_done;
 
+/* One window (rmp_window_open). The SELECTED window's x11, surface, width,
+ * height, scaled and damage are P's own fields below (so the single-window
+ * code is unchanged); a window not selected keeps them here. */
+typedef struct {
+    int used, shown;
+    int interval;                 /* its rmp_set_frame_interval */
+    int have_target;              /* last_target is valid */
+    double last_target;           /* display time of its last frame (several windows) */
+    RmpX11 *x11;
+    EGLSurface surface;
+    int width, height, scaled;
+    rmp_damage damage;
+} Window;
+
 static struct {
     int initialized;
     rmp_platform_options options;
     RmpKms *kms;                  /* the KMS output, or */
-    RmpX11 *x11;                  /* the X11 output (exactly one is set) */
+    RmpX11 *x11;                  /* the X11 output (exactly one is set); the selected window's */
+    RmpXdnd *xdnd;                /* X11: drag and drop */
     double last_present;          /* X11: when the previous swap returned */
     EGLDisplay display;
     EGLContext context;
-    EGLSurface surface;
+    EGLSurface surface;           /* the selected window's */
+    EGLConfig config;             /* for the surfaces of more windows */
+    Window win[RMP_WINDOWS_MAX];  /* 0: the first window (KMS: the only one) */
+    int cur;                      /* the selected window */
+    /* rmp_frames_begin .. rmp_frames_end: one pass over the windows. */
+    int tick_open, tick_presented, tick_held;
+    double tick_target;
     int has_age;
     SetDamageRegionFn set_damage;
     int damage_error_reported;
@@ -124,6 +167,9 @@ static struct {
     rmp_frame_stats stats;
 } P;
 
+/* The X window of window i (the selected one's is P.x11). */
+static RmpX11 *win_x11(int i) { return i == P.cur ? P.x11 : P.win[i].x11; }
+
 double rmp_now_seconds(void)
 {
     struct timespec ts;
@@ -152,6 +198,35 @@ void rmp_platform_default_options(rmp_platform_options *o)
     o->wm_class = NULL;
     o->icon = NULL;
     o->icon_words = 0;
+    o->place_apart = 0;
+    o->close_key = 0;
+    o->window_w = o->window_h = 0;
+    o->positioned = o->x = o->y = 0;
+    o->map_unfocused = 0;
+}
+
+int rmp_platform_output(void) { return !P.initialized ? 0 : P.x11 ? RMP_OUTPUT_X11 : RMP_OUTPUT_KMS; }
+
+int rmp_platform_probe(const rmp_platform_options *options, int *screen_w, int *screen_h, rmp_rect *work)
+{
+    rmp_platform_options defaults;
+    if (!options) {
+        rmp_platform_default_options(&defaults);
+        options = &defaults;
+    }
+    if (options->output == RMP_OUTPUT_KMS) return RMP_OUTPUT_KMS;
+#if RMP_WITH_X11
+    int w = 0, h = 0, area[4];
+    if (rmp_x11_probe(&w, &h, area) == 0) {
+        if (screen_w) *screen_w = w;
+        if (screen_h) *screen_h = h;
+        if (work) *work = (rmp_rect){ area[0], area[1], area[2], area[3] };
+        return RMP_OUTPUT_X11;
+    }
+#else
+    (void)screen_w; (void)screen_h; (void)work;
+#endif
+    return RMP_OUTPUT_KMS;
 }
 
 int rmp_display_width(void) { return P.width; }
@@ -359,6 +434,7 @@ static int egl_open(void)
         return -1;
     }
     const EGLint context_attrs[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
+    P.config = chosen;
     P.context = eglCreateContext(P.display, chosen, EGL_NO_CONTEXT, context_attrs);
     if (P.context == EGL_NO_CONTEXT) return -1;
     if (P.x11) {
@@ -406,6 +482,67 @@ static void egl_close(void)
     P.context = EGL_NO_CONTEXT;
 }
 
+/* ---- drag and drop (X11) ------------------------------------------------- */
+static int x11_events(void);
+/* The app's callbacks: kept across rmp_platform_init (which clears P). */
+static struct {
+    rmp_dnd_over_fn over;
+    rmp_dnd_drop_fn drop;
+    void *ctx;
+} DND;
+
+/* Window pixels of window `win` to its display pixels (floor, also left of /
+ * above it), as the pointer's (the window's scaling and centring undone). */
+static void window_to_display_of(int win, int *x, int *y)
+{
+    rmp_rect d;
+    int dw, dh;
+    rmp_gfx_output_rect(win, &d, &dw, &dh);
+    if (d.w <= 0 || d.h <= 0) return;
+    long px = (long)(*x - d.x) * dw, py = (long)(*y - d.y) * dh;
+    *x = (int)(px >= 0 ? px / d.w : (px - d.w + 1) / d.w);
+    *y = (int)(py >= 0 ? py / d.h : (py - d.h + 1) / d.h);
+}
+
+static int dnd_over(void *ctx, int x, int y, const char *const *paths, size_t count, unsigned mods, unsigned allowed)
+{
+    (void)ctx;
+    if (!DND.over) return RMP_DND_NONE;
+    window_to_display_of(0, &x, &y);
+    return DND.over(DND.ctx, x, y, paths, count, mods, allowed);
+}
+
+static int dnd_drop(void *ctx, int x, int y, const char *const *paths, size_t count, int action)
+{
+    (void)ctx;
+    if (!DND.drop) return RMP_DND_NONE;
+    window_to_display_of(0, &x, &y);
+    return DND.drop(DND.ctx, x, y, paths, count, action);
+}
+
+int rmp_dnd_accept(rmp_dnd_over_fn over, rmp_dnd_drop_fn drop, void *ctx)
+{
+    DND.over = over && drop ? over : NULL;
+    DND.drop = over && drop ? drop : NULL;
+    DND.ctx = ctx;
+    if (!P.x11 || !P.xdnd) return -1;
+    if (DND.over) rmp_xdnd_set_target(P.xdnd, dnd_over, dnd_drop, NULL);
+    else rmp_xdnd_set_target(P.xdnd, NULL, NULL, NULL);
+    return 0;
+}
+
+int rmp_dnd_drag(const char *const *paths, size_t count)
+{
+    return P.initialized && P.x11 ? rmp_xdnd_drag(P.xdnd, paths, count) : -1;
+}
+
+int rmp_dnd_take_result(void)
+{
+    if (!P.initialized || !P.x11) return -1;
+    x11_events();
+    return rmp_xdnd_take_result(P.xdnd);
+}
+
 /* ---- init / shutdown --------------------------------------------------- */
 int rmp_platform_init(const rmp_platform_options *options)
 {
@@ -414,6 +551,8 @@ int rmp_platform_init(const rmp_platform_options *options)
     P.display = EGL_NO_DISPLAY;
     P.context = EGL_NO_CONTEXT;
     P.surface = EGL_NO_SURFACE;
+    P.win[0].used = P.win[0].shown = 1;
+    P.win[0].interval = 2;        /* rmp_pacing_init's */
     if (options) P.options = *options;
     else rmp_platform_default_options(&P.options);
     P.clear_rgb = 0x080C10;
@@ -463,8 +602,13 @@ int rmp_platform_init(const rmp_platform_options *options)
     rmp_damage_add_full(&P.damage);
     rmp_pacing_init(&P.pacing, P.x11 ? X11_PERIOD : rmp_kms_refresh_period(P.kms));
     double now = rmp_now_seconds();
-    if (P.x11) rmp_x11_show(P.x11);
-    else rmp_input_open(P.options.grab_keyboard, now);
+    if (P.x11) {
+        P.xdnd = rmp_xdnd_open(P.x11);
+        if (DND.over) rmp_xdnd_set_target(P.xdnd, dnd_over, dnd_drop, NULL);
+        rmp_x11_show(P.x11);
+    } else {
+        rmp_input_open(P.options.grab_keyboard, now);
+    }
     stats_reset(now);
     return 0;
 fail:
@@ -472,10 +616,19 @@ fail:
     return -1;
 }
 
+static void win_save(int i);
+static void win_load(int i);
+
 void rmp_platform_shutdown(void)
 {
     if (!P.initialized) return;
     P.initialized = 0;
+    if (P.cur != 0) {   /* window 0's surface for the GL clean-up below */
+        rmp_gfx_select_output(0);
+        win_save(P.cur);
+        win_load(0);
+        P.cur = 0;
+    }
     rmp_input_close();
     /* Restore the display first so the screen is never left black. */
     int restored = P.kms ? rmp_kms_restore(P.kms) : 0;
@@ -484,18 +637,44 @@ void rmp_platform_shutdown(void)
         if (P.display != EGL_NO_DISPLAY && P.context != EGL_NO_CONTEXT &&
             eglMakeCurrent(P.display, P.surface, P.surface, P.context))
             rmp_gfx_shutdown();
+        for (int i = 1; i < RMP_WINDOWS_MAX; i++)
+            if (P.win[i].used && P.win[i].surface != EGL_NO_SURFACE && P.display != EGL_NO_DISPLAY)
+                eglDestroySurface(P.display, P.win[i].surface);
         egl_close();
         rmp_kms_close(P.kms);
+        rmp_xdnd_close(P.xdnd);
         rmp_x11_close(P.x11);   /* after EGL: the surface is on its window */
+        for (int i = 1; i < RMP_WINDOWS_MAX; i++)
+            if (P.win[i].used) rmp_x11_close(P.win[i].x11);
     } else {
         fprintf(stderr, "display restore failed; retaining EGL/GBM until process exit\n");
     }
     P.kms = NULL;
     P.x11 = NULL;
+    P.xdnd = NULL;
+    memset(P.win, 0, sizeof P.win);
 }
 
 /* ---- frame loop -------------------------------------------------------- */
-void rmp_set_frame_interval(int vblanks) { rmp_pacing_set_interval(&P.pacing, vblanks); }
+/* The pacing runs at the fastest shown window (the selected one when none
+ * is shown). One window: exactly its interval, as before. */
+static void apply_interval(void)
+{
+    int n = 0;
+    for (int i = 0; i < RMP_WINDOWS_MAX; i++)
+        if (P.win[i].used && P.win[i].shown && (!n || P.win[i].interval < n)) n = P.win[i].interval;
+    rmp_pacing_set_interval(&P.pacing, n ? n : P.win[P.cur].interval);
+}
+
+void rmp_set_frame_interval(int vblanks)
+{
+    if (!P.initialized) {
+        rmp_pacing_set_interval(&P.pacing, vblanks);
+        return;
+    }
+    P.win[P.cur].interval = vblanks < 1 ? 1 : vblanks > 4 ? 4 : vblanks;
+    apply_interval();
+}
 int  rmp_frame_interval(void) { return P.pacing.interval; }
 
 void rmp_frame_damage(const rmp_rect *r) { if (r && P.initialized) rmp_damage_add(&P.damage, *r); }
@@ -513,6 +692,14 @@ static double due_time(double now)
  * Not inside a frame (the scaled texture may be re-created). */
 static int x11_events(void)
 {
+    /* The other windows: only read (a new size or an expose is applied when
+     * the window is selected, before its frame: the flags wait in RmpX11). */
+    for (int i = 0; i < RMP_WINDOWS_MAX; i++)
+        if (i != P.cur && P.win[i].used && rmp_x11_dispatch(P.win[i].x11) < 0) {
+            fprintf(stderr, "x11: connection lost\n");
+            quit_flag = 1;
+            return -1;
+        }
     if (rmp_x11_dispatch(P.x11) < 0) {
         fprintf(stderr, "x11: connection lost\n");
         quit_flag = 1;
@@ -549,6 +736,17 @@ double rmp_frame_time(void)
     return rmp_pacing_target(&P.pacing, rmp_now_seconds());
 }
 
+/* A queued key, pointer event or close request in any window. */
+static int x11_input_pending(void)
+{
+    for (int i = 0; i < RMP_WINDOWS_MAX; i++) {
+        if (!P.win[i].used) continue;
+        RmpX11 *x = win_x11(i);
+        if (rmp_x11_keys_pending(x) || rmp_x11_pointer_pending(x) || rmp_x11_close_pending(x)) return 1;
+    }
+    return 0;
+}
+
 /* X11: like the KMS loop below, without flip events (the swap blocks). */
 static int x11_wait(double max_seconds)
 {
@@ -557,13 +755,16 @@ static int x11_wait(double max_seconds)
         if (x11_events() < 0) return -1;
         double now = rmp_now_seconds(), due = due_time(now);
         if (due <= now) return 1;
-        if (rmp_x11_keys_pending(P.x11) || quit_flag) return 0;
+        if (x11_input_pending() || quit_flag) return 0;
         if (now >= limit) return 0;
         double until = due < limit ? due : limit;
         int timeout = (int)ceil((until - now) * 1000);
         if (timeout < 0) timeout = 0;
-        struct pollfd fd = { rmp_x11_fd(P.x11), POLLIN, 0 };
-        if (poll(&fd, 1, timeout) < 0 && errno != EINTR) return -1;
+        struct pollfd fds[RMP_WINDOWS_MAX];
+        nfds_t nfds = 0;
+        for (int i = 0; i < RMP_WINDOWS_MAX; i++)
+            if (P.win[i].used) fds[nfds++] = (struct pollfd){ rmp_x11_fd(win_x11(i)), POLLIN, 0 };
+        if (poll(fds, nfds, timeout) < 0 && errno != EINTR) return -1;
     }
 }
 
@@ -595,29 +796,10 @@ int rmp_wait(double max_seconds)
     }
 }
 
-int rmp_frame_begin(rmp_rect *out, int max)
+/* Age, damage region and partial update of the selected window, for a frame
+ * whose pacing fields (frame_begin, target...) are set. */
+static int begin_region(rmp_rect *out, int max)
 {
-    if ((!P.kms && !P.x11) || P.frame_state == FRAME_ACTIVE) return -1;
-    if (max > RMP_REPAINT_MAX) max = RMP_REPAINT_MAX;
-    if (max < 1) return -1;
-    if (P.x11 ? x11_events() < 0 : rmp_kms_dispatch(P.kms) < 0) return -1;
-    double now = rmp_now_seconds();
-    if (due_time(now) > now) { P.frame_state = FRAME_SKIP_TIME; return 0; }
-    if (!rmp_damage_pending(&P.damage)) { P.frame_state = FRAME_SKIP_IDLE; return 0; }
-    /* Normally immediate (three GBM buffers); blocks only if all are busy. */
-    if (P.kms && rmp_kms_wait_free_buffer(P.kms) < 0) return -1;
-    P.frame_begin = rmp_now_seconds();
-    /* Where this frame is to be shown: interval >= 2 holds its flip until
-     * the vblank before (rmp_frame_end). Sequences count like flip records. */
-    P.frame_interval = P.pacing.interval;
-    P.frame_target = rmp_pacing_target(&P.pacing, P.frame_begin);
-    P.frame_has_seq = P.pacing.have_flip && P.have_sequence;
-    if (P.frame_has_seq) {
-        P.frame_target_seq = P.last_sequence +
-            (unsigned)lround((P.frame_target - P.pacing.last_flip) / P.pacing.period);
-        P.frame_deadline_seq = P.last_sequence +
-            (unsigned)lround((rmp_pacing_deadline(&P.pacing, P.frame_begin) - P.pacing.last_flip) / P.pacing.period);
-    }
     /* Age first, then the damage region, then any GL command (partial_update). */
     EGLint age = 0;
     if (P.has_age && !eglQuerySurface(P.display, P.surface, EGL_BUFFER_AGE_EXT, &age)) age = 0;
@@ -645,6 +827,52 @@ int rmp_frame_begin(rmp_rect *out, int max)
     P.frame_state = FRAME_ACTIVE;
     rmp_gfx_frame_start(full, P.clear_rgb);
     return n;
+}
+
+/* Inside rmp_frames_begin .. rmp_frames_end: the pass is due already; this
+ * window draws when it has damage and its own interval has come round (a
+ * 30 fps window beside a 60 fps one draws every other pass). */
+static int tick_frame_begin(rmp_rect *out, int max, double now)
+{
+    Window *w = &P.win[P.cur];
+    if (!rmp_damage_pending(&P.damage)) { P.frame_state = FRAME_SKIP_IDLE; return 0; }
+    if (w->interval > P.pacing.interval && w->have_target &&
+        P.tick_target < w->last_target + ((double)w->interval - 0.5) * P.pacing.period) {
+        P.frame_state = FRAME_SKIP_TIME;   /* the damage waits for its turn */
+        return 0;
+    }
+    P.frame_begin = now;
+    P.frame_interval = P.pacing.interval;
+    P.frame_target = P.tick_target;
+    P.frame_has_seq = 0;
+    return begin_region(out, max);
+}
+
+int rmp_frame_begin(rmp_rect *out, int max)
+{
+    if ((!P.kms && !P.x11) || P.frame_state == FRAME_ACTIVE) return -1;
+    if (max > RMP_REPAINT_MAX) max = RMP_REPAINT_MAX;
+    if (max < 1) return -1;
+    if (P.x11 ? x11_events() < 0 : rmp_kms_dispatch(P.kms) < 0) return -1;
+    double now = rmp_now_seconds();
+    if (P.tick_open) return tick_frame_begin(out, max, now);
+    if (due_time(now) > now) { P.frame_state = FRAME_SKIP_TIME; return 0; }
+    if (!rmp_damage_pending(&P.damage)) { P.frame_state = FRAME_SKIP_IDLE; return 0; }
+    /* Normally immediate (three GBM buffers); blocks only if all are busy. */
+    if (P.kms && rmp_kms_wait_free_buffer(P.kms) < 0) return -1;
+    P.frame_begin = rmp_now_seconds();
+    /* Where this frame is to be shown: interval >= 2 holds its flip until
+     * the vblank before (rmp_frame_end). Sequences count like flip records. */
+    P.frame_interval = P.pacing.interval;
+    P.frame_target = rmp_pacing_target(&P.pacing, P.frame_begin);
+    P.frame_has_seq = P.pacing.have_flip && P.have_sequence;
+    if (P.frame_has_seq) {
+        P.frame_target_seq = P.last_sequence +
+            (unsigned)lround((P.frame_target - P.pacing.last_flip) / P.pacing.period);
+        P.frame_deadline_seq = P.last_sequence +
+            (unsigned)lround((rmp_pacing_deadline(&P.pacing, P.frame_begin) - P.pacing.last_flip) / P.pacing.period);
+    }
+    return begin_region(out, max);
 }
 
 void rmp_frame_clip(const rmp_rect *r)
@@ -721,16 +949,78 @@ static int x11_present(double swap_start)
     return 0;
 }
 
+/* One window's frame inside a pass: the first swap of the pass waits for the
+ * vblank before the target (as x11_present), the others follow at once, so
+ * that they all land on the target. The pacing moves at rmp_frames_end. */
+static int x11_present_tick(double swap_start)
+{
+    double hold_start = rmp_now_seconds(), hold = 0;
+    if (!P.tick_held) {
+        sleep_until(P.frame_target - P.pacing.period + RMP_PACING_MARGIN);
+        hold = rmp_now_seconds() - hold_start;
+        P.tick_held = 1;
+    }
+    if (!eglSwapBuffers(P.display, P.surface)) {
+        fprintf(stderr, "eglSwapBuffers failed: 0x%x\n", (unsigned)eglGetError());
+        return -1;
+    }
+    double now = rmp_now_seconds();
+    rmp_damage_commit(&P.damage);
+    P.win[P.cur].last_target = P.frame_target;
+    P.win[P.cur].have_target = 1;
+    P.tick_presented++;
+    P.frames++;
+    P.build_sum += (swap_start - P.frame_begin) * 1000;
+    P.swap_sum += (now - swap_start - hold) * 1000;
+    P.hold_sum += hold * 1000;
+    P.px_sum += (double)P.frame_px;
+    return 0;
+}
+
+int rmp_frames_begin(void)
+{
+    if (!P.initialized || !P.x11 || P.frame_state == FRAME_ACTIVE || P.tick_open) return -1;
+    if (x11_events() < 0) return -1;
+    double now = rmp_now_seconds();
+    if (due_time(now) > now) return 0;
+    P.tick_open = 1;
+    P.tick_presented = P.tick_held = 0;
+    P.tick_target = rmp_pacing_target(&P.pacing, now);
+    return 1;
+}
+
+int rmp_frames_end(void)
+{
+    if (!P.tick_open || P.frame_state == FRAME_ACTIVE) return -1;
+    P.tick_open = 0;
+    double now = rmp_now_seconds();
+    if (!P.tick_presented) {   /* no window had anything to draw */
+        rmp_pacing_idle(&P.pacing, now);
+        return 0;
+    }
+    double shown = now <= P.tick_target ? P.tick_target : now;
+    if (P.last_present > 0 && P.interval_count < STATS_INTERVALS)
+        P.intervals[P.interval_count++] = (shown - P.last_present) * 1000;
+    P.last_present = shown;
+    rmp_pacing_presented(&P.pacing, 0);
+    rmp_pacing_flip_done(&P.pacing, shown);
+    stats_report(now);
+    return 0;
+}
+
 int rmp_frame_end(void)
 {
     int state = P.frame_state;
     P.frame_state = FRAME_NONE;
-    if (state == FRAME_SKIP_IDLE) { rmp_pacing_idle(&P.pacing, rmp_now_seconds()); return 0; }
+    if (state == FRAME_SKIP_IDLE) {
+        if (!P.tick_open) rmp_pacing_idle(&P.pacing, rmp_now_seconds());
+        return 0;
+    }
     if (state != FRAME_ACTIVE) return 0;
     rmp_gfx_frame_finish();
     if (rmp_gfx_check_error("frame") < 0) return -1;
     double swap_start = rmp_now_seconds();
-    if (P.x11) return x11_present(swap_start);
+    if (P.x11) return P.tick_open ? x11_present_tick(swap_start) : x11_present(swap_start);
     /* No glFinish: the GPU finishes while the CPU builds the next frame; the
      * kernel's implicit fence holds the pageflip until rendering is done. */
     if (!eglSwapBuffers(P.display, P.surface)) {
@@ -773,9 +1063,14 @@ int rmp_poll_keys(rmp_key_event *out, int max)
         /* Ctrl(left)+C quits here too, like the grabbed keyboard on KMS. */
         x11_events();
         int n = 0;
-        while (n < max && rmp_x11_poll_key(P.x11, out + n)) {
-            if (out[n].code == KEY_C && out[n].value == 1 && rmp_x11_key_down(P.x11, KEY_LEFTCTRL)) quit_flag = 1;
-            n++;
+        for (int i = 0; i < RMP_WINDOWS_MAX && n < max; i++) {
+            if (!P.win[i].used) continue;
+            RmpX11 *x = win_x11(i);
+            while (n < max && rmp_x11_poll_key(x, out + n)) {
+                if (out[n].code == KEY_C && out[n].value == 1 && rmp_x11_key_down(x, KEY_LEFTCTRL)) quit_flag = 1;
+                out[n].window = i;
+                n++;
+            }
         }
         return n;
     }
@@ -787,10 +1082,181 @@ int rmp_poll_keys(rmp_key_event *out, int max)
         if (P.options.grab_keyboard && out[n].code == KEY_C && out[n].value == 1 &&
             rmp_input_key_down(KEY_LEFTCTRL))
             quit_flag = 1;
+        out[n].window = 0;
         n++;
+    }
+    return n;
+}
+
+int rmp_poll_pointer(rmp_pointer_event *out, int max)
+{
+    if (!P.initialized || max <= 0 || !P.x11) return 0;
+    x11_events();
+    const double now = rmp_now_seconds();
+    int n = 0;
+    for (int i = 0; i < RMP_WINDOWS_MAX && n < max; i++) {
+        if (!P.win[i].used) continue;
+        RmpX11 *x = win_x11(i);
+        while (n < max && rmp_x11_poll_pointer(x, out + n)) {
+            rmp_pointer_event *e = out + n++;
+            window_to_display_of(i, &e->x, &e->y);
+            e->time = now;
+            e->window = i;
+        }
     }
     return n;
 }
 
 int rmp_key_down(int code) { return P.x11 ? rmp_x11_key_down(P.x11, code) : rmp_input_key_down(code); }
 int rmp_keyboard_connected(void) { return P.x11 ? 1 : rmp_input_connected(); }
+
+/* ---- several windows ------------------------------------------------------ */
+static void win_save(int i)
+{
+    Window *w = &P.win[i];
+    w->x11 = P.x11;
+    w->surface = P.surface;
+    w->width = P.width;
+    w->height = P.height;
+    w->scaled = P.scaled;
+    w->damage = P.damage;
+}
+
+static void win_load(int i)
+{
+    const Window *w = &P.win[i];
+    P.x11 = w->x11;
+    P.surface = w->surface;
+    P.width = w->width;
+    P.height = w->height;
+    P.scaled = w->scaled;
+    P.damage = w->damage;
+}
+
+static int valid_window(int i) { return P.initialized && i >= 0 && i < RMP_WINDOWS_MAX && P.win[i].used; }
+
+static rmp_damage *win_damage(int i) { return i == P.cur ? &P.damage : &P.win[i].damage; }
+
+int rmp_window_selected(void) { return P.cur; }
+
+int rmp_window_select(int i)
+{
+    if (!valid_window(i) || P.frame_state == FRAME_ACTIVE) return -1;
+    if (i == P.cur) return 0;
+    rmp_gfx_select_output(i);   /* flushes into the old surface first */
+    win_save(P.cur);
+    win_load(i);
+    P.cur = i;
+    if (!eglMakeCurrent(P.display, P.surface, P.surface, P.context)) {
+        fprintf(stderr, "eglMakeCurrent (window %d) failed: 0x%x\n", i, (unsigned)eglGetError());
+        return -1;
+    }
+    rmp_gfx_invalidate_state();   /* the display framebuffer and viewport of this window */
+    return 0;
+}
+
+int rmp_window_open(const rmp_window_options *o)
+{
+    if (!P.initialized || !P.x11 || !o || P.frame_state == FRAME_ACTIVE || P.display == EGL_NO_DISPLAY) return -1;
+    if (o->display_w < 1 || o->display_h < 1 || o->display_w > 4096 || o->display_h > 4096) return -1;
+    int id = -1;
+    for (int i = 1; i < RMP_WINDOWS_MAX && id < 0; i++)
+        if (!P.win[i].used) id = i;
+    if (id < 0) return -1;
+    rmp_platform_options names = P.options;
+    if (o->title) names.title = o->title;
+    names.window_w = o->window_w;
+    names.window_h = o->window_h;
+    names.positioned = o->positioned;
+    names.x = o->x;
+    names.y = o->y;
+    names.place_apart = 0;
+    names.close_key = -1;   /* rmp_window_take_close */
+    names.map_unfocused = 1;   /* the focus moves only with rmp_window_raise */
+    RmpX11 *x = rmp_x11_open(o->display_w, o->display_h, 0, 0, 0, &names);
+    if (!x) return -1;
+    CreatePlatformWindowSurfaceFn create =
+        (CreatePlatformWindowSurfaceFn)eglGetProcAddress("eglCreatePlatformWindowSurfaceEXT");
+    EGLSurface surface = create ? create(P.display, P.config, rmp_x11_window(x), NULL) : EGL_NO_SURFACE;
+    if (surface == EGL_NO_SURFACE) {
+        fprintf(stderr, "EGL: no surface for another window (0x%x)\n", (unsigned)eglGetError());
+        rmp_x11_close(x);
+        return -1;
+    }
+    Window *w = &P.win[id];
+    memset(w, 0, sizeof *w);
+    w->used = 1;
+    w->interval = 2;
+    w->x11 = x;
+    w->surface = surface;
+    w->width = o->display_w;
+    w->height = o->display_h;
+    rmp_damage_init(&w->damage, w->width, w->height);
+    rmp_damage_add_full(&w->damage);
+    const int prev = P.cur;
+    int ok = rmp_window_select(id) == 0;
+    if (ok) {
+        (void)eglSwapInterval(P.display, 1);
+        int ow, oh;
+        rmp_x11_size(P.x11, &ow, &oh);
+        int scaled = rmp_gfx_set_display(P.width, P.height, 0) < 0 ? -1 : rmp_gfx_set_output(ow, oh);
+        ok = scaled >= 0;
+        if (ok) P.scaled = scaled;
+    }
+    if (!ok) {
+        fprintf(stderr, "x11: cannot set up window %d\n", id);
+        rmp_window_close(id);
+        if (P.win[prev].used) rmp_window_select(prev);
+        return -1;
+    }
+    rmp_window_select(prev);
+    return id;
+}
+
+void rmp_window_close(int i)
+{
+    if (!valid_window(i) || i == 0 || P.frame_state == FRAME_ACTIVE) return;
+    if (P.cur == i && rmp_window_select(0) < 0) return;
+    /* Its scaled texture: drop it while its slot is selected in rmp_gfx. */
+    rmp_gfx_select_output(i);
+    rmp_gfx_release_output();
+    rmp_gfx_select_output(0);
+    rmp_gfx_invalidate_state();
+    Window *w = &P.win[i];
+    if (w->surface != EGL_NO_SURFACE) eglDestroySurface(P.display, w->surface);
+    rmp_x11_close(w->x11);
+    memset(w, 0, sizeof *w);
+    apply_interval();
+}
+
+void rmp_window_show(int i, int show)
+{
+    if (!valid_window(i) || !P.x11) return;
+    show = show != 0;
+    if (show == P.win[i].shown) return;
+    P.win[i].shown = show;
+    P.win[i].have_target = 0;
+    if (show) {
+        rmp_x11_show(win_x11(i));
+        rmp_damage_add_full(win_damage(i));
+    } else {
+        rmp_x11_hide(win_x11(i));
+    }
+    apply_interval();
+}
+
+int rmp_window_shown(int i) { return valid_window(i) && P.win[i].shown; }
+
+void rmp_window_raise(int i)
+{
+    if (!valid_window(i) || !P.x11) return;
+    if (!P.win[i].shown) {
+        P.win[i].shown = 1;
+        P.win[i].have_target = 0;
+        rmp_damage_add_full(win_damage(i));
+        apply_interval();
+    }
+    rmp_x11_activate(win_x11(i));
+}
+
+int rmp_window_take_close(int i) { return valid_window(i) && P.x11 ? rmp_x11_take_close(win_x11(i)) : 0; }

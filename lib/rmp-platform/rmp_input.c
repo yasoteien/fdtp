@@ -32,7 +32,7 @@ static struct {
     unsigned head, count;
     int extra;                          /* gpio-keys (RMP_INPUT_EXTRA_NAME) */
     char path[300];                     /* the node of fd */
-} I = { -1, 0, 0, 0, 0, -1e9, {0}, {0}, {{0, 0}}, 0, 0, -1, "" };
+} I = { -1, 0, 0, 0, 0, -1e9, {0}, {0}, {{0, 0, 0}}, 0, 0, -1, "" };
 
 /* The keys taken from the extra device. */
 static int extra_key(int code) { return code == KEY_LEFTALT || code == KEY_RIGHTSHIFT; }
@@ -60,7 +60,7 @@ static void push(int code, int value)
         I.head = (I.head + 1) % RMP_INPUT_QUEUE;
         I.count--;
     }
-    I.queue[(I.head + I.count) % RMP_INPUT_QUEUE] = (rmp_key_event){ code, value };
+    I.queue[(I.head + I.count) % RMP_INPUT_QUEUE] = (rmp_key_event){ code, value, 0 };
     I.count++;
 }
 

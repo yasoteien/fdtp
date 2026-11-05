@@ -92,14 +92,26 @@ static xcb_atom_t interned(const char *name)
     return XCB_ATOM_NONE;
 }
 
+static int created_x, created_y, created_w, created_h, unmapped;
 xcb_void_cookie_t xcb_create_window(xcb_connection_t *c, uint8_t depth, xcb_window_t wid, xcb_window_t parent,
                                     int16_t x, int16_t y, uint16_t width, uint16_t height, uint16_t border_width,
                                     uint16_t _class, xcb_visualid_t visual, uint32_t value_mask,
                                     const void *value_list)
 {
-    (void)c; (void)depth; (void)wid; (void)parent; (void)x; (void)y; (void)width; (void)height;
+    (void)c; (void)depth; (void)wid; (void)parent;
     (void)border_width; (void)_class; (void)visual; (void)value_mask;
     selected_events = ((const uint32_t *)value_list)[1];
+    created_x = x;
+    created_y = y;
+    created_w = width;
+    created_h = height;
+    return (xcb_void_cookie_t){ 0 };
+}
+xcb_void_cookie_t xcb_unmap_window(xcb_connection_t *c, xcb_window_t window)
+{
+    (void)c;
+    CHECK(window == 7);
+    unmapped++;
     return (xcb_void_cookie_t){ 0 };
 }
 xcb_void_cookie_t xcb_change_property(xcb_connection_t *c, uint8_t mode, xcb_window_t window, xcb_atom_t property,
@@ -334,6 +346,208 @@ static void test_fullscreen(void)
     rmp_x11_close(x);
 }
 
+/* One event through rmp_x11_dispatch (the fake queue holds one). */
+static void feed(RmpX11 *x, const void *event, size_t size)
+{
+    pending_event = calloc(1, sizeof(xcb_generic_event_t) > size ? sizeof(xcb_generic_event_t) : size);
+    memcpy(pending_event, event, size);
+    CHECK(rmp_x11_dispatch(x) == 0);
+}
+
+static void button(RmpX11 *x, int press, int detail, int ex, int ey, uint16_t state)
+{
+    xcb_button_press_event_t b;
+    memset(&b, 0, sizeof b);
+    b.response_type = press ? XCB_BUTTON_PRESS : XCB_BUTTON_RELEASE;
+    b.detail = (xcb_button_t)detail;
+    b.event_x = (int16_t)ex;
+    b.event_y = (int16_t)ey;
+    b.state = state;
+    feed(x, &b, sizeof b);
+}
+
+static void motion(RmpX11 *x, int ex, int ey)
+{
+    xcb_motion_notify_event_t m;
+    memset(&m, 0, sizeof m);
+    m.response_type = XCB_MOTION_NOTIFY;
+    m.event_x = (int16_t)ex;
+    m.event_y = (int16_t)ey;
+    m.state = XCB_BUTTON_MASK_1;
+    feed(x, &m, sizeof m);
+}
+
+/* Buttons, held motion and the wheel reach the queue (window pixels); a run
+ * of motion is one event; the window asks for the button events. */
+static void test_pointer(void)
+{
+    reset();
+    RmpX11 *x = rmp_x11_open(1024, 600, 0, 1, 1, NULL);
+    CHECK(x);
+    CHECK(selected_events & XCB_EVENT_MASK_BUTTON_PRESS);
+    CHECK(selected_events & XCB_EVENT_MASK_BUTTON_RELEASE);
+    CHECK(selected_events & XCB_EVENT_MASK_BUTTON_MOTION);
+    CHECK(!rmp_x11_pointer_pending(x));
+    button(x, 1, 1, 10, 20, XCB_MOD_MASK_CONTROL | XCB_MOD_MASK_SHIFT);
+    motion(x, 11, 21);
+    motion(x, 30, 40);
+    button(x, 0, 1, 31, 41, 0);
+    button(x, 1, 5, 5, 5, 0);       /* wheel down */
+    button(x, 0, 5, 5, 5, 0);       /* its release: nothing */
+    button(x, 1, 4, 5, 5, XCB_MOD_MASK_1);   /* wheel up with Alt */
+    button(x, 1, 8, 5, 5, 0);       /* extra button: nothing */
+    rmp_pointer_event e;
+    CHECK(rmp_x11_poll_pointer(x, &e) && e.type == RMP_POINTER_PRESS && e.button == 1 && e.x == 10 && e.y == 20 &&
+          e.mods == (RMP_MOD_CTRL | RMP_MOD_SHIFT));
+    CHECK(rmp_x11_poll_pointer(x, &e) && e.type == RMP_POINTER_MOTION && e.x == 30 && e.y == 40);
+    CHECK(rmp_x11_poll_pointer(x, &e) && e.type == RMP_POINTER_RELEASE && e.button == 1 && e.x == 31 && !e.mods);
+    CHECK(rmp_x11_poll_pointer(x, &e) && e.type == RMP_POINTER_WHEEL && e.wheel == 1);
+    CHECK(rmp_x11_poll_pointer(x, &e) && e.type == RMP_POINTER_WHEEL && e.wheel == -1 && e.mods == RMP_MOD_ALT);
+    CHECK(!rmp_x11_poll_pointer(x, &e) && !rmp_x11_pointer_pending(x));
+    rmp_x11_close(x);
+}
+
+/* The drag and drop's hook (rmp_xdnd.c): it sees every event first, takes
+ * what it returns 1 for, and is called once more with NULL per dispatch;
+ * the server time of input events is kept. */
+static int hook_calls, hook_nulls, hook_take;
+static int test_hook_fn(void *ctx, const void *event)
+{
+    CHECK(ctx == &hook_calls);
+    if (!event) {
+        hook_nulls++;
+        return 0;
+    }
+    hook_calls++;
+    return hook_take;
+}
+static void test_hook(void)
+{
+    reset();
+    RmpX11 *x = rmp_x11_open(1024, 600, 0, 1, 1, NULL);
+    CHECK(x && !rmp_x11_last_time(x) && rmp_x11_window_id(x) == 7 && rmp_x11_root(x) == 1);
+    hook_calls = hook_nulls = 0;
+    hook_take = 0;
+    rmp_x11_set_event_hook(x, test_hook_fn, &hook_calls);
+    xcb_button_press_event_t b;
+    memset(&b, 0, sizeof b);
+    b.response_type = XCB_BUTTON_PRESS;
+    b.detail = 1;
+    b.time = 1234;
+    feed(x, &b, sizeof b);
+    CHECK(hook_calls == 1 && hook_nulls == 1 && rmp_x11_pointer_pending(x) && rmp_x11_last_time(x) == 1234);
+    rmp_pointer_event e;
+    CHECK(rmp_x11_poll_pointer(x, &e) && e.type == RMP_POINTER_PRESS);
+    hook_take = 1;   /* taken: not queued, the time still kept */
+    b.response_type = XCB_BUTTON_RELEASE;
+    b.time = 1300;
+    feed(x, &b, sizeof b);
+    CHECK(hook_calls == 2 && hook_nulls == 2 && !rmp_x11_pointer_pending(x) && rmp_x11_last_time(x) == 1300);
+    rmp_x11_set_event_hook(x, NULL, NULL);
+    b.response_type = XCB_BUTTON_PRESS;
+    feed(x, &b, sizeof b);
+    CHECK(hook_calls == 2 && hook_nulls == 2 && rmp_x11_pointer_pending(x));
+    rmp_x11_close(x);
+    /* place_apart with no window manager list: placed by the window manager
+     * (no USPosition / PPosition), as without it. */
+    reset();
+    rmp_platform_options o;
+    memset(&o, 0, sizeof o);
+    o.wm_class = "FDTP";
+    o.place_apart = 1;
+    x = rmp_x11_open(1024, 600, 0, 1, 1, &o);
+    int i = prop(XCB_ATOM_WM_NORMAL_HINTS);
+    CHECK(x && i >= 0 && !(((const uint32_t *)props[i].data)[0] & 5));
+    rmp_x11_close(x);
+}
+
+/* The close button: F10 by default (rmp-jukebox), the app's close_key when
+ * given (FDTP: q, since its F10 is Unpack). */
+static void test_close_key(void)
+{
+    for (int pass = 0; pass < 2; pass++) {
+        reset();
+        rmp_platform_options o;
+        memset(&o, 0, sizeof o);
+        o.close_key = pass ? 16 : 0;
+        RmpX11 *x = rmp_x11_open(1024, 600, 0, 1, 1, &o);
+        CHECK(x);
+        xcb_client_message_event_t m;
+        memset(&m, 0, sizeof m);
+        m.response_type = XCB_CLIENT_MESSAGE;
+        m.format = 32;
+        m.type = interned("WM_PROTOCOLS");
+        m.data.data32[0] = interned("WM_DELETE_WINDOW");
+        feed(x, &m, sizeof m);
+        rmp_key_event k;
+        const int want = pass ? 16 : KEY_F10;
+        CHECK(rmp_x11_poll_key(x, &k) && k.code == want && k.value == 1);
+        CHECK(rmp_x11_poll_key(x, &k) && k.code == want && k.value == 0);
+        CHECK(!rmp_x11_poll_key(x, &k));
+        rmp_x11_close(x);
+    }
+}
+
+/* Several windows (rmp_window_open): close_key < 0 sets a flag instead of
+ * queuing a key; window_w x window_h is the first size with the display's
+ * aspect kept; positioned puts the frame at x, y (USPosition | PPosition);
+ * hide unmaps and sends the ICCCM synthetic UnmapNotify to the root. */
+static void test_more_windows(void)
+{
+    reset();
+    rmp_platform_options o;
+    memset(&o, 0, sizeof o);
+    o.close_key = -1;
+    o.window_w = 896;
+    o.window_h = 504;
+    o.positioned = 1;
+    o.x = 1030;
+    o.y = 240;
+    o.map_unfocused = 1;
+    RmpX11 *x = rmp_x11_open(1024, 576, 0, 1, 0, &o);
+    CHECK(x);
+    CHECK(created_x == 1030 && created_y == 240 && created_w == 896 && created_h == 504);
+    int w, h;
+    rmp_x11_size(x, &w, &h);
+    CHECK(w == 896 && h == 504);
+    int i = prop(XCB_ATOM_WM_NORMAL_HINTS);
+    CHECK(i >= 0 && props[i].len == 18);
+    if (i >= 0) {
+        const uint32_t *hints = (const uint32_t *)(const void *)props[i].data;
+        CHECK((hints[0] & (1 | 4 | 16 | 128)) == (1 | 4 | 16 | 128));
+        CHECK(hints[1] == 1030 && hints[2] == 240);
+        CHECK(hints[11] == 1024 && hints[12] == 576 && hints[13] == 1024 && hints[14] == 576);
+    }
+    i = prop(interned("_NET_WM_USER_TIME"));
+    CHECK(i >= 0 && props[i].format == 32 && props[i].len == 1 && ((const uint32_t *)(const void *)props[i].data)[0] == 0);
+    xcb_client_message_event_t m;
+    memset(&m, 0, sizeof m);
+    m.response_type = XCB_CLIENT_MESSAGE;
+    m.format = 32;
+    m.type = interned("WM_PROTOCOLS");
+    m.data.data32[0] = interned("WM_DELETE_WINDOW");
+    feed(x, &m, sizeof m);
+    rmp_key_event k;
+    CHECK(!rmp_x11_poll_key(x, &k));
+    CHECK(rmp_x11_close_pending(x));
+    CHECK(rmp_x11_take_close(x) == 1);
+    CHECK(rmp_x11_take_close(x) == 0 && !rmp_x11_close_pending(x));
+    int before = unmapped;
+    rmp_x11_hide(x);
+    CHECK(unmapped == before + 1);
+    CHECK(sent.response_type == XCB_UNMAP_NOTIFY);
+    rmp_x11_close(x);
+    /* Not positioned, no window size: as before (the display's size). */
+    reset();
+    memset(&o, 0, sizeof o);
+    x = rmp_x11_open(1024, 600, 0, 1, 0, &o);
+    CHECK(x && created_x == 0 && created_y == 0 && created_w == 1024 && created_h == 600);
+    i = prop(XCB_ATOM_WM_NORMAL_HINTS);
+    CHECK(i >= 0 && (((const uint32_t *)props[i].data)[0] & (1 | 4)) == 0);
+    CHECK(prop(interned("_NET_WM_USER_TIME")) < 0);
+    rmp_x11_close(x);
+}
+
 int main(void)
 {
     test_default_null();
@@ -341,7 +555,11 @@ int main(void)
     test_fdtp();
     test_class_only();
     test_fullscreen();
+    test_pointer();
+    test_close_key();
+    test_more_windows();
+    test_hook();
     reset();
-    printf("PASS test_x11: default rmp-jukebox name and no icon; title, WM_CLASS, _NET_WM_NAME, _NET_WM_ICON when given; fullscreen ADD/REMOVE, shortcuts, WM property updates\n");
+    printf("PASS test_x11: default rmp-jukebox name and no icon; title, WM_CLASS, _NET_WM_NAME, _NET_WM_ICON when given; fullscreen ADD/REMOVE, shortcuts, WM property updates; pointer buttons, held motion (one per run) and the wheel; the event hook; close flag, first size, position and hide for more windows\n");
     return 0;
 }
