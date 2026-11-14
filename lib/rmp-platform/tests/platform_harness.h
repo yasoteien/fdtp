@@ -30,6 +30,8 @@ unsigned h_sequence(double t);       /* vblank sequence of a flip time */
 void h_key(int code, int value);
 extern int h_keyboard;               /* connected */
 void h_clear_quit(void);
+/* Window pixels to display pixels, as the pointer's (rmp_platform.c). */
+void h_window_to_display(int window, int *x, int *y);
 
 enum { X_RESTORE = 1, X_CLOSE, X_PRESENT };
 

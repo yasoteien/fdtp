@@ -25,7 +25,8 @@
 # statically (giflib and libwebp are, in a build against a sysroot made
 # without -d).
 #
-# Installs: /usr/bin/fdtp; /usr/share/applications/fdtp.desktop;
+# Installs: /usr/bin/fdtp (and fdtp-localsend; fdtp-dict in the armhf .deb
+# when built, see below); /usr/share/applications/fdtp.desktop;
 # /usr/share/icons/hicolor/NxN/apps/fdtp.png; /usr/share/doc/fdtp/ (README,
 # NOTICE, copyright with the AGPL text, changelog.Debian.gz, the manual's
 # PDFs when there are any); /usr/share/fdtp/pomera/ (the Pomera scripts) and
@@ -91,6 +92,18 @@ fi
 LOCALSEND_BINARY=$(dirname "$BINARY")/fdtp-localsend
 BINARIES=("$BINARY")
 [ ! -f "$LOCALSEND_BINARY" ] || BINARIES+=("$LOCALSEND_BINARY")
+# fdtp-dict (revision 1 §16): the reader of the Pomera DM250's stock
+# dictionaries, a program of its own beside fdtp, binary only and not under
+# the AGPL. Built only where its source is (not in the public tree).
+# Packaged in the armhf .deb only, and only when it needs nothing but libc:
+# it must never link FDTP or FDTP's libraries (MuPDF is AGPL).
+DICT_BINARY=$(dirname "$BINARY")/fdtp-dict
+[ "$ARCH" = armhf ] && [ -f "$DICT_BINARY" ] || DICT_BINARY=
+if [ -n "$DICT_BINARY" ]; then
+	dict_needed=$(LC_ALL=C "$TRIPLET-readelf" -d "$DICT_BINARY" | sed -n 's/.*(NEEDED).*\[\(.*\)\]/\1/p' | sort -u | tr '\n' ' ')
+	[ "$dict_needed" = "libc.so.6 " ] || die "$DICT_BINARY needs $dict_needed(only libc.so.6 is allowed)"
+	BINARIES+=("$DICT_BINARY")
+fi
 NEEDED=
 for elf in "${BINARIES[@]}"; do
 head=$(LC_ALL=C "$TRIPLET-readelf" -h "$elf") || die "$elf is not an ELF file"
@@ -166,6 +179,10 @@ if [ -f "$LOCALSEND_BINARY" ]; then
 	inst 755 "$LOCALSEND_BINARY" /usr/bin/fdtp-localsend
 	"$TRIPLET-strip" --strip-unneeded --remove-section=.comment --remove-section=.note "$STAGE/usr/bin/fdtp-localsend"
 fi
+if [ -n "$DICT_BINARY" ]; then
+	inst 755 "$DICT_BINARY" /usr/bin/fdtp-dict
+	"$TRIPLET-strip" --strip-unneeded --remove-section=.comment --remove-section=.note "$STAGE/usr/bin/fdtp-dict"
+fi
 mkdir -p "$STAGE/usr/share/applications"
 sed 's|^Exec=.*|Exec=/usr/bin/fdtp|' "$ICONS/fdtp.desktop" > "$STAGE/usr/share/applications/fdtp.desktop"
 chmod 644 "$STAGE/usr/share/applications/fdtp.desktop"
@@ -183,8 +200,12 @@ LICENSE=$(first "$APP/public/LICENSE" "$APP/LICENSE")
 [ -n "$LICENSE" ] || die "no LICENSE"
 # The AGPL text as the body of the License paragraph (DEP-5: a space before
 # each line, " ." for an empty one).
-awk -v lic="$LICENSE" '
+# @DICT@: the paragraph of fdtp-dict when it is packaged, else nothing.
+awk -v lic="$LICENSE" -v dict="${DICT_BINARY:+yes}" '
 	$0 == "@AGPL_TEXT@" { while ((getline l < lic) > 0) { sub(/[ \t\r]+$/, "", l); print (l == "" ? " ." : " " l) } next }
+	$0 == "@DICT@" { if (dict == "") { skip = 1; next } next }
+	skip && /^$/ { skip = 0; next }
+	skip { next }
 	{ print }' "$PKGDIR/copyright" > "$STAGE$DOC/copyright"
 gzip -9n -c "$PKGDIR/changelog" > "$STAGE$DOC/changelog.Debian.gz"
 chmod 644 "$STAGE$DOC/copyright" "$STAGE$DOC/changelog.Debian.gz"

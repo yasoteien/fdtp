@@ -10,6 +10,18 @@ Files: *
 Copyright: 2026 yasoteien
 License: AGPL-3.0-or-later
 
+@DICT@
+Files: usr/bin/fdtp-dict
+Copyright: 2026 yasoteien
+License: other
+ fdtp-dict (in the armhf package only) reads the electronic dictionaries
+ stored on a Pomera DM250's own internal memory, for the owner of that
+ Pomera. It is a separate program that fdtp runs and talks to through its
+ output; it is not linked with fdtp or with any library under the AGPL or
+ the GPL (only with the C library). It is distributed as a binary only and
+ is not covered by the AGPL; it may be used and redistributed unchanged as
+ part of this package. No dictionary data is included in this package.
+
 Files: data/fonts/*
 Copyright: Yasuyuki Furukawa <yasu@on.cs.keio.ac.jp>
            2001-2004 /efont/ Project.

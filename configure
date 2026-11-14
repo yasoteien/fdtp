@@ -29,6 +29,7 @@
 #   FDTP_CONFIGURE_OWNKERNEL yes|no: own-kernel directory detection
 #   FDTP_CONFIGURE_ADJTIME  /etc/adjtime (third line LOCAL asks about UTC)
 #   FDTP_CONFIGURE_UID      id -u
+#   FDTP_CONFIGURE_DICT_PROBE  replacement dictionary probe (exit 0: found)
 #   FDTP_CONFIGURE_PROBE    the internal memory probe (a command printing
 #                           vfat or exfat when found)
 #   FDTP_CONFIGURE_PDCHARGE_PROBE  read-only PD charger probe (test command)
@@ -108,6 +109,8 @@ while :; do case $PREFIX in /?*/) PREFIX=${PREFIX%/} ;; *) break ;; esac; done
 # msg_init, pick, say, warn, tty_init, ask_yn and the Pomera questions are
 # shared with pomera_setup.sh (fdtp-pomera-setup of the .deb).
 PQ_AGAIN=make-install
+# The stock dictionaries are read by src/jds.c, kept out of the public tree.
+if [ -f "$SRC/src/jds.c" ]; then PQ_DICT_READER=yes; else PQ_DICT_READER=no; fi
 . "$PDIR/pomera_questions.sh"
 msg_init
 tty_init "$YES"
@@ -236,7 +239,7 @@ else
 	ask_heif
 fi
 
-STABILITY=no INTERNAL=keep PDCHARGE=keep CVE=keep WIFI_PS=keep CLEAN_OLD=keep RTC=keep KERNEL_APT=keep POMERA=no
+STABILITY=no INTERNAL=keep DICT=keep PDCHARGE=keep CVE=keep WIFI_PS=keep CLEAN_OLD=keep RTC=keep KERNEL_APT=keep POMERA=no
 if [ "$UNAME" = Linux ] && [ "$NOPOMERA" = 0 ] && is_dm250 "$DT"; then POMERA=yes; fi
 if [ "$POMERA" = yes ]; then
 	echo
@@ -253,6 +256,7 @@ tmp=$OUT.tmp.$$
 	echo "FDTP_LANGUAGE = $LANG_ANSWER"
 	echo "POMERA_STABILITY = $STABILITY"
 	echo "POMERA_INTERNAL = $INTERNAL"
+	echo "POMERA_DICT = $DICT"
 	echo "POMERA_PDCHARGE = $PDCHARGE"
 	echo "POMERA_CVE = $CVE"
 	echo "POMERA_WIFI_PS = $WIFI_PS"
@@ -280,6 +284,7 @@ if [ "$POMERA" = yes ]; then
 	 no) printf '  %s: %s\n' "$(pick "内蔵文書の利用設定" "internal document access")" "$(pick "起動時の自動利用を解除" "remove automatic access at boot")" ;;
 	 keep) printf '  %s: %s\n' "$(pick "内蔵文書の利用設定" "internal document access")" "$(pick "既存設定を変更しない" "keep existing settings")" ;;
 	esac
+	printf '  %s: %s\n' "$(pick "純正電子辞書（yes=自動利用、no=解除、keep=変更なし）" "stock dictionaries (yes=automatic access, no=remove, keep=unchanged)")" "$DICT"
 	case $PDCHARGE in
 	 yes) printf '  %s: %s\n' "$(pick "PD ハブ充電・充電 LED" "PD hub charging / charge LEDs")" "$(pick "追加の充電制御を有効にする（充電 LED は部品がある場合のみ）" "enable additional charging control (charge LEDs only if the component is available)")" ;;
 	 no) printf '  %s: %s\n' "$(pick "PD ハブ充電・充電 LED" "PD hub charging / charge LEDs")" "$(pick "以前の充電・充電 LED 設定を解除" "remove earlier charging and charge LED settings")" ;;

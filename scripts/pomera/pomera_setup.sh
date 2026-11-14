@@ -6,7 +6,7 @@
 #
 #   sudo fdtp-pomera-setup [--yes]          the questions of ./configure (Wi-Fi
 #                                           stability, the mount mode of the
-#                                           internal memory, PD hub charging,
+#                                           internal memory, stock dictionaries, PD hub charging,
 #                                           CVE-2026-98432 mitigation, installing libheif
 #                                           for HEIC when it is missing), each
 #                                           after what it does and how to undo
@@ -41,6 +41,9 @@ fi
 DT=${FDTP_CONFIGURE_DT:-/proc/device-tree}
 UID_NOW=${FDTP_CONFIGURE_UID:-$(id -u)}
 PQ_AGAIN=now
+# The stock dictionaries are read by fdtp-dict (the armhf .deb); without it
+# FDTP cannot use them, so pomera_questions.sh does not ask.
+if [ -x "${FDTP_DICT_BIN:-/usr/bin/fdtp-dict}" ]; then PQ_DICT_READER=yes; else PQ_DICT_READER=no; fi
 . "$PDIR/pomera_questions.sh"
 
 MODE=setup YES=0
@@ -67,7 +70,7 @@ fi
 
 # What is set now, one line each in SET (empty: nothing).
 status() {
-	SET= STAB_SET= INT_SET= PIO_SET= PD_SET= CVE_SET= KERNEL_APT_SET=
+	SET= DICT_SET= STAB_SET= INT_SET= PIO_SET= PD_SET= CVE_SET= KERNEL_APT_SET=
 	if files=$(sh "$PDIR/pomera_stability.sh" present 2>/dev/null); then
 		STAB_SET=1
 		for file in $files; do
@@ -89,6 +92,11 @@ status() {
 		*) label=$(pick "内蔵文書：自動利用の設定あり（方式を判別できません）" "Internal documents: automatic access configured (mode unknown)") ;;
 		esac
 		SET="$SET$label
+"
+	fi
+	if sh "$PDIR/pomera_mount_dict.sh" persisted >/dev/null 2>&1; then
+		DICT_SET=1
+		SET="$SET$(pick "純正電子辞書：読み取り専用で使う設定（/etc/fstab）" "Stock dictionaries: read-only access configured (/etc/fstab)")
 "
 	fi
 	if sh "$PDIR/pomera_pdcharge.sh" status >/dev/null 2>&1; then
@@ -135,13 +143,14 @@ undo)
 	if [ -z "$SET" ]; then say "このコマンドで解除できる追加設定はありません。時計の読み取り設定は対象外です。" "There are no additional settings this command can remove. Hardware clock interpretation is outside its scope."; exit 0; fi
 	say "今あるもの:" "Set now:"
 	printf '%s' "$SET" | sed 's/^/  /'
-	if [ -n "$STAB_SET$INT_SET$PD_SET$CVE_SET$KERNEL_APT_SET" ]; then
+	if [ -n "$STAB_SET$INT_SET$DICT_SET$PD_SET$CVE_SET$KERNEL_APT_SET" ]; then
 		# Only the lines about what is set (1.15: with only the kernel apt source,
 		# the fstab, pdcharge and CVE lines were shown too).
-		if [ -n "$STAB_SET$INT_SET$PD_SET$CVE_SET" ]; then
+		if [ -n "$STAB_SET$INT_SET$DICT_SET$PD_SET$CVE_SET" ]; then
 			say "一覧にある追加設定だけを解除します。充電プログラムがあれば、すぐ停止します。内蔵文書の現在の利用状態や停止時の自動再起動が設定されている場合、その動作は再起動まで残ります。" \
 				"Only the listed additional settings are removed. If a charging program is configured, it stops immediately. If internal document access or automatic restart on a freeze is configured, that behavior remains until reboot."
 		fi
+		[ -z "$DICT_SET" ] || say "電子辞書の現在のマウントも、切り離すか再起動するまで残ります。" "The current dictionary mount also remains until unmount or reboot."
 		[ -z "$CVE_SET" ] || say "CVE-2026-98432 の対策もすぐ外れます。" "The CVE-2026-98432 mitigation is also removed immediately."
 		[ -z "$KERNEL_APT_SET" ] || say "pomera-kernel（試験版）を apt で入れるための配布元の登録と署名確認用の鍵を外します。カーネルは外しません。" "Remove the apt distribution source registration and signature verification key for pomera-kernel (test release); the kernel stays installed."
 		ask_yn y "一覧のうち、SD の PIO 設定を除く FDTP の追加設定を解除しますか？
@@ -154,6 +163,7 @@ Answer:"
 		if [ "$ANSWER" = yes ]; then
 			[ -z "$STAB_SET" ] || { sh "$PDIR/pomera_stability.sh" remove && reboot=yes; }
 			[ -z "$INT_SET" ] || { sh "$PDIR/pomera_mount_internal.sh" unpersist && reboot=yes; }
+			[ -z "$DICT_SET" ] || { sh "$PDIR/pomera_mount_dict.sh" unpersist && reboot=yes; }
 			[ -z "$PD_SET" ] || sh "$PDIR/pomera_pdcharge.sh" remove
 			[ -z "$KERNEL_APT_SET" ] || sh "$PDIR/pomera_kernel_apt.sh" remove
 			[ -z "$CVE_SET" ] || sh "$PDIR/pomera_cve_2026_98432.sh" remove
@@ -195,13 +205,13 @@ ask_heif
 echo
 # 3 (do not mount) changes something only when an earlier mount is set up.
 if [ "$INTERNAL" = no ] && ! sh "$PDIR/pomera_mount_internal.sh" persisted 2>/dev/null; then INTERNAL=keep; fi
-if [ "$STABILITY" = no ] && [ "$INTERNAL" = keep ] && [ "$PDCHARGE" = keep ] && [ "$CVE" = keep ] && [ "$WIFI_PS" = keep ] && [ "$CLEAN_OLD" != yes ] && [ "$RTC" != yes ] && [ "$KERNEL_APT" != yes ] && [ "$KERNEL_APT" != source ]; then
+if [ "$DICT" = keep ] && [ "$STABILITY" = no ] && [ "$INTERNAL" = keep ] && [ "$PDCHARGE" = keep ] && [ "$CVE" = keep ] && [ "$WIFI_PS" = keep ] && [ "$CLEAN_OLD" != yes ] && [ "$RTC" != yes ] && [ "$KERNEL_APT" != yes ] && [ "$KERNEL_APT" != source ]; then
 	say "Pomera 固有の追加設定は変更しませんでした。" "Pomera-specific additional settings were not changed."
 	exit 0
 fi
 # install_pomera.sh asks before the PIO change only on a terminal.
 if [ "$TTY" = yes ]; then
-	FDTP_QUESTION_HINT_SHOWN=${QUESTION_HINT_SHOWN:-no} POMERA_KERNEL_APT=$KERNEL_APT POMERA_WIFI_PS=$WIFI_PS POMERA_CLEAN_OLD=$CLEAN_OLD POMERA_RTC=$RTC POMERA_STABILITY=$STABILITY POMERA_INTERNAL=$INTERNAL POMERA_PDCHARGE=$PDCHARGE POMERA_CVE=$CVE FDTP_MSG_LANG=$MSG FDTP_CONFIGURE_DT=$DT sh "$PDIR/install_pomera.sh"
+	FDTP_QUESTION_HINT_SHOWN=${QUESTION_HINT_SHOWN:-no} POMERA_KERNEL_APT=$KERNEL_APT POMERA_WIFI_PS=$WIFI_PS POMERA_CLEAN_OLD=$CLEAN_OLD POMERA_RTC=$RTC POMERA_STABILITY=$STABILITY POMERA_DICT=$DICT POMERA_INTERNAL=$INTERNAL POMERA_PDCHARGE=$PDCHARGE POMERA_CVE=$CVE FDTP_MSG_LANG=$MSG FDTP_CONFIGURE_DT=$DT sh "$PDIR/install_pomera.sh"
 else
-	FDTP_QUESTION_HINT_SHOWN=${QUESTION_HINT_SHOWN:-no} POMERA_KERNEL_APT=$KERNEL_APT POMERA_WIFI_PS=$WIFI_PS POMERA_CLEAN_OLD=$CLEAN_OLD POMERA_RTC=$RTC POMERA_STABILITY=$STABILITY POMERA_INTERNAL=$INTERNAL POMERA_PDCHARGE=$PDCHARGE POMERA_CVE=$CVE FDTP_MSG_LANG=$MSG FDTP_CONFIGURE_DT=$DT sh "$PDIR/install_pomera.sh" </dev/null
+	FDTP_QUESTION_HINT_SHOWN=${QUESTION_HINT_SHOWN:-no} POMERA_KERNEL_APT=$KERNEL_APT POMERA_WIFI_PS=$WIFI_PS POMERA_CLEAN_OLD=$CLEAN_OLD POMERA_RTC=$RTC POMERA_STABILITY=$STABILITY POMERA_DICT=$DICT POMERA_INTERNAL=$INTERNAL POMERA_PDCHARGE=$PDCHARGE POMERA_CVE=$CVE FDTP_MSG_LANG=$MSG FDTP_CONFIGURE_DT=$DT sh "$PDIR/install_pomera.sh" </dev/null
 fi

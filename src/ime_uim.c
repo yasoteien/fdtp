@@ -22,6 +22,7 @@ struct Ime {
     Buffer commit, preedit;
     size_t caret, hl_start, hl_end;
     int cand_active, cand_count, cand_index, cand_limit;
+    int cand_page; /* first index of the page whose strings are current */
     char *cand[IME_CANDIDATES_MAX];
     char label[16];
 };
@@ -91,12 +92,35 @@ static void cand_activate_cb(void *ptr, int nr, int display_limit)
         ime->cand_count = i + 1;
     }
     ime->cand_index = -1;
+    ime->cand_page = 0;
     ime->cand_active = ime->cand_count > 0;
+}
+/* uim-mozc gives the strings of the page shown by Mozc only (its candidate
+ * window): asked for another page's index, it answers with the current
+ * page's. So the strings are fetched again whenever the selection moves to
+ * another page (the user's report, 2026-11-14: 25/136 showed page 1). */
+static void fetch_page(Ime *ime, int index)
+{
+    int first = index / ime->cand_limit * ime->cand_limit;
+    if (first == ime->cand_page) return;
+    for (int i = first; i < ime->cand_count && i < first + ime->cand_limit; ++i) {
+        uim_candidate c = uim_get_candidate(ime->uc, i, i % ime->cand_limit);
+        const char *str = c ? uim_candidate_get_cand_str(c) : NULL;
+        char *copy = strdup(str ? str : "");
+        if (c) uim_candidate_free(c);
+        if (!copy) return;
+        free(ime->cand[i]);
+        ime->cand[i] = copy;
+    }
+    ime->cand_page = first;
 }
 static void cand_select_cb(void *ptr, int index)
 {
     Ime *ime = ptr;
-    if (index >= 0 && index < ime->cand_count) ime->cand_index = index;
+    if (index >= 0 && index < ime->cand_count) {
+        ime->cand_index = index;
+        fetch_page(ime, index);
+    }
 }
 static void cand_shift_page_cb(void *ptr, int direction)
 {
@@ -108,6 +132,7 @@ static void cand_shift_page_cb(void *ptr, int direction)
     if (index >= ime->cand_count) index = 0;
     ime->cand_index = index;
     uim_set_candidate_index(ime->uc, index);
+    fetch_page(ime, index);
 }
 static void cand_deactivate_cb(void *ptr)
 {

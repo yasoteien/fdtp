@@ -56,7 +56,7 @@ def base_env(**extra):
     env = {k: v for k, v in os.environ.items()
            if not k.startswith(("LC_", "FDTP_", "POMERA_")) and k not in ("LANG", "LANGUAGE", "TERM", "PKG_CONFIG", "CC",
                                                                           "MAKEFLAGS", "MFLAGS", "MAKELEVEL", "PREFIX", "DESTDIR")}
-    env.update(FDTP_CONFIGURE_OWNKERNEL="no", FDTP_CONFIGURE_ADJTIME="/nonexistent/fdtp-adjtime")
+    env.update(FDTP_CONFIGURE_DICT_PROBE="exit 1", FDTP_CONFIGURE_OWNKERNEL="no", FDTP_CONFIGURE_ADJTIME="/nonexistent/fdtp-adjtime")
     env.update(extra)
     return env
 
@@ -103,7 +103,7 @@ class Machine:
 
     def configure(self, *args, uname="Linux", uid="1000", probe=None, tty=None, stdin="", lang=None, term=None,
                   pc="libdrm gbm egl glesv2 xcb libjpeg libpng libwebp zlib expat",
-                  libs="gif mupdf uim uim-scm", shell="sh", heif="yes", apt=None, brew=None, pdcharge_probe=None, cve_probe="exit 1", ownkernel="no", adjtime=None, wifi_default=None, kernel_root=None):
+                  libs="gif mupdf uim uim-scm", shell="sh", heif="yes", apt=None, brew=None, pdcharge_probe=None, cve_probe="exit 1", ownkernel="no", adjtime=None, wifi_default=None, kernel_root=None, dict_probe="exit 1"):
         if os.path.exists(self.out):
             os.remove(self.out)
         env = base_env(FDTP_CONFIG_MK=self.out, FDTP_CONFIGURE_UNAME=uname, FDTP_CONFIGURE_DT=self.dt,
@@ -112,7 +112,7 @@ class Machine:
                        FDTP_CONFIGURE_ADJTIME=adjtime or os.path.join(self.root, "no-adjtime"),
                        POMERA_WIFI_PS_DEFAULT=wifi_default or "y", PKG_CONFIG=self.pkg_config, CC=self.cc, FAKE_PC=pc, FAKE_LIBS=libs,
                        FDTP_CONFIGURE_PROBE=probe if probe is not None else "echo should-not-run; exit 1",
-                       FDTP_CONFIGURE_CVE_PROBE=cve_probe, FDTP_CONFIGURE_HEIF=heif, FDTP_CONFIGURE_BREW=brew or os.path.join(self.root, "no-brew"),
+                       FDTP_CONFIGURE_DICT_PROBE=dict_probe, FDTP_CONFIGURE_CVE_PROBE=cve_probe, FDTP_CONFIGURE_HEIF=heif, FDTP_CONFIGURE_BREW=brew or os.path.join(self.root, "no-brew"),
                        FDTP_CONFIGURE_APT=apt or "echo apt-should-not-run; false")
         if pdcharge_probe is not None:
             env["FDTP_CONFIGURE_PDCHARGE_PROBE"] = pdcharge_probe
@@ -183,7 +183,7 @@ def test_darwin(m):
     code, text, mk = m.configure("--yes", "--no-pomera", "--prefix=/opt/fdtp/", uname="Darwin")
     check(code == 0, "Darwin --yes failed: " + text)
     check(mk == {"FDTP_CONFIGURED": "yes", "PREFIX": "/opt/fdtp", "FDTP_LANGUAGE": "auto", "POMERA_STABILITY": "no",
-                 "POMERA_INTERNAL": "keep", "POMERA_PDCHARGE": "keep", "POMERA_CVE": "keep", "POMERA_WIFI_PS": "keep",
+                 "POMERA_INTERNAL": "keep", "POMERA_DICT": "keep", "POMERA_PDCHARGE": "keep", "POMERA_CVE": "keep", "POMERA_WIFI_PS": "keep",
                  "POMERA_CLEAN_OLD": "keep", "POMERA_RTC": "keep", "POMERA_KERNEL_APT": "keep", "HAVE_XCB": "no", "HAVE_UIM": "no"}, "Darwin config.mk: %s" % mk)
     check("Wi-Fi" not in text and "pkg-config" not in text, "Darwin asked about the Pomera or pkg-config")
     check("make install is for Linux" in text, "Darwin: no note that make install is for Linux")
@@ -427,7 +427,8 @@ def test_install(m):
     # New answers are forwarded even when they are the only requested action.
     for key, value in (("POMERA_WIFI_PS", "off"), ("POMERA_WIFI_PS", "on"),
                        ("POMERA_CLEAN_OLD", "yes"), ("POMERA_RTC", "yes"),
-                       ("POMERA_KERNEL_APT", "yes"), ("POMERA_KERNEL_APT", "source")):
+                       ("POMERA_KERNEL_APT", "yes"), ("POMERA_KERNEL_APT", "source"),
+                       ("POMERA_DICT", "yes"), ("POMERA_DICT", "no")):
         with open(legacy, "w") as f:
             f.write(key + " = " + value + "\n")
         code, text = run(["make", "-n", "-C", APP, "install", "FDTP_CONFIG_MK=" + legacy,
@@ -1323,6 +1324,12 @@ def test_kernel_apt(m):
     with open(helper_copy, "w") as f:
         f.write(helper_source.replace('gpghome=$(mktemp -d)',
                                      'gpghome=$(mktemp -d "$FDTP_KERNEL_APT_ROOT/../gpg.XXXXXXXX")'))
+    installer_copy = os.path.join(fake, "install_pomera.sh")
+    with open(installer_copy) as f:
+        installer_source = f.read()
+    with open(installer_copy, "w") as f:
+        f.write(installer_source.replace('newf=$(mktemp)',
+                                         'newf=$(mktemp "$FDTP_KERNEL_APT_ROOT/../new.XXXXXXXX")'))
     log = os.path.join(fake, "calls")
     root = os.path.join(fake, "root")
     os.makedirs(root)
@@ -1611,6 +1618,87 @@ def test_review2_wording(m):
                   and not re.search(r"own kernel|自前|作者|FDTP_CONFIGURE_", text, re.I), "public " + kind + ": " + text)
     m.device()
 
+def test_dict(m):
+    print("== stock dictionary questions, setup status/undo and install forwarding")
+    for shell in SHELLS:
+        for lang, question in (("ja", "純正の電子辞書を FDTP で使えるようにしますか？"),
+                               ("en", "Make the stock electronic dictionaries available to FDTP?")):
+            m.device(POMERA_DT)
+            code, text, mk = m.configure("--yes", uid="0", shell=shell, lang=lang,
+                                         dict_probe="exit 0")
+            check(code == 0 and mk.get("POMERA_DICT") == "yes" and question in text
+                  and text.index("fstab.bak-dict") < text.index(question)
+                  and "unpersist" in text and "umount" in text, "dictionary default/intro: " + text)
+            code, text, mk = m.configure("--lang=" + lang, uid="0", tty="yes", stdin="n\nn\n", shell=shell,
+                                         lang=lang, dict_probe="exit 0")
+            check(code == 0 and mk.get("POMERA_DICT") == "no", "dictionary no: " + text)
+            for opts in ({"uid": "1000"}, {"uid": "0", "dict_probe": "exit 1"},
+                         {"uid": "0", "uname": "Darwin", "dict_probe": "exit 0"}):
+                code, text, mk = m.configure("--yes", shell=shell, lang=lang, **opts)
+                check(code == 0 and mk.get("POMERA_DICT") == "keep" and question not in text,
+                      "dictionary skipped: " + text)
+            m.device(b"ordinary,pc\0")
+            code, text, mk = m.configure("--yes", uid="0", shell=shell, dict_probe="exit 0")
+            check(code == 0 and mk.get("POMERA_DICT") == "keep" and question not in text,
+                  "dictionary non-DM250: " + text)
+    fake = os.path.join(m.root, "dict-setup")
+    os.makedirs(fake)
+    shutil.copy(os.path.join(POMERA, "pomera_questions.sh"), fake)
+    log = os.path.join(fake, "calls")
+    helpers = {
+        "pomera_mount_dict.sh": 'case "$1" in probe) exit 0 ;; persisted) [ "$FAKE_DICT_SET" = yes ] ;; *) echo "$1" >> "$DICT_LOG" ;; esac\n',
+        "install_pomera.sh": 'echo "DICT=$POMERA_DICT" >> "$DICT_LOG"\n',
+        "pomera_dma_pio.sh": 'case "$1" in state) echo original ;; backup-dir) echo /fake ;; *) exit 1 ;; esac\n',
+    }
+    for name in ("pomera_stability.sh", "pomera_mount_internal.sh", "pomera_pdcharge.sh",
+                 "pomera_cve_2026_98432.sh", "pomera_kernel_apt.sh"):
+        helpers[name] = 'exit 1\n'
+    for name, body in helpers.items():
+        with open(os.path.join(fake, name), "w") as f:
+            f.write("#!/bin/sh\n" + body)
+    m.device(POMERA_DT)
+    env = base_env(FDTP_POMERA_DIR=fake, FDTP_CONFIGURE_DT=m.dt, FDTP_CONFIGURE_UID="0",
+                   FDTP_CONFIGURE_HEIF="yes", FDTP_CONFIGURE_OWNKERNEL="yes",
+                   FDTP_CONFIGURE_DICT_PROBE="exit 0", FDTP_CONFIGURE_PROBE="exit 1",
+                   FDTP_CONFIGURE_TTY="no", FAKE_DICT_SET="yes", DICT_LOG=log, FDTP_MSG_LANG="en")
+    setup = os.path.join(POMERA, "pomera_setup.sh")
+    for shell in SHELLS:
+        code, text = run([shell, setup, "--status"], env=env)
+        check(code == 0 and "Stock dictionaries: read-only access configured" in text, "dictionary status: " + text)
+        open(log, "w").close()
+        code, text = run([shell, setup, "--undo", "--yes"], env=env)
+        check(code == 0 and open(log).read() == "unpersist\n", "dictionary undo: " + text)
+        open(log, "w").close()
+        code, text = run([shell, setup, "--yes"], env=env)
+        check(code == 0 and open(log).read() == "DICT=yes\n", "dictionary setup forwarding: " + text)
+    # Real installer, harmless helpers and fake id: only the dictionary action.
+    shutil.copy(os.path.join(POMERA, "install_pomera.sh"), os.path.join(fake, "install_pomera.sh"))
+    bindir = os.path.join(fake, "bin")
+    os.makedirs(bindir)
+    with open(os.path.join(bindir, "id"), "w") as f:
+        f.write("#!/bin/sh\necho 0\n")
+    os.chmod(os.path.join(bindir, "id"), 0o755)
+    env.update(PATH=bindir + os.pathsep + env["PATH"])
+    for shell in SHELLS:
+        for answer, want in (("yes", "persist\n"), ("no", "unpersist\n"), ("keep", "")):
+            open(log, "w").close()
+            code, text = run([shell, os.path.join(fake, "install_pomera.sh")], env=dict(env, POMERA_DICT=answer))
+            check(code == 0 and open(log).read() == want, "dictionary installer " + answer + ": " + text)
+    # fdtp never links the gate or the reader (they are in fdtp-dict, a
+    # program of its own); fdtp-dict is built on Linux only, and only where
+    # its private source src/jds.c is.
+    private = os.path.exists(os.path.join(APP, "src", "jds.c"))
+    for uname in ("Linux", "Darwin"):
+        code, text = run(["make", "-pn", "UNAME=" + uname], env=base_env())
+        common = re.search(r"^COMMON = (.*)$", text, re.M)
+        names = common.group(1).split() if common else []
+        check(common and "dict_ui" in names and not {"dict_gate", "jds", "jds_main"} & set(names),
+              "dictionary objects of fdtp " + uname)
+        check(bool(re.search(r"^DICT_EXE :?= .*fdtp-dict$", text, re.M)) == (uname == "Linux" and private),
+              "fdtp-dict built " + uname)
+    m.device()
+
+
 def test_private(tmp):
     """The checks of tools/make_public.sh on these files (when it is there:
     it is not in the public copy)."""
@@ -1651,7 +1739,7 @@ def main():
                            (test_pdcharge_setup, (m,)), (test_pdcharge_safety, (m,)), (test_pdcharge_loop, (m,)),
                            (test_cve_questions, (m,)), (test_cve_setup, (m,)), (test_cve_kernel, (m,)),
                            (test_cve_rules, (m,)), (test_own_kernel, (m,)), (test_own_setup_install, (m,)),
-                           (test_kernel_apt, (m,)), (test_wording_regressions, (m,)), (test_review2_wording, (m,)), (test_own_safety, (m,)), (test_stability_parts, (m,)), (test_private, (tmp,))):
+                           (test_kernel_apt, (m,)), (test_wording_regressions, (m,)), (test_review2_wording, (m,)), (test_own_safety, (m,)), (test_stability_parts, (m,)), (test_dict, (m,)), (test_private, (tmp,))):
             try:
                 test(*args)
             except Exception as e:  # a broken step is a failure, the others still run

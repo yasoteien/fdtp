@@ -59,6 +59,11 @@ int rmp_x11_close_pending(const RmpX11 *x);
 /* Connects to $DISPLAY just to read the screen's size and the work area
  * (x, y, w, h; the whole screen without _NET_WORKAREA). 0, or -1 (no X). */
 int rmp_x11_probe(int *screen_w, int *screen_h, int work[4]);
+/* Keep the window at w:h from now on (not resizable windows): the
+ * WM_NORMAL_HINTS aspect and least size (half of w x h) are set again, and
+ * the window asks for that w:h at its present height (its width changes;
+ * not when full screen). Same w and h as now: nothing. */
+void rmp_x11_set_aspect(RmpX11 *x, int w, int h);
 /* Cached requested / WM-reported state. Set uses EWMH ADD / REMOVE. */
 int rmp_x11_is_fullscreen(const RmpX11 *x);
 void rmp_x11_set_fullscreen(RmpX11 *x, int fullscreen);

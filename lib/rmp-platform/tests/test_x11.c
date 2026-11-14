@@ -178,10 +178,16 @@ xcb_void_cookie_t xcb_map_window(xcb_connection_t *c, xcb_window_t window)
     (void)c; (void)window;
     return (xcb_void_cookie_t){ 0 };
 }
+static int configured, configured_w, configured_h;   /* size requests */
 xcb_void_cookie_t xcb_configure_window(xcb_connection_t *c, xcb_window_t window, uint16_t value_mask,
                                        const void *value_list)
 {
-    (void)c; (void)window; (void)value_mask; (void)value_list;
+    (void)c; (void)window;
+    if (value_mask == (XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT)) {
+        configured++;
+        configured_w = (int)((const uint32_t *)value_list)[0];
+        configured_h = (int)((const uint32_t *)value_list)[1];
+    }
     return (xcb_void_cookie_t){ 0 };
 }
 
@@ -548,6 +554,84 @@ static void test_more_windows(void)
     rmp_x11_close(x);
 }
 
+static const uint32_t *normal_hints(void)
+{
+    int i = prop(XCB_ATOM_WM_NORMAL_HINTS);
+    CHECK(i >= 0 && props[i].len == 18);
+    return (const uint32_t *)(const void *)props[i].data;
+}
+static void configure_notify(RmpX11 *x, int w, int h)
+{
+    xcb_configure_notify_event_t e;
+    memset(&e, 0, sizeof e);
+    e.response_type = XCB_CONFIGURE_NOTIFY;
+    e.window = 7;
+    e.width = (uint16_t)w;
+    e.height = (uint16_t)h;
+    feed(x, &e, sizeof e);
+}
+
+/* rmp_x11_set_aspect (rmp_set_display_crop: the WRD / SRY / RMP window shows
+ * only its picture): the aspect and least size hints follow, the position
+ * hints stay, the window asks for the new w:h at its height (narrower and
+ * wider), the screen's width bounds it, and keep_aspect then holds it there.
+ * Full screen and resizable windows keep their size. */
+static void test_set_aspect(void)
+{
+    reset();
+    rmp_platform_options o;
+    memset(&o, 0, sizeof o);
+    o.close_key = -1;
+    o.window_w = 512;
+    o.window_h = 300;
+    o.positioned = 1;
+    o.x = 40;
+    o.y = 50;
+    RmpX11 *x = rmp_x11_open(1024, 600, 0, 1, 0, &o);   /* the fake screen is 1024 x 600 */
+    CHECK(x);
+    configured = 0;
+    rmp_x11_set_aspect(x, 1024, 600);                      /* the same: nothing */
+    CHECK(configured == 0);
+    rmp_x11_set_aspect(x, 800, 600);                       /* SRY: 400 x 300 */
+    const uint32_t *h = normal_hints();
+    CHECK((h[0] & (1 | 4 | 16 | 128)) == (1 | 4 | 16 | 128) && h[1] == 40 && h[2] == 50);
+    CHECK(h[5] == 400 && h[6] == 300 && h[11] == 800 && h[12] == 600 && h[13] == 800 && h[14] == 600);
+    CHECK(configured == 1 && configured_w == 400 && configured_h == 300);
+    configure_notify(x, 400, 300);                         /* the window manager did it: no more asks */
+    CHECK(configured == 1);
+    rmp_x11_set_aspect(x, 960, 600);                       /* WRD: wider at the same height */
+    h = normal_hints();
+    CHECK(h[5] == 480 && h[6] == 300 && h[11] == 960 && h[12] == 600);
+    CHECK(configured == 2 && configured_w == 480 && configured_h == 300);
+    configure_notify(x, 480, 300);
+    CHECK(configured == 2);
+    configure_notify(x, 700, 500);                         /* a user resize: kept at 960:600 */
+    CHECK(configured == 3 && configured_w == 700 && configured_h == 437);
+    configure_notify(x, 700, 437);
+    rmp_x11_set_aspect(x, 1600, 600);                      /* wider than the screen: its width */
+    CHECK(configured == 4 && configured_w == 1024 && configured_h == 384);
+    rmp_x11_set_aspect(x, 3000, 600);                      /* never below the least size */
+    CHECK(configured == 5 && configured_w == 1500 && configured_h == 300);
+    rmp_x11_close(x);
+    /* Full screen: hints change, the size does not. */
+    reset();
+    x = rmp_x11_open(1024, 600, 1, 1, 0, NULL);
+    CHECK(x);
+    configured = 0;
+    rmp_x11_set_aspect(x, 800, 600);
+    CHECK(configured == 0 && normal_hints()[11] == 800);
+    rmp_x11_close(x);
+    /* Resizable (FDTP): no aspect hint is added, the size stays. */
+    reset();
+    x = rmp_x11_open(1024, 600, 0, 1, 1, NULL);
+    CHECK(x);
+    configured = 0;
+    rmp_x11_set_aspect(x, 800, 600);
+    h = normal_hints();
+    CHECK(!(h[0] & 128) && h[11] == 0 && configured == 0);
+    rmp_x11_close(x);
+}
+
 int main(void)
 {
     test_default_null();
@@ -559,7 +643,8 @@ int main(void)
     test_close_key();
     test_more_windows();
     test_hook();
+    test_set_aspect();
     reset();
-    printf("PASS test_x11: default rmp-jukebox name and no icon; title, WM_CLASS, _NET_WM_NAME, _NET_WM_ICON when given; fullscreen ADD/REMOVE, shortcuts, WM property updates; pointer buttons, held motion (one per run) and the wheel; the event hook; close flag, first size, position and hide for more windows\n");
+    printf("PASS test_x11: default rmp-jukebox name and no icon; title, WM_CLASS, _NET_WM_NAME, _NET_WM_ICON when given; fullscreen ADD/REMOVE, shortcuts, WM property updates; pointer buttons, held motion (one per run) and the wheel; the event hook; close flag, first size, position and hide for more windows; set_aspect (hints, size at the same height, screen bound, full screen, resizable)\n");
     return 0;
 }

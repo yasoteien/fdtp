@@ -38,6 +38,7 @@ struct RmpX11 {
     int fullscreen;                 /* last request, reconciled with WM state */
     int aspect_w, aspect_h;          /* the size the window is kept at (w:h) */
     int asked_w, asked_h;            /* the last size asked for (no loop) */
+    uint32_t hints[18];              /* WM_NORMAL_HINTS as set (rmp_x11_set_aspect) */
     unsigned char down[KEYCODES];
     unsigned char eaten[KEYCODES];   /* pressed as full screen: release not queued */
     rmp_key_event queue[QUEUE];
@@ -308,6 +309,7 @@ RmpX11 *rmp_x11_open(int w, int h, int fullscreen, int quiet, int resizable, con
     }
     xcb_change_property(c, XCB_PROP_MODE_REPLACE, x->window, XCB_ATOM_WM_NORMAL_HINTS, XCB_ATOM_WM_SIZE_HINTS, 32,
                         18, hints);
+    memcpy(x->hints, hints, sizeof hints);
     if (fullscreen)
         xcb_change_property(c, XCB_PROP_MODE_REPLACE, x->window, x->net_state, XCB_ATOM_ATOM, 32, 1,
                             &x->net_fullscreen);
@@ -382,6 +384,41 @@ static void keep_aspect(RmpX11 *x)
     x->asked_h = h;
     const uint32_t size[2] = { (uint32_t)w, (uint32_t)h };
     xcb_configure_window(x->c, x->window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, size);
+    xcb_flush(x->c);
+}
+
+void rmp_x11_set_aspect(RmpX11 *x, int w, int h)
+{
+    if (w < 1 || h < 1 || (w == x->aspect_w && h == x->aspect_h)) return;
+    x->aspect_w = w;
+    x->aspect_h = h;
+    if (!(x->hints[0] & 128)) return;   /* resizable: no aspect hint */
+    x->hints[5] = (uint32_t)w / 2;
+    x->hints[6] = (uint32_t)h / 2;
+    x->hints[11] = x->hints[13] = (uint32_t)w;
+    x->hints[12] = x->hints[14] = (uint32_t)h;
+    xcb_change_property(x->c, XCB_PROP_MODE_REPLACE, x->window, XCB_ATOM_WM_NORMAL_HINTS, XCB_ATOM_WM_SIZE_HINTS, 32,
+                        18, x->hints);
+    /* The new w:h at the same height (narrower or wider), within the screen.
+     * Full screen keeps its size: bars are expected there. */
+    const int sw = x->screen->width_in_pixels, sh = x->screen->height_in_pixels;
+    if (!x->fullscreen && !(x->w == sw && x->h == sh)) {
+        int nh = x->h, nw = (int)(((long)x->h * w + h / 2) / h);
+        if (nw > sw) {
+            nw = sw;
+            nh = (int)(((long)sw * h + w / 2) / w);
+        }
+        if (nw < w / 2 || nh < h / 2) {   /* not below the least size just set */
+            nw = w / 2;
+            nh = h / 2;
+        }
+        if (nw != x->w || nh != x->h) {
+            x->asked_w = nw;
+            x->asked_h = nh;
+            const uint32_t size[2] = { (uint32_t)nw, (uint32_t)nh };
+            xcb_configure_window(x->c, x->window, XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT, size);
+        }
+    }
     xcb_flush(x->c);
 }
 

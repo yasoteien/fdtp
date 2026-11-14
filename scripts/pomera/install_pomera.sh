@@ -8,6 +8,10 @@
 #   POMERA_INTERNAL=no      pomera_mount_internal.sh unpersist (a mount set up
 #                           by an earlier install is removed)
 #   POMERA_INTERNAL=keep    nothing (the question was skipped)
+#   POMERA_DICT=yes|no|keep  persist / unpersist / leave dictionaries unchanged
+#                            (yes also puts the ATOK proper nouns into the
+#                            sudo user's Mozc, no takes them out; FDTP_DICT_BIN
+#                            names fdtp-dict when it is not in /usr/bin)
 #   POMERA_PDCHARGE=yes|no|keep  install / remove / leave pdcharge unchanged
 #   POMERA_CVE=yes|no|keep  install / remove / leave the CVE mitigation unchanged
 #   POMERA_WIFI_PS=off|on|keep  install-ps / remove-ps / leave unchanged
@@ -37,6 +41,7 @@ RTC=${POMERA_RTC:-keep}
 KERNEL_APT=${POMERA_KERNEL_APT:-keep}
 PDCHARGE=${POMERA_PDCHARGE:-keep}
 CVE=${POMERA_CVE:-keep}
+DICT=${POMERA_DICT:-keep}
 INTERNAL=${POMERA_INTERNAL:-}
 if [ -z "$INTERNAL" ]; then
 	if [ "${POMERA_INTERNAL_RO:-no}" = yes ]; then INTERNAL=ro; else INTERNAL=keep; fi
@@ -46,7 +51,7 @@ msg_lang=${FDTP_MSG_LANG:-${LC_ALL:-${LC_MESSAGES:-${LANG:-}}}}
 case $msg_lang in auto) msg_lang=${LC_ALL:-${LC_MESSAGES:-${LANG:-}}} ;; esac
 say() { case $msg_lang in ja*) printf '%s\n' "$1" ;; *) printf '%s\n' "$2" ;; esac; }
 
-[ "$KERNEL_APT" = yes ] || [ "$KERNEL_APT" = source ] || [ "$WIFI_PS" = off ] || [ "$WIFI_PS" = on ] || [ "$CLEAN_OLD" = yes ] || [ "$RTC" = yes ] || [ "$STABILITY" = yes ] || [ "$INTERNAL" = ro ] || [ "$INTERNAL" = rw ] || [ "$INTERNAL" = no ] || [ "$PDCHARGE" = yes ] || [ "$PDCHARGE" = no ] || [ "$CVE" = yes ] || [ "$CVE" = no ] || exit 0
+[ "$DICT" = yes ] || [ "$DICT" = no ] || [ "$KERNEL_APT" = yes ] || [ "$KERNEL_APT" = source ] || [ "$WIFI_PS" = off ] || [ "$WIFI_PS" = on ] || [ "$CLEAN_OLD" = yes ] || [ "$RTC" = yes ] || [ "$STABILITY" = yes ] || [ "$INTERNAL" = ro ] || [ "$INTERNAL" = rw ] || [ "$INTERNAL" = no ] || [ "$PDCHARGE" = yes ] || [ "$PDCHARGE" = no ] || [ "$CVE" = yes ] || [ "$CVE" = no ] || exit 0
 model=$(cat "$DT/compatible" "$DT/model" 2>/dev/null | tr '\0' ' ' || true)
 case $(printf '%s' "$model" | tr 'A-Z' 'a-z') in
 *dm250*) ;;
@@ -131,6 +136,26 @@ no)
 		sh "$DIR/pomera_mount_internal.sh" unpersist || true
 	fi
 	;;
+esac
+# The ATOK proper nouns in the user's Mozc (pomera_atok_mozc.py), as that
+# user (sudo's SUDO_USER; nothing for root itself): added with the
+# dictionaries' mount, taken out with it.
+atok_mozc() {
+	u=${SUDO_USER:-}
+	[ -n "$u" ] && [ "$u" != root ] && command -v python3 >/dev/null && command -v runuser >/dev/null || return 0
+	h=$(getent passwd "$u" | cut -d: -f6)
+	[ -n "$h" ] || return 0
+	runuser -u "$u" -- env -u XDG_CONFIG_HOME HOME="$h" FDTP_MSG_LANG="$msg_lang" ${FDTP_DICT_BIN:+FDTP_DICT_BIN="$FDTP_DICT_BIN"} \
+		python3 "$DIR/pomera_atok_mozc.py" "$1"
+}
+case $DICT in
+ yes)
+	if sh "$DIR/pomera_mount_dict.sh" persist; then
+		say "== ATOK の固有名詞を日本語入力（Mozc）へ ==" "== ATOK proper nouns into the input method (Mozc) =="
+		atok_mozc install || say "ATOK の固有名詞は入れませんでした（上の理由）。" "The ATOK proper nouns were not added (see above)."
+	else say "辞書のマウントは設定しませんでした（上の理由）。" "The dictionary mount was not set up (see above)."
+	fi ;;
+ no) sh "$DIR/pomera_mount_dict.sh" unpersist; atok_mozc remove || true ;;
 esac
 case $PDCHARGE in
  yes) sh "$DIR/pomera_pdcharge.sh" install || say "追加充電プログラムの設定は行いませんでした（上の理由）。" "The additional charging program was not set up (see above)." ;;

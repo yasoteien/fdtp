@@ -10,6 +10,10 @@ typedef struct { uint32_t code; unsigned char width; uint16_t rows[16]; } Font24
 /* Rows use bit (width-1-x) for the left-to-right pixel x. */
 const Font24Glyph *font24_lookup(uint32_t code);
 int font24_width(uint32_t code);
+/* The glyph drawn for base followed by the combining mark (U+0300 grave,
+ * U+0301 acute; the dictionaries' stressed vowels, revision 1 §16), or 0
+ * when there is none. */
+uint32_t font24_compose(uint32_t base, uint32_t mark);
 /* Decode one UTF-8 character, advancing *text; invalid input becomes '?'. */
 uint32_t font24_decode(const char **text);
 #endif

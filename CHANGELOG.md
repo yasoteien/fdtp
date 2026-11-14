@@ -4,6 +4,20 @@ All notable changes to FDTP are recorded in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions have two decimal places (0.01, 0.02, ... 1.00); they do not follow Semantic Versioning.
 
+## [1.18] - 2026-11-14
+
+### Added
+
+- Pomera DM250: the stock electronic dictionaries (Kadokawa thesaurus, Meikyo Japanese, Genius English-Japanese and Japanese-English) in the novel editor. Ctrl+j looks up the selection or the word at the cursor, F3 a typed word; the result is a floating box with the four books (← → or Tab), the entries of the word (Shift+← →), pronunciations and the thesaurus's classes. The books are read from the Pomera's own internal memory, mounted read-only, by `fdtp-dict`, which comes with the armhf .deb only (binary only, not under the AGPL; it works only on a Pomera that has the dictionaries). `fdtp-pomera-setup` asks whether to mount them.
+- The proper nouns of ATOK's sports, anime and entertainment dictionaries go into the user's Mozc user dictionary (`scripts/pomera/pomera_atok_mozc.py`; the personal names dictionary is added switched off). The user's own Mozc dictionaries are kept.
+- Novel editor: the first save after opening a file keeps the previous file in `~/.fdtp/backup/` (3 versions).
+- The user manual: 2.4, 6.6, 6.7, 10.9 and 10.10.
+
+### Fixed
+
+- Japanese input: on the second and later pages, the candidate list showed the first page's words.
+- Shift_JIS text: ～ ∥ － ￠ ￡ ￢ ― (as Windows reads them) were shown as 〓.
+
 ## [1.12] - 2026-10-29
 
 ### Added

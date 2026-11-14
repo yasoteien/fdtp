@@ -44,6 +44,7 @@ typedef struct {
     rmp_rect dst;
     int sharp;
     int display_w, display_h;
+    rmp_rect crop;
 } gfx_output;
 
 static struct {
@@ -64,6 +65,7 @@ static struct {
     int out_w, out_h;
     rmp_rect dst;
     int sharp;                    /* rmp_gfx_set_display: nearest at whole scales */
+    rmp_rect crop;                /* rmp_gfx_set_crop: the part shown (w 0: all) */
     gfx_output outputs[RMP_GFX_OUTPUTS];   /* the windows not selected */
     int output;                   /* the selected one */
     int need_clear;
@@ -517,15 +519,22 @@ void rmp_gfx_clip(const rmp_rect *r)
 
 static void paste_texture(int tw, int th, rmp_rect src, float x0, float y0, float x1, float y1);
 
+/* The part of the display that is shown: the crop, or all of it. */
+static rmp_rect shown_part(void)
+{
+    return G.crop.w > 0 ? G.crop : (rmp_rect){ 0, 0, G.display_w, G.display_h };
+}
+
 /* Scaled output: the whole surface each frame, black bars around the
- * display texture. The next rmp_gfx_clip binds the display again. */
+ * display texture (or its cropped part). The next rmp_gfx_clip binds the
+ * display again. */
 static void present_scaled(void)
 {
     target(0, G.out_w, G.out_h);
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
     pipeline(TEXTURE, G.screen_tex, BLEND_OFF);
-    paste_texture(G.display_w, G.display_h, (rmp_rect){ 0, 0, G.display_w, G.display_h },
+    paste_texture(G.display_w, G.display_h, shown_part(),
                   (float)G.dst.x, (float)G.dst.y, (float)(G.dst.x + G.dst.w), (float)(G.dst.y + G.dst.h));
     flush();
 }
@@ -558,14 +567,21 @@ rmp_rect rmp_gfx_display_rect(void)
 int rmp_gfx_set_output(int out_w, int out_h)
 {
     if (!G.ready || out_w <= 0 || out_h <= 0) return -1;
-    if (out_w == G.display_w && out_h == G.display_h) {
+    if (out_w == G.display_w && out_h == G.display_h && G.crop.w <= 0) {
         if (G.screen_fbo) drop_screen();
         return 0;
     }
     /* One scale for both axes (aspect kept), centred: bars left/right on a
-     * wider surface, top/bottom on a taller one. */
-    float s = fminf((float)out_w / (float)G.display_w, (float)out_h / (float)G.display_h);
-    int w = (int)lroundf((float)G.display_w * s), h = (int)lroundf((float)G.display_h * s);
+     * wider surface, top/bottom on a taller one. A crop: the same for its part. */
+    const rmp_rect part = shown_part();
+    float s = fminf((float)out_w / (float)part.w, (float)out_h / (float)part.h);
+    int w = (int)lroundf((float)part.w * s), h = (int)lroundf((float)part.h * s);
+    /* A window kept at the aspect by whole pixels may still be off by one
+     * (819 x 511 for 960:600): fill it rather than leave a 1-pixel bar. */
+    if (out_w - w <= 1 && out_h - h <= 1) {
+        w = out_w;
+        h = out_h;
+    }
     G.dst = (rmp_rect){ (out_w - w) / 2, (out_h - h) / 2, w, h };
     G.out_w = out_w;
     G.out_h = out_h;
@@ -602,6 +618,7 @@ int rmp_gfx_set_display(int display_w, int display_h, int sharp)
     G.display_w = display_w;
     G.display_h = display_h;
     G.sharp = sharp != 0;
+    G.crop = (rmp_rect){ 0, 0, 0, 0 };
     target(0, display_w, display_h);
     return 0;
 }
@@ -611,7 +628,7 @@ void rmp_gfx_select_output(int slot)
     if (!G.ready || slot < 0 || slot >= RMP_GFX_OUTPUTS || slot == G.output) return;
     flush();
     G.outputs[G.output] = (gfx_output){ G.screen_fbo, G.screen_tex, G.out_w, G.out_h, G.dst, G.sharp,
-                                        G.display_w, G.display_h };
+                                        G.display_w, G.display_h, G.crop };
     const gfx_output o = G.outputs[slot];
     G.screen_fbo = o.screen_fbo;
     G.screen_tex = o.screen_tex;
@@ -621,6 +638,7 @@ void rmp_gfx_select_output(int slot)
     G.sharp = o.sharp;
     G.display_w = o.display_w;
     G.display_h = o.display_h;
+    G.crop = o.crop;
     G.outputs[slot] = (gfx_output){ 0 };
     G.output = slot;
     G.bound_texture = (GLuint)-1;
@@ -634,20 +652,32 @@ void rmp_gfx_release_output(void)
     if (G.screen_fbo) drop_screen();
     G.display_w = G.display_h = 0;
     G.out_w = G.out_h = 0;
+    G.crop = (rmp_rect){ 0, 0, 0, 0 };
 }
 
-void rmp_gfx_output_rect(int slot, rmp_rect *dst, int *display_w, int *display_h)
+int rmp_gfx_set_crop(const rmp_rect *r)
+{
+    if (!G.ready) return -1;
+    if (!r || (r->x == 0 && r->y == 0 && r->w == G.display_w && r->h == G.display_h)) {
+        G.crop = (rmp_rect){ 0, 0, 0, 0 };
+        return 0;
+    }
+    if (r->w < 1 || r->h < 1 || r->x < 0 || r->y < 0 || r->x > G.display_w - r->w || r->y > G.display_h - r->h)
+        return -1;
+    G.crop = *r;
+    return 0;
+}
+
+void rmp_gfx_output_rect(int slot, rmp_rect *dst, rmp_rect *src)
 {
     if (slot == G.output || slot < 0 || slot >= RMP_GFX_OUTPUTS) {
         *dst = rmp_gfx_display_rect();
-        *display_w = G.display_w;
-        *display_h = G.display_h;
+        *src = shown_part();
         return;
     }
     const gfx_output *o = &G.outputs[slot];
     *dst = o->screen_fbo ? o->dst : (rmp_rect){ 0, 0, o->display_w, o->display_h };
-    *display_w = o->display_w;
-    *display_h = o->display_h;
+    *src = o->crop.w > 0 ? o->crop : (rmp_rect){ 0, 0, o->display_w, o->display_h };
 }
 
 rmp_layer *rmp_layer_create(int w, int h)

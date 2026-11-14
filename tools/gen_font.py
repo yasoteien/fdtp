@@ -112,6 +112,93 @@ class PCF:
         return rows
 
 
+# ---- Glyphs the Shinonome fonts lack (drawn here, same 8x16 grid and
+# one-dot strokes as their lower case: x-height rows 5-13) ----------------
+# IPA letters for pronunciations (the stock dictionaries, revision 1 §16).
+IPA = {
+    0x00E6: ['.##.##..', '#..#..#.', '...#..#.', '.######.', '#..#....', '#..#....', '#..#..#.', '#..#..#.', '.##.##..'],  # æ
+    0x0251: ['..###.#.', '.#...##.', '#.....#.', '#.....#.', '#.....#.', '#.....#.', '#.....#.', '.#...##.', '..###.#.'],  # ɑ
+    0x0254: ['..###...', '.#...#..', '......#.', '......#.', '......#.', '......#.', '......#.', '.#...#..', '..###...'],  # ɔ
+    0x0259: ['..###...', '.#...#..', '......#.', '......#.', '#######.', '#.....#.', '#.....#.', '.#...#..', '..###...'],  # ə
+    0x026A: ['.#####..', '...#....', '...#....', '...#....', '...#....', '...#....', '...#....', '...#....', '.#####..'],  # ɪ
+    0x028A: ['##...##.', '.#...#..', '#.....#.', '#.....#.', '#.....#.', '#.....#.', '#.....#.', '.#...#..', '..###...'],  # ʊ
+    0x028C: ['...#....', '...#....', '..#.#...', '..#.#...', '.#...#..', '.#...#..', '#.....#.', '#.....#.', '#.....#.'],  # ʌ
+    0x0261: ['..###.#.', '.#...##.', '#.....#.', '#.....#.', '#.....#.', '#.....#.', '#.....#.', '.#...##.', '..###.#.',
+             '......#.', '.#####..'],                                                                              # ɡ
+    0x014B: ['.#.###..', '.##...#.', '.#....#.', '.#....#.', '.#....#.', '.#....#.', '.#....#.', '.#....#.', '.#....#.',
+             '......#.', '....##..'],                                                                              # ŋ
+    0x0292: ['######..', '....#...', '...#....', '..###...', '.....#..', '......#.', '......#.', '......#.', '#....#..',
+             '.####...'],                                                                                          # ʒ
+    0x02D0: ['', '..###...', '...#....', '', '', '', '...#....', '..###...', ''],                                    # ː
+}
+TALL = {   # rows 1-15 (ascenders, descenders)
+    0x00F0: ['.#...#..', '..##....', '.#.#....', '....#...', '..####..', '.#...#..', '#.....#.', '#.....#.', '#.....#.',
+             '#.....#.', '#.....#.', '.#...#..', '..###...'],                                                      # ð
+    0x0283: ['....##..', '...#..#.', '...#....', '...#....', '...#....', '...#....', '...#....', '...#....', '...#....',
+             '...#....', '...#....', '...#....', '...#....', '#..#....', '.##.....'],                              # ʃ
+}
+ACUTE, GRAVE = ['....#...', '...#....'], ['..#.....', '...#....']
+# The vowels with a stress mark: base, mark -> the precomposed character
+# when Unicode has one, else a code of our own in U+F700- (font24_compose).
+VOWELS = 'aeiouæɑɔəɪʊʌ'
+PRECOMPOSED = {('a', 0x301): 0xE1, ('e', 0x301): 0xE9, ('i', 0x301): 0xED, ('o', 0x301): 0xF3, ('u', 0x301): 0xFA,
+               ('a', 0x300): 0xE0, ('e', 0x300): 0xE8, ('i', 0x300): 0xEC, ('o', 0x300): 0xF2, ('u', 0x300): 0xF9,
+               ('æ', 0x301): 0x1FD}
+# Shift_JIS read as Windows CP932 gives these; the JIS fonts have the others.
+CP932_ALIASES = {0xFF5E: 0x301C, 0x2225: 0x2016, 0xFF0D: 0x2212, 0xFFE0: 0x00A2, 0xFFE1: 0x00A3, 0xFFE2: 0x00AC,
+                 0x2015: 0x2014}
+
+
+def bits(pattern):
+    return sum(1 << (7 - x) for x, c in enumerate(pattern) if c == '#')
+
+
+def circled(letter):
+    """Ⓒ Ⓤ (the dictionaries' countable and uncountable marks): 16 dots wide."""
+    rows = [0] * 16
+    for y in range(16):
+        for x in range(16):
+            d = ((x - 7.5) ** 2 + (y - 7.5) ** 2) ** 0.5
+            if abs(d - 6.8) < 0.55:
+                rows[y] |= 1 << (15 - x)
+    for i, pattern in enumerate(letter):
+        for x, c in enumerate(pattern):
+            if c == '#':
+                rows[5 + i] |= 1 << (15 - (5 + x))
+    return rows
+
+
+def add_extra(glyphs):
+    for code, pattern in IPA.items():
+        rows = [0] * 16
+        for i, line in enumerate(pattern):
+            rows[5 + i] = bits(line)
+        glyphs[code] = (8, rows)
+    for code, pattern in TALL.items():
+        rows = [0] * 16
+        for i, line in enumerate(pattern):
+            rows[1 + i] = bits(line)
+        glyphs[code] = (8, rows)
+    glyphs[0x24B8] = (16, circled(['.###.', '#...#', '#....', '#....', '#...#', '.###.']))
+    glyphs[0x24CA] = (16, circled(['#...#', '#...#', '#...#', '#...#', '#...#', '.###.']))
+    compose = {}
+    own = 0xF700
+    for base in VOWELS:
+        for mark, accent in ((0x301, ACUTE), (0x300, GRAVE)):
+            code = PRECOMPOSED.get((base, mark))
+            if code is None:
+                code, own = own, own + 1
+            rows = list(glyphs[ord(base)][1])
+            rows[0:5] = [0] * 5          # no dot over i
+            rows[2], rows[3] = bits(accent[0]), bits(accent[1])
+            glyphs[code] = (8, rows)
+            compose[(ord(base), mark)] = code
+    for new, old in CP932_ALIASES.items():
+        if new not in glyphs and old in glyphs:
+            glyphs[new] = glyphs[old]
+    return compose
+
+
 def build(fonts):
     """16-dot Shinonome glyphs (PC-98 look). The renderer scales them 1.5x
     to 12x24 cells by area averaging, as the FD 3.13 photo shows."""
@@ -139,10 +226,11 @@ def build(fonts):
     rows = glyphs[ord('0')][1]
     for y, x in ((4, 5), (5, 5), (6, 4), (7, 4), (8, 3), (9, 3), (10, 2)):
         rows[y] |= 1 << (7-x)
+    compose = add_extra(glyphs)
     for required in '?〓A0あ漢':
         if ord(required) not in glyphs:
             raise ValueError(f'missing required glyph: {required}')
-    return glyphs
+    return glyphs, compose
 
 
 def fonts_dir(root):
@@ -158,7 +246,7 @@ def main():
     parser.add_argument('--output', type=Path, default=root/'build/font24.inc')
     parser.add_argument('--dump', action='store_true')
     args = parser.parse_args()
-    glyphs = build(args.fonts)
+    glyphs, compose = build(args.fonts)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open('w', encoding='ascii') as output:
         output.write('/* Generated by tools/gen_font.py; do not edit. */\n')
@@ -166,6 +254,11 @@ def main():
         for code, (width, rows) in sorted(glyphs.items()):
             output.write('    {0x%Xu, %d, {%s}},\n' %
                          (code, width, ','.join('0x%04Xu' % row for row in rows)))
+        output.write('};\n')
+        output.write('/* base, combining mark (U+0300/U+0301) -> the glyph drawn for the pair */\n')
+        output.write('static const struct { uint32_t base, mark, code; } font24_pairs[] = {\n')
+        for (base, mark), code in sorted(compose.items()):
+            output.write('    {0x%Xu, 0x%Xu, 0x%Xu},\n' % (base, mark, code))
         output.write('};\n')
     if args.dump:
         for char in 'A0あ漢':

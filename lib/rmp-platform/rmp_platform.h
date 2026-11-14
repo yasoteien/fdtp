@@ -121,6 +121,15 @@ void rmp_output_size(int *w, int *h);
  * options) is sampled sharp (nearest) when the scale is a whole number.
  * 0 on success, -1 on error. */
 int  rmp_set_display_size(int w, int h);
+/* Show only the part r of the display in the selected window (NULL or the
+ * whole display: all of it, the default; rmp_set_display_size resets it).
+ * The app still draws the whole display; r is shown scaled to fit the
+ * surface with r's aspect. On X11 the window is kept at r's w:h from now on
+ * (WM_NORMAL_HINTS aspect, least size half of r) and asks for that w:h at
+ * its present height (not when full screen). Pointer and drop coordinates
+ * stay display coordinates (inside r). Not inside a frame; the next frame
+ * repaints everything. 0, or -1 (r not inside the display). */
+int  rmp_set_display_crop(const rmp_rect *r);
 /* X11 full screen state: initially the option, then the last request or
  * _NET_WM_STATE update received from the window manager. Requests are
  * asynchronous; the window manager may refuse them. KMS and uninitialized:

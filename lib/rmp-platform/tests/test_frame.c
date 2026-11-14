@@ -624,6 +624,89 @@ int main(void)
              "1:1 again at the surface's size, the next frame repaints all");
     }
 
+    /* 14. A crop (rmp_set_display_crop; the WRD / SRY / RMP window of the
+     * wide screen): only that part of the display is shown, scaled to fit
+     * the surface with its aspect, through the display texture even at 1:1;
+     * the app still draws the whole display; the pointer maps back into it.
+     * The mock surface is 1024 x 600. */
+    {
+        CHECK(rmp_display_width() == 1024 && rmp_display_height() == 600);
+        const rmp_rect bad[] = { { -1, 0, 100, 100 }, { 0, -1, 100, 100 }, { 0, 0, 0, 600 }, { 0, 0, 100, 0 },
+                                 { 1, 0, 1024, 600 }, { 0, 1, 1024, 600 }, { 925, 0, 100, 100 } };
+        for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) CHECK(rmp_set_display_crop(&bad[i]) < 0);
+        rmp_rect dst, src;
+        rmp_gfx_output_rect(0, &dst, &src);   /* the bad ones changed nothing: 1:1 */
+        CHECK(dst.x == 0 && dst.w == 1024 && src.x == 0 && src.y == 0 && src.w == 1024 && src.h == 600);
+        mock_gl_reset_log();
+        const rmp_rect sry = { 112, 0, 800, 600 };   /* same height: 1:1, no bars, still the texture */
+        CHECK(rmp_set_display_crop(&sry) == 0);
+        int t = mock_find(EV_TEXIMAGE, 0);
+        CHECK(t >= 0 && mock_log[t].a == 1024 && mock_log[t].b == 600);
+        rmp_gfx_output_rect(0, &dst, &src);
+        CHECK(dst.x == 112 && dst.y == 0 && dst.w == 800 && dst.h == 600);
+        CHECK(src.x == 112 && src.y == 0 && src.w == 800 && src.h == 600);
+        const rmp_rect part = { 112, 100, 400, 300 };   /* 2x: 800 x 600 in the middle */
+        CHECK(rmp_set_display_crop(&part) == 0);
+        rmp_gfx_output_rect(0, &dst, &src);
+        CHECK(dst.x == 112 && dst.y == 0 && dst.w == 800 && dst.h == 600);
+        CHECK(src.x == 112 && src.y == 100 && src.w == 400 && src.h == 300);
+        int px = 112, py = 0;            /* the crop's top-left */
+        h_window_to_display(0, &px, &py);
+        CHECK(px == 112 && py == 100);
+        px = 911; py = 599;              /* its bottom-right pixel */
+        h_window_to_display(0, &px, &py);
+        CHECK(px == 511 && py == 399);
+        px = 913; py = 1;                /* each scaled pixel is 2 x 2 */
+        h_window_to_display(0, &px, &py);
+        CHECK(px == 512 && py == 100);
+        px = 111; py = 0;                /* on the bar left of it: outside the crop */
+        h_window_to_display(0, &px, &py);
+        CHECK(px == 111 && py == 100);
+        while (!rmp_frame_ready()) CHECK(rmp_wait(0.1) >= 0);
+        int k = rmp_frame_begin(rects, RMP_REPAINT_MAX);   /* the whole display is drawn */
+        CHECK(k == 1 && rects[0].x == 0 && rects[0].w == 1024 && rects[0].h == 600 && rmp_frame_is_full());
+        paint_rect((rmp_rect){ 0, 0, 1024, 600 });
+        mock_gl_reset_log();
+        CHECK(rmp_frame_end() == 0);
+        int fb = mock_find(EV_BINDFB, 0);
+        CHECK(fb >= 0 && mock_log[fb].a == 0 && mock_find(EV_DRAW, fb) > fb);   /* presented on the surface */
+        /* Off the surface's aspect by less than a pixel: filled, no 1-pixel bar. */
+        const rmp_rect narrow = { 0, 0, 1023, 600 };
+        CHECK(rmp_set_display_crop(&narrow) == 0);
+        rmp_gfx_output_rect(0, &dst, &src);
+        CHECK(dst.x == 0 && dst.y == 0 && dst.w == 1024 && dst.h == 600 && src.w == 1023);
+        px = 1023; py = 599;
+        h_window_to_display(0, &px, &py);
+        CHECK(px == 1022 && py == 599);
+        /* The whole display (or NULL): 1:1 again, no texture. */
+        mock_gl_reset_log();
+        const rmp_rect whole = { 0, 0, 1024, 600 };
+        CHECK(rmp_set_display_crop(&whole) == 0);
+        CHECK(mock_find(EV_TEXIMAGE, 0) < 0);
+        rmp_gfx_output_rect(0, &dst, &src);
+        CHECK(dst.x == 0 && dst.w == 1024 && src.x == 0 && src.y == 0 && src.w == 1024 && src.h == 600);
+        px = 5; py = 6;
+        h_window_to_display(0, &px, &py);
+        CHECK(px == 5 && py == 6);
+        CHECK(rmp_set_display_crop(&sry) == 0 && rmp_set_display_crop(NULL) == 0);
+        rmp_gfx_output_rect(0, &dst, &src);
+        CHECK(dst.w == 1024 && src.w == 1024);
+        /* A new display size drops the crop. */
+        CHECK(rmp_set_display_crop(&sry) == 0 && rmp_set_display_size(1280, 720) == 0);
+        rmp_gfx_output_rect(0, &dst, &src);
+        CHECK(src.x == 0 && src.y == 0 && src.w == 1280 && src.h == 720);
+        CHECK(rmp_set_display_size(1024, 600) == 0);
+        rmp_gfx_output_rect(0, &dst, &src);
+        CHECK(dst.w == 1024 && src.w == 1024 && src.h == 600);
+        while (!rmp_frame_ready()) CHECK(rmp_wait(0.1) >= 0);
+        k = rmp_frame_begin(rects, RMP_REPAINT_MAX);
+        CHECK(k == 1 && rects[0].w == 1024 && rects[0].h == 600);
+        CHECK(rmp_frame_end() == 0);
+        puts("PASS 14: rmp_set_display_crop: bad rects refused; the part shown scaled to fit with its aspect "
+             "(through the texture even at 1:1), pointer mapped back into it; whole / NULL / a new display "
+             "size: as before");
+    }
+
     /* 11. Shutdown order. */
     rmp_layer_destroy(layer);
     mock_gl_reset_log();

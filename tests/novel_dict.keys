@@ -1,0 +1,15 @@
+# Revision 1 §16 with tests/dict_helper_fake.py. 1: Ctrl+J at the end of
+# the first line: the longest end before the cursor (ことば), 明鏡.
+END C-j SNAP
+# 2: Tab, ←, →: the books after, before and after again (英和, not there). 3: Esc closes.
+TAB LEFT RIGHT SNAP ESC SNAP
+# 4: the English word around the cursor (apple), 英和.
+DOWN HOME RIGHT RIGHT RIGHT RIGHT C-j SNAP ESC
+# 5: F3, かき typed with the input method, RET: three entries (1/3).
+F3 M-SPC "kaki" RET M-SPC RET SNAP
+# 6: Shift+→ (2/3). 7: Shift+← twice, past the first (3/3).
+S-RIGHT SNAP S-LEFT S-LEFT SNAP
+# 8: RET asks for another word (かき in the box). 9: Esc goes back to the box.
+RET SNAP ESC SNAP ESC
+# 10: the help lists the dictionary keys.
+F1 SNAP ESC

@@ -64,6 +64,7 @@ static void rmp_x11_hide(RmpX11 *x) { (void)x; }
 static void rmp_x11_activate(RmpX11 *x) { (void)x; }
 static int rmp_x11_take_close(RmpX11 *x) { (void)x; return 0; }
 static int rmp_x11_close_pending(const RmpX11 *x) { (void)x; return 0; }
+static void rmp_x11_set_aspect(RmpX11 *x, int w, int h) { (void)x; (void)w; (void)h; }
 typedef struct RmpXdnd RmpXdnd;
 typedef int (*rmp_xdnd_over_fn)(void *, int, int, const char *const *, size_t, unsigned, unsigned);
 typedef int (*rmp_xdnd_drop_fn)(void *, int, int, const char *const *, size_t, int);
@@ -266,6 +267,21 @@ int rmp_set_display_size(int w, int h)
     P.scaled = scaled;
     rmp_damage_init(&P.damage, w, h);
     rmp_damage_add_full(&P.damage);
+    return 0;
+}
+
+int rmp_set_display_crop(const rmp_rect *r)
+{
+    if (!P.initialized || P.frame_state == FRAME_ACTIVE) return -1;
+    const rmp_rect c = r ? *r : (rmp_rect){ 0, 0, P.width, P.height };
+    if (rmp_gfx_set_crop(&c) < 0) return -1;
+    int out_w, out_h;
+    rmp_output_size(&out_w, &out_h);
+    int scaled = rmp_gfx_set_output(out_w, out_h);
+    if (scaled < 0) return -1;
+    P.scaled = scaled;
+    rmp_damage_add_full(&P.damage);
+    if (P.x11) rmp_x11_set_aspect(P.x11, c.w, c.h);
     return 0;
 }
 
@@ -492,16 +508,16 @@ static struct {
 } DND;
 
 /* Window pixels of window `win` to its display pixels (floor, also left of /
- * above it), as the pointer's (the window's scaling and centring undone). */
+ * above it), as the pointer's (the window's scaling, centring and crop
+ * undone). */
 static void window_to_display_of(int win, int *x, int *y)
 {
-    rmp_rect d;
-    int dw, dh;
-    rmp_gfx_output_rect(win, &d, &dw, &dh);
+    rmp_rect d, src;
+    rmp_gfx_output_rect(win, &d, &src);
     if (d.w <= 0 || d.h <= 0) return;
-    long px = (long)(*x - d.x) * dw, py = (long)(*y - d.y) * dh;
-    *x = (int)(px >= 0 ? px / d.w : (px - d.w + 1) / d.w);
-    *y = (int)(py >= 0 ? py / d.h : (py - d.h + 1) / d.h);
+    long px = (long)(*x - d.x) * src.w, py = (long)(*y - d.y) * src.h;
+    *x = src.x + (int)(px >= 0 ? px / d.w : (px - d.w + 1) / d.w);
+    *y = src.y + (int)(py >= 0 ? py / d.h : (py - d.h + 1) / d.h);
 }
 
 static int dnd_over(void *ctx, int x, int y, const char *const *paths, size_t count, unsigned mods, unsigned allowed)

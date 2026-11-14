@@ -23,6 +23,7 @@ endif
 PREFIX ?= /usr/local
 DESTDIR ?=
 FDTPRC ?= /etc/fdtprc
+POMERA_DICT ?= keep
 POMERA_STABILITY ?= no
 POMERA_PDCHARGE ?= keep
 POMERA_CVE ?= keep
@@ -58,11 +59,12 @@ install uninstall:
 	@echo "make $@: for Linux (macOS builds fdtp-preview only)" >&2; exit 1
 else
 .SECONDEXPANSION:
-install: $(INSTALL_EXE) $$(LOCALSEND_EXE)
+install: $(INSTALL_EXE) $$(LOCALSEND_EXE) $$(DICT_EXE)
 	@case "$(FDTP_LANGUAGE)" in ''|auto|ja|en) ;; *) echo "FDTP_LANGUAGE must be auto, ja or en" >&2; exit 1 ;; esac
 	install -d "$(DESTDIR)$(BINDIR)" "$(DESTDIR)$(APPSDIR)" "$(DESTDIR)$(DOCDIR)"
 	install -m 755 "$(INSTALL_EXE)" "$(DESTDIR)$(BINDIR)/fdtp"
 	$(if $(LOCALSEND_EXE),install -m 755 "$(LOCALSEND_EXE)" "$(DESTDIR)$(BINDIR)/fdtp-localsend")
+	$(if $(DICT_EXE),install -m 755 "$(DICT_EXE)" "$(DESTDIR)$(BINDIR)/fdtp-dict")
 	sed 's|^Exec=.*|Exec=$(BINDIR)/fdtp|' "$(ICONS_DIR)/fdtp.desktop" > "$(DESTDIR)$(APPSDIR)/fdtp.desktop"
 	chmod 644 "$(DESTDIR)$(APPSDIR)/fdtp.desktop"
 	for s in $(ICON_SIZES); do \
@@ -89,14 +91,14 @@ install: $(INSTALL_EXE) $$(LOCALSEND_EXE)
 		fi; \
 		chmod 644 "$$f"; echo "$$f: LANGUAGE=$(FDTP_LANGUAGE)"; \
 	fi
-	@if [ -z "$(DESTDIR)" ] && { [ "$(POMERA_KERNEL_APT)" = yes ] || [ "$(POMERA_KERNEL_APT)" = source ] || [ "$(POMERA_WIFI_PS)" = off ] || [ "$(POMERA_WIFI_PS)" = on ] || [ "$(POMERA_CLEAN_OLD)" = yes ] || [ "$(POMERA_RTC)" = yes ] || [ "$(POMERA_CVE)" = yes ] || [ "$(POMERA_PDCHARGE)" = yes ] || [ "$(POMERA_CVE)" = no ] || [ "$(POMERA_PDCHARGE)" = no ] || [ "$(POMERA_STABILITY)" = yes ] || { [ "$(POMERA_INTERNAL)" = ro ] || [ "$(POMERA_INTERNAL)" = rw ] || [ "$(POMERA_INTERNAL)" = no ]; }; }; then \
-		POMERA_KERNEL_APT="$(POMERA_KERNEL_APT)" POMERA_WIFI_PS="$(POMERA_WIFI_PS)" POMERA_CLEAN_OLD="$(POMERA_CLEAN_OLD)" POMERA_RTC="$(POMERA_RTC)" POMERA_CVE="$(POMERA_CVE)" POMERA_PDCHARGE="$(POMERA_PDCHARGE)" POMERA_STABILITY="$(POMERA_STABILITY)" POMERA_INTERNAL="$(POMERA_INTERNAL)" FDTP_MSG_LANG="$(INSTALL_MSG_LANG)" \
+	@if [ -z "$(DESTDIR)" ] && { [ "$(POMERA_DICT)" = yes ] || [ "$(POMERA_DICT)" = no ] || [ "$(POMERA_KERNEL_APT)" = yes ] || [ "$(POMERA_KERNEL_APT)" = source ] || [ "$(POMERA_WIFI_PS)" = off ] || [ "$(POMERA_WIFI_PS)" = on ] || [ "$(POMERA_CLEAN_OLD)" = yes ] || [ "$(POMERA_RTC)" = yes ] || [ "$(POMERA_CVE)" = yes ] || [ "$(POMERA_PDCHARGE)" = yes ] || [ "$(POMERA_CVE)" = no ] || [ "$(POMERA_PDCHARGE)" = no ] || [ "$(POMERA_STABILITY)" = yes ] || { [ "$(POMERA_INTERNAL)" = ro ] || [ "$(POMERA_INTERNAL)" = rw ] || [ "$(POMERA_INTERNAL)" = no ]; }; }; then \
+		FDTP_DICT_BIN="$(if $(DICT_EXE),$(BINDIR)/fdtp-dict)" POMERA_DICT="$(POMERA_DICT)" POMERA_KERNEL_APT="$(POMERA_KERNEL_APT)" POMERA_WIFI_PS="$(POMERA_WIFI_PS)" POMERA_CLEAN_OLD="$(POMERA_CLEAN_OLD)" POMERA_RTC="$(POMERA_RTC)" POMERA_CVE="$(POMERA_CVE)" POMERA_PDCHARGE="$(POMERA_PDCHARGE)" POMERA_STABILITY="$(POMERA_STABILITY)" POMERA_INTERNAL="$(POMERA_INTERNAL)" FDTP_MSG_LANG="$(INSTALL_MSG_LANG)" \
 			sh "$(POMERA_SCRIPTS)/install_pomera.sh"; \
 	fi
 	@echo "installed: $(BINDIR)/fdtp$(if $(DESTDIR), (under $(DESTDIR)))"
 
 uninstall:
-	rm -f "$(DESTDIR)$(BINDIR)/fdtp" "$(DESTDIR)$(BINDIR)/fdtp-localsend" "$(DESTDIR)$(APPSDIR)/fdtp.desktop"
+	rm -f "$(DESTDIR)$(BINDIR)/fdtp" "$(DESTDIR)$(BINDIR)/fdtp-localsend" "$(DESTDIR)$(BINDIR)/fdtp-dict" "$(DESTDIR)$(APPSDIR)/fdtp.desktop"
 	for s in $(ICON_SIZES); do rm -f "$(DESTDIR)$(ICONDIR)/$${s}x$${s}/apps/fdtp.png"; done
 	rm -rf "$(DESTDIR)$(PREFIX)/share/doc/fdtp"
 	@# /etc/fdtprc only when make install made it and it has nothing else.
@@ -107,13 +109,14 @@ uninstall:
 			rm -f "$$f" && echo "removed $$f"; \
 		else echo "$$f is kept (it has settings of its own)"; fi; \
 	fi
-	@if [ "$(POMERA_CVE)" = yes ] || [ "$(POMERA_PDCHARGE)" = yes ] || [ "$(POMERA_STABILITY)" = yes ] || { [ "$(POMERA_INTERNAL)" = ro ] || [ "$(POMERA_INTERNAL)" = rw ]; }; then \
+	@if [ "$(POMERA_DICT)" = yes ] || [ "$(POMERA_CVE)" = yes ] || [ "$(POMERA_PDCHARGE)" = yes ] || [ "$(POMERA_STABILITY)" = yes ] || { [ "$(POMERA_INTERNAL)" = ro ] || [ "$(POMERA_INTERNAL)" = rw ]; }; then \
 		echo "The Pomera settings are not undone. To undo them:"; \
 		if [ "$(POMERA_STABILITY)" = yes ]; then \
 			echo "  sudo sh $(POMERA_SCRIPTS)/pomera_stability.sh remove"; \
 			echo "  sudo sh $(POMERA_SCRIPTS)/pomera_dma_pio.sh restore     (if the SD was rewritten)"; \
 		fi; \
 		if { [ "$(POMERA_INTERNAL)" = ro ] || [ "$(POMERA_INTERNAL)" = rw ]; }; then echo "  sudo sh $(POMERA_SCRIPTS)/pomera_mount_internal.sh unpersist"; fi; \
+		if [ "$(POMERA_DICT)" = yes ]; then echo "  sudo sh $(POMERA_SCRIPTS)/pomera_mount_dict.sh unpersist"; fi; \
 		if [ "$(POMERA_PDCHARGE)" = yes ]; then echo "  sudo sh $(POMERA_SCRIPTS)/pomera_pdcharge.sh remove"; fi; \
 		if [ "$(POMERA_CVE)" = yes ]; then echo "  sudo sh $(POMERA_SCRIPTS)/pomera_cve_2026_98432.sh remove"; fi; \
 		echo "and reboot."; \

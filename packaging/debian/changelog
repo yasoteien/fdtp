@@ -1,3 +1,23 @@
+fdtp (1.18-1) trixie; urgency=medium
+
+  * Pomera DM250: the stock electronic dictionaries (Kadokawa thesaurus,
+    Meikyo Japanese, Genius English-Japanese and Japanese-English) in the
+    novel editor: Ctrl+j looks up the selection or the word at the cursor,
+    F3 a typed word; a floating box with the four books. They are read
+    from the stock eMMC, mounted read-only, by fdtp-dict (armhf only,
+    binary only, not under the AGPL; it works only on a Pomera with its
+    own dictionaries). fdtp-pomera-setup asks whether to mount them.
+  * The proper nouns of ATOK's sports, anime and entertainment
+    dictionaries go into the user's Mozc user dictionary (the personal
+    names one is added switched off): pomera_atok_mozc.py.
+  * Novel editor: the first save after opening keeps the previous file in
+    ~/.fdtp/backup (3 versions).
+  * Japanese input: the candidate list showed the first page's words on
+    the later pages (uim-mozc gives only the current page); fixed.
+  * Shift_JIS text: ～ ∥ － ￠ ￡ ￢ ― (CP932) were shown as 〓; fixed.
+
+ -- yasoteien <263659156+yasoteien@users.noreply.github.com>  Sat, 14 Nov 2026 10:30:00 +0900
+
 fdtp (1.17-1) trixie; urgency=medium
 
   * X11 window: the mouse (click, Ctrl+click, Shift+click, double click,

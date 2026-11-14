@@ -51,6 +51,13 @@ The screens are in English or Japanese:
 - On the Pomera's 1024x600 screen, FDTP shows 85 columns by 25 rows. On larger screens, use `--size auto` or `--size 160x45`.
 - In an X11 window, Alt+Enter or F11 switches to full screen (or start with `--fullscreen`).
 
+**The Pomera's stock dictionaries and ATOK's proper nouns** (since 1.18, Pomera DM250 only)
+
+- The novel editor looks words up in the dictionaries stored in the Pomera itself (Kadokawa thesaurus, Meikyo Japanese, Genius English-Japanese and Japanese-English): Ctrl+j for the selection or the word at the cursor, F3 for a typed word.
+- The proper nouns of ATOK's sports, anime and entertainment dictionaries can be added to the Japanese input (Mozc).
+- The dictionaries are read in place from the Pomera's internal memory, mounted read-only, by `fdtp-dict`, which comes with the armhf .deb for the Pomera (binary only, not under the AGPL) and works only on a Pomera that has them. No dictionary data is included anywhere.
+- The novel editor keeps the previous file in `~/.fdtp/backup/` at the first save after opening (3 versions).
+
 **Mouse, more windows, drag and drop in the X11 window** (since 1.17)
 
 The X11 mode now works with the mouse. It also has FDTM's (the macOS version's) multiple windows and drag and drop, though on the Pomera's small screen these may be hard to use (they are useful when FDTP runs on an ordinary Debian 13).

@@ -72,3 +72,12 @@ Word のルビ	Word ruby
 開けません: %s	Cannot open: %s
 新しいファイルです	New file
 読めない字を〓（U+FFFD）にしました。保存すると元に戻りません	Unreadable characters replaced (U+FFFD). Saving is irreversible.
+辞書で引く語	Word to look up
+電子辞書（本体の純正の辞書）	Dictionaries (the stock ones on the Pomera)
+選んだ語・カーソルの所の語を引く	Look up the selection or the word at the cursor
+語を打って引く	Type a word to look up
+窓では ←→ か Tab で辞書、Shift+←→ で項目、RET で別の語	In the box: ←→ or Tab dictionary, Shift+←→ entry, RET another word
+保存しました（%s）。前の版の控えは取れませんでした	Saved (%s). The previous version could not be kept
+自動保存と控え	Autosave and backups
+変更から 30 秒で ~/.fdtp/autosave に写す。保存せずに終わっても次に開く時に戻せる	Changes are copied to ~/.fdtp/autosave after 30 seconds; after an exit without saving, opening the file offers them back
+開いてから最初の保存で、元のファイルを ~/.fdtp/backup に控える（3 世代、.1 が最新）	The first save after opening keeps the old file in ~/.fdtp/backup (3 versions, .1 newest)

@@ -82,12 +82,25 @@ int main(int argc, char **argv)
             }
         printf("],\"widget_selected\":%d", a->widgets.kind == WIDGET_CHOICE ? a->widgets.selected : -1);
         /* The first row shown of a box that scrolls (item 25). */
-        printf(",\"widget_top\":%d", a->widgets.kind == WIDGET_HELP ? a->widgets.help_top : a->widgets.kind == WIDGET_INFO ? a->widgets.info_top : 0);
+        printf(",\"widget_top\":%d", a->widgets.kind == WIDGET_HELP ? a->widgets.help_top : a->widgets.kind == WIDGET_INFO ? a->widgets.info_top :
+                                       a->widgets.kind == WIDGET_READER ? a->widgets.reader_top : 0);
+        /* A reader box (revision 1 §16): its heading and the current tab. */
+        printf(",\"widget_heading\":");
+        json_text(a->widgets.kind == WIDGET_READER ? a->widgets.reader_heading : "");
+        printf(",\"widget_tab\":");
+        json_text(a->widgets.kind == WIDGET_READER && a->widgets.reader_tab_count ? a->widgets.reader_tabs[a->widgets.reader_tab] : "");
         if (app_top(a)) {
             app_draw(a, c, &cells);
             char path[4096];
             snprintf(path, sizeof(path), "%s-%03u.ppm", argv[3], serial);
             if (canvas_write_ppm(c, path)) { rc = 2; break; }
+            /* The boxes over the screen [col, row, w, h, rule, kind] and the lines in them. */
+            printf(",\"boxes\":[");
+            for (int i = 0; i < cells.box_count; ++i) {
+                const CellBox *b = &cells.boxes[i];
+                printf("%s[%d,%d,%d,%d,%d,%d]", i ? "," : "", b->col, b->row, b->w, b->h, b->rule, b->kind);
+            }
+            printf("],\"box_lines\":%d", cells.line_count);
             noveledit_debug(app_top(a), state, 1 << 20);
             printf(",\"state\":%s", state);
         }

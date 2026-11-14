@@ -16,6 +16,7 @@
 #include "novel_layout.h"
 #include "font24.h"
 #include "raster.h"
+#include "dict_ui.h"
 #include <errno.h>
 #include <limits.h>
 #include <stdio.h>
@@ -58,7 +59,9 @@ typedef enum {
 /* Save as (revision 1 3.18): the name box, then the overwrite question
  * (both App widgets, boxes over the text). F2 (revision 1 4): the choice of
  * conversion, then its y/n question. */
-enum { ASK_NONE, ASK_NAME, ASK_OVERWRITE, ASK_CONVERT, ASK_CONVERT_YN, ASK_LOSSY };
+/* ASK_DICT: the dictionary box (revision 1 §16); ASK_DICT_INPUT: the word to
+ * look up. */
+enum { ASK_NONE, ASK_NAME, ASK_OVERWRITE, ASK_CONVERT, ASK_CONVERT_YN, ASK_LOSSY, ASK_DICT, ASK_DICT_INPUT };
 enum { CONVERT_FORMAT, CONVERT_MANUSCRIPT, CONVERT_WEB, CONVERT_WORD, CONVERTS };
 enum { EDIT_NONE, EDIT_TYPE, EDIT_BS, EDIT_DEL };
 typedef struct { uint32_t code; int x, y, w, h, color, kind; } DebugGlyph;
@@ -67,6 +70,8 @@ typedef struct {
     Screen screen;
     NovelDoc doc;
     char *path, *name, *autosave, *state;
+    char *backed_up; /* the path whose old contents are kept (backup), NULL: none yet */
+    int backup_failed; /* the last save could not keep the old contents */
     NPos cur, anchor;
     int has_anchor, vertical, numbers, number_digits, goal, last_edit;
     NPos last_end;
@@ -88,6 +93,7 @@ typedef struct {
     int loss_utf8, loss_ready; /* approval is consumed by one save attempt */
     int caret_x, caret_y, caret_visible;
     int field_x, field_y; /* caret in the name box, for the candidate list */
+    int dict_back;        /* the word box came from the dictionary box (Esc goes back) */
     DebugGlyph dbg[DEBUG_GLYPHS]; size_t ndbg;
 } Novel;
 
@@ -250,14 +256,18 @@ static void state_put(const char *file, const char *path, int vertical, int numb
     }
     free(out); free(lines); free(text);
 }
-static char *autosave_path(const char *path)
+/* A file of ours for path: in $env, else ~/.fdtp/sub; named by a hash of
+ * the whole path and its base name: "<hash>-<name>.txt" (the autosave copy)
+ * or, generation g > 0, the name with .<g> before its extension (the
+ * backups: "<hash>-b.1.txt" for b.txt). */
+static char *kept_path(const char *env, const char *sub, const char *path, int generation)
 {
-    const char *set = getenv("FDTP_NOVEL_AUTOSAVE");
+    const char *set = getenv(env);
     char *dir = NULL;
     if (set && *set) dir = strdup(set);
     else if (getenv("HOME") && *getenv("HOME")) {
         char *fdtp = join(getenv("HOME"), ".fdtp");
-        dir = fdtp ? join(fdtp, "autosave") : NULL;
+        dir = fdtp ? join(fdtp, sub) : NULL;
         free(fdtp);
     }
     if (!dir) return NULL;
@@ -272,10 +282,43 @@ static char *autosave_path(const char *path)
     while (n > 17 && ((unsigned char)name[n - 1] & 0xc0) == 0x80) --n; /* whole characters only */
     if (n > 17 && (unsigned char)name[n - 1] >= 0xc0) --n;
     name[n] = 0;
-    strcat(name, ".txt");
+    if (generation > 0) {   /* before the extension: b.txt -> b.1.txt */
+        char *dot = strrchr(name + 17, '.');
+        char ext[64] = "";
+        if (dot && strlen(dot) < sizeof(ext)) { strcpy(ext, dot); *dot = 0; }
+        n = (int)strlen(name);
+        snprintf(name + n, sizeof(name) - (size_t)n, ".%d%s", generation, ext);
+    } else strcat(name, ".txt");
     char *p = join(dir, name);
     free(dir);
     return p;
+}
+static char *autosave_path(const char *path) { return kept_path("FDTP_NOVEL_AUTOSAVE", "autosave", path, 0); }
+
+/* Backups (the user's request, 2026-11-14): the first save after the file
+ * was opened (or the first one to another existing file) keeps what was
+ * there, like Emacs's file~: ~/.fdtp/backup/<hash>-<name>.1.txt, the older
+ * ones moved to .2 and .3 (BACKUPS kept). Returns 0, or -1 when the copy
+ * could not be made (the save goes on). */
+#define BACKUPS 3
+static int backup(const char *path)
+{
+    struct stat st;
+    if (stat(path, &st) || !S_ISREG(st.st_mode)) return 0;   /* nothing there yet */
+    size_t n;
+    char *data = read_all(path, &n);
+    if (!data) return -1;
+    char *names[BACKUPS + 1] = {0};
+    int rc = 0;
+    for (int g = 1; g <= BACKUPS && !rc; ++g) if (!(names[g] = kept_path("FDTP_NOVEL_BACKUP", "backup", path, g))) rc = -1;
+    if (!rc) {
+        unlink(names[BACKUPS]);
+        for (int g = BACKUPS - 1; g >= 1; --g) rename(names[g], names[g + 1]);
+        rc = write_file(names[1], data, n);
+    }
+    for (int g = 1; g <= BACKUPS; ++g) free(names[g]);
+    free(data);
+    return rc;
 }
 static void write_autosave(Novel *v)
 {
@@ -600,6 +643,11 @@ static int save_to(Novel *v, App *a, const char *path, int utf8, PromptKind ask)
         return 0;
     }
     v->loss_ready = 0;
+    int kept = 1;
+    if (!v->backed_up || strcmp(v->backed_up, path)) {
+        kept = backup(path) == 0;
+        if (kept) { free(v->backed_up); v->backed_up = strdup(path); }
+    }
     int rc = novel_doc_save(&v->doc, path, utf8);
     if (rc == -2) { open_prompt(v, ask, NULL); return 0; }
     if (rc) {
@@ -612,13 +660,15 @@ static int save_to(Novel *v, App *a, const char *path, int utf8, PromptKind ask)
         return 0;
     }
     remove_autosave(v);
+    v->backup_failed = !kept;
     return 1;
 }
 static int save(Novel *v, App *a, int utf8, PromptKind ask)
 {
     if (!save_to(v, a, v->path, utf8, ask)) return 0;
-    char message[96];
-    snprintf(message, sizeof(message), T("保存しました（%s）"), jis_encoding_name(v->doc.encoding));
+    char message[160];
+    snprintf(message, sizeof(message), v->backup_failed ? T("保存しました（%s）。前の版の控えは取れませんでした") : T("保存しました（%s）"),
+             jis_encoding_name(v->doc.encoding));
     app_notice(a, message);
     return 1;
 }
@@ -738,6 +788,21 @@ static void ask_key(Novel *v, App *a, const Key *k)
         } else if (r == WIDGET_CANCEL) v->ask = ASK_NONE;
         return;
     }
+    if (v->ask == ASK_DICT_INPUT) {
+        int consumed = ime_key(v->ime, k);
+        const char *commit = ime_commit(v->ime);
+        if (*commit) { field_insert(w, commit); ime_commit_done(v->ime); }
+        if (consumed || (k->key == KCHAR && k->ch == IME_CH_ZENKAKU_HANKAKU)) return;
+        WidgetResult r = widgets_key(w, k);
+        if (r == WIDGET_ACCEPT && w->text[0]) {
+            char text[WIDGET_CAP];
+            snprintf(text, sizeof(text), "%s", w->text);
+            dict_ui_lookup(w, text, DICT_UI_EXACT);
+            v->ask = w->kind == WIDGET_READER ? ASK_DICT : ASK_NONE;
+        } else if (r == WIDGET_ACCEPT || r == WIDGET_CANCEL)
+            v->ask = v->dict_back && dict_ui_reopen(w) ? ASK_DICT : ASK_NONE;
+        return;
+    }
     if (v->ask == ASK_NAME) {
         int consumed = ime_key(v->ime, k);
         const char *commit = ime_commit(v->ime);
@@ -792,12 +857,22 @@ static const WidgetHelpItem help_items[] = {
     {"F2", N_("出版社の書式に整形")},
     {"", N_("原稿形式へ・Web 形式へ")},
     {"", N_("Word 縦書きで書き出す")},
+    {NULL, N_("自動保存と控え")},
+    {"", N_("変更から 30 秒で ~/.fdtp/autosave に写す。保存せずに終わっても次に開く時に戻せる")},
+    {"", N_("開いてから最初の保存で、元のファイルを ~/.fdtp/backup に控える（3 世代、.1 が最新）")},
     {NULL, N_("その他")},
     {"F1", N_("このヘルプ")},
+    /* the last rows: left out without the dictionaries (noveledit_help) */
+    {NULL, N_("電子辞書（本体の純正の辞書）")},
+    {"Ctrl+j", N_("選んだ語・カーソルの所の語を引く")},
+    {"F3", N_("語を打って引く")},
+    {"", N_("窓では ←→ か Tab で辞書、Shift+←→ で項目、RET で別の語")},
 };
+#define DICT_HELP_ROWS 4
 const WidgetHelpItem *noveledit_help(int *count)
 {
     *count = (int)(sizeof(help_items) / sizeof(help_items[0]));
+    if (!dict_ui_available()) *count -= DICT_HELP_ROWS;
     static WidgetHelpItem translated[sizeof(help_items) / sizeof(help_items[0])];
     for (int i = 0; i < *count; ++i) {
         translated[i].key = help_items[i].key ? T(help_items[i].key) : NULL;
@@ -1131,9 +1206,88 @@ static int prompt_key(Novel *v, App *a, const Key *k)
 }
 
 /* ---- keys ------------------------------------------------------------- */
+/* ---- the stock dictionaries (revision 1 §16) ----------------------------
+ * Ctrl+J looks up the selection, else the word at the cursor: an English
+ * word around it as it is; Japanese, having no spaces, from the cursor on
+ * (the longest start that is a word) when a word character is there, else
+ * the characters before it (the longest end). F3 asks for a word. Without
+ * the dictionaries (the gate, dict_gate.c) both keys do nothing. */
+static void dict_input(Novel *v, App *a, const char *initial, int back)
+{
+    widgets_input_history(&a->widgets, T("辞書で引く語"), initial ? initial : "", ".", WIDGET_HISTORY_SEARCH);
+    v->ask = ASK_DICT_INPUT;
+    v->dict_back = back;
+}
+static int english_char(uint32_t c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '\'' || c == '-'; }
+static int japanese_char(uint32_t c)
+{
+    return (c >= 0x3041 && c <= 0x30ff && c != 0x30fb) || (c >= 0x3400 && c <= 0x9fff) || (c >= 0xf900 && c <= 0xfaff) ||
+           (c >= 0xff10 && c <= 0xff19) || (c >= 0xff21 && c <= 0xff3a) || (c >= 0xff41 && c <= 0xff5a) || c == 0x3005;
+}
+static void dict_lookup_here(Novel *v, App *a)
+{
+    if (!dict_ui_available()) return;
+    NPos sa, sb;
+    char *text = NULL;
+    int how = DICT_UI_EXACT;
+    if (selection(v, &sa, &sb)) {
+        size_t n;
+        text = novel_doc_copy(&v->doc, sa, sb, &n);
+    } else {
+        const NLine *L = &v->doc.lines[v->cur.line];
+        size_t off = v->cur.off, from = off, to = off, next;
+        while (from > 0) {   /* back over English letters */
+            size_t p = from - 1;
+            while (p > 0 && ((unsigned char)L->s[p] & 0xc0) == 0x80) --p;
+            if (!english_char(novel_decode(L->s, L->len, p, &next))) break;
+            from = p;
+        }
+        while (to < L->len && english_char(novel_decode(L->s, L->len, to, &next))) to = next;
+        int chars = 0;
+        if (to > from) text = strndup(L->s + from, to - from);
+        else if (off < L->len && japanese_char(novel_decode(L->s, L->len, off, &next))) {
+            to = off;
+            while (to < L->len && chars < 16 && japanese_char(novel_decode(L->s, L->len, to, &next))) { to = next; ++chars; }
+            text = strndup(L->s + off, to - off);
+            how = DICT_UI_FROM;
+        } else {
+            from = off;
+            while (from > 0 && chars < 16) {
+                size_t p = from - 1;
+                while (p > 0 && ((unsigned char)L->s[p] & 0xc0) == 0x80) --p;
+                if (!japanese_char(novel_decode(L->s, L->len, p, &next))) break;
+                from = p;
+                ++chars;
+            }
+            if (from < off) text = strndup(L->s + from, off - from);
+            how = DICT_UI_UPTO;
+        }
+    }
+    if (!text || !*text) { free(text); dict_input(v, a, "", 0); return; }
+    dict_ui_lookup(&a->widgets, text, how);
+    free(text);
+    v->ask = a->widgets.kind == WIDGET_READER ? ASK_DICT : ASK_NONE;
+}
+static void dict_menu(Novel *v, App *a)
+{
+    if (!dict_ui_available()) return;
+    NPos sa, sb;
+    char *text = NULL;
+    size_t n;
+    if (selection(v, &sa, &sb)) text = novel_doc_copy(&v->doc, sa, sb, &n);
+    if (text && (strlen(text) >= WIDGET_CAP || strchr(text, '\n'))) { free(text); text = NULL; }
+    dict_input(v, a, text, 0);
+    free(text);
+}
 static int novel_key(Screen *s, App *a, const Key *k)
 {
     Novel *v = s->self;
+    if (v->ask == ASK_DICT && a->widgets.kind == WIDGET_READER) {
+        int r = dict_ui_key(&a->widgets, k);
+        if (r == DICT_UI_CLOSED) v->ask = ASK_NONE;
+        else if (r == DICT_UI_ASK) dict_input(v, a, dict_ui_word(), 1);
+        return 0;
+    }
     if (v->ask != ASK_NONE) {
         if (v->ask == ASK_LOSSY && a->widgets.kind == WIDGET_CONFIRM) {
             WidgetResult r = widgets_key(&a->widgets, k);
@@ -1201,6 +1355,7 @@ static int novel_key(Screen *s, App *a, const Key *k)
         else if (ctrl(k, 'z')) undo(v, a, 0);
         else if (ctrl(k, 'y')) undo(v, a, 1);
         else if (ctrl(k, 'a')) select_range(v, (NPos){0, 0}, novel_doc_end(&v->doc));
+        else if (ctrl(k, 'j')) dict_lookup_here(v, a);
         ensure_visible(v);
         return 0;
     }
@@ -1225,6 +1380,7 @@ static int novel_key(Screen *s, App *a, const Key *k)
     case KPGDN: page_move(v, 1, shift); break;
     case KF1: show_help(a); break;
     case KF2: open_convert(v, a); break;
+    case KF3: dict_menu(v, a); break;
     case KRET: insert(v, a, "\n", 1, EDIT_NONE); break;
     case KTAB: insert(v, a, "\t", 1, EDIT_TYPE); break;
     case KBS: erase(v, a, 0); break;
@@ -1389,7 +1545,7 @@ static void draw_bands(Novel *v, App *a, Canvas *c, Cells *cells)
         } else cells_text(cells, 2, FD_LINE, prompt_label(v), YELLOW, BG, FD_COLS - 2);
     }
     if (a->widgets.kind != WIDGET_NONE) { widgets_draw(&a->widgets, cells); if (widgets_row23(&a->widgets)) row23 = 1; }
-    if (v->ask == ASK_NAME && a->widgets.kind == WIDGET_INPUT) {
+    if ((v->ask == ASK_NAME || v->ask == ASK_DICT_INPUT) && a->widgets.kind == WIDGET_INPUT) {
         /* The name box (widgets.c: the field on row 11, its text in columns
          * 8 to 71): the preedit at the field's cursor, the rest after it. */
         int FIELD_ROW, FIELD_START, FIELD_END;
@@ -1481,7 +1637,7 @@ static void novel_destroy(Screen *s)
     novel_doc_free(&v->doc);
     nl_free(&v->lay);
     ime_close(v->ime);
-    free(v->scratch); free(v->path); free(v->name); free(v->autosave); free(v->state);
+    free(v->scratch); free(v->path); free(v->name); free(v->autosave); free(v->state); free(v->backed_up);
     free(v->target); free(v->asked);
     free(v);
     /* The clipboard outlives the editors: copy in one file, paste in the next. */

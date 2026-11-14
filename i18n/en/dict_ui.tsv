@@ -1,0 +1,7 @@
+RET で別の語を引けます。←→ で辞書を替えます。	RET looks up another word; ←→ changes the dictionary.
+←→:辞書 RET:別の語 Esc:閉じる	←→:book RET:word Esc:close
+←→:辞書 S←→:項目 RET:別の語 Esc:閉じる	←→:book S←→:entry RET:word Esc:close
+「%s」は見つかりません	"%s" not found
+純正の辞書が見つかりません	The stock dictionaries are not available
+辞書を開けません	Cannot open the dictionary
+電子辞書	Dictionary

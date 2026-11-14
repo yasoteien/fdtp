@@ -38,6 +38,13 @@ static const Font24Glyph *find_glyph(uint32_t code)
     return NULL;
 }
 
+uint32_t font24_compose(uint32_t base, uint32_t mark)
+{
+    for (size_t i = 0; i < sizeof(font24_pairs) / sizeof(font24_pairs[0]); ++i)
+        if (font24_pairs[i].base == base && font24_pairs[i].mark == mark) return font24_pairs[i].code;
+    return 0;
+}
+
 const Font24Glyph *font24_lookup(uint32_t code)
 {
     const Font24Glyph *glyph = find_glyph(code);

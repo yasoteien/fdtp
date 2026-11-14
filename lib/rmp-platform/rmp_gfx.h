@@ -62,13 +62,19 @@ void rmp_layer_paste(const rmp_layer *layer, rmp_rect src, int x, int y);
 int  rmp_gfx_init(int display_w, int display_h);
 /* The surface is out_w x out_h. Different from the display size: draw into
  * a display-sized texture and show it scaled to fit (aspect kept, centred,
- * black bars) at every rmp_gfx_frame_finish. 0 = same size (no texture),
+ * black bars) at every rmp_gfx_frame_finish. 0 = same size and no crop (no texture),
  * 1 = scaling, -1 = error. May be called again when the surface changes
  * (an X window resized); the caller then repaints everything. */
 int  rmp_gfx_set_output(int out_w, int out_h);
-/* Where the display is drawn on the output (the whole output when it is not
- * scaled). For mapping window pixels back to the display (the pointer). */
+/* Where the display (or its crop) is drawn on the output (the whole output
+ * when it is not scaled). For mapping window pixels back to the display
+ * (the pointer). */
 rmp_rect rmp_gfx_display_rect(void);
+/* Show only the part r of the display (rmp_set_display_crop), scaled to fit
+ * the output with r's aspect; NULL or the whole display: all of it (the
+ * default; rmp_gfx_set_display resets it). Call rmp_gfx_set_output again
+ * after it. 0, or -1 (r not inside the display). */
+int  rmp_gfx_set_crop(const rmp_rect *r);
 /* A new display size (rmp_set_display_size). Drops the scaled texture: call
  * rmp_gfx_set_output again. sharp: a whole-number scale is sampled with
  * GL_NEAREST (the default display keeps GL_LINEAR). 0, or -1 on error. */
@@ -80,11 +86,12 @@ void rmp_gfx_shutdown(void);
  * current and calls rmp_gfx_invalidate_state. A new slot starts empty (set
  * it up with rmp_gfx_set_display and rmp_gfx_set_output). release: drops
  * the selected one's texture (its window is closing). output_rect: as
- * rmp_gfx_display_rect, and the display size, of any slot. */
+ * rmp_gfx_display_rect (dst), and the part of the display shown there (src:
+ * the crop, or the whole display), of any slot. */
 #define RMP_GFX_OUTPUTS 8
 void rmp_gfx_select_output(int slot);
 void rmp_gfx_release_output(void);
-void rmp_gfx_output_rect(int slot, rmp_rect *dst, int *display_w, int *display_h);
+void rmp_gfx_output_rect(int slot, rmp_rect *dst, rmp_rect *src);
 void rmp_gfx_frame_start(int clear_on_first_bind, unsigned clear_rgb);
 void rmp_gfx_clip(const rmp_rect *r);
 void rmp_gfx_frame_finish(void);

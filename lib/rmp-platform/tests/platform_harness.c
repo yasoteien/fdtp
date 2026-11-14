@@ -39,6 +39,7 @@ unsigned long h_missed_total(void) { return P.missed_total; }
 unsigned h_sequence(double t) { return (unsigned)lround(t / H_PERIOD); }
 int h_keyboard = 1;
 void h_clear_quit(void) { quit_flag = 0; }
+void h_window_to_display(int window, int *x, int *y) { window_to_display_of(window, x, y); }
 static int modeset_done;
 
 static double now_for_log(void) { return h_now; }

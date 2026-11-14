@@ -89,6 +89,9 @@ class Runner:
                         TMPDIR=str(work / 'tmp'), ASAN_OPTIONS='halt_on_error=1:detect_leaks=0',
                         UBSAN_OPTIONS='halt_on_error=1:print_stacktrace=1')
         self.env.pop('FDTP_NOVEL_STATE', None)
+        # No dictionaries unless a scenario gives the fake fdtp-dict (scenario_dict).
+        self.env['FDTP_DICT_HELPER'] = ''
+        self.env['FDTP_NOVEL_BACKUP'] = str(work / 'backup')
         self.runs = 0
         self.timings = {}
 
@@ -724,7 +727,7 @@ def scenario_large(r, f, budget):
     return len(s) + len(ll)
 
 
-WIDGET_NONE, WIDGET_NOTICE, WIDGET_CONFIRM, WIDGET_INPUT, WIDGET_INFO, WIDGET_ERROR, WIDGET_HELP = 0, 1, 2, 3, 5, 6, 7
+WIDGET_NONE, WIDGET_NOTICE, WIDGET_CONFIRM, WIDGET_INPUT, WIDGET_INFO, WIDGET_ERROR, WIDGET_HELP, WIDGET_READER = 0, 1, 2, 3, 5, 6, 7, 8
 
 
 def scenario_saveas(r, f):
@@ -818,6 +821,78 @@ def scenario_saveas_ime(r, f):
     require(im.count(32 + 8 * 12, 11 * 24, 48, 24, CYAN) > 48 * 24 // 2, 'preedit drawn in the field')
     require((d / 'ねこ.txt').read_bytes() == b'qC\n' and s[1]['state']['name'] == 'ねこ.txt', 'saved under a Japanese name')
     return len(s)
+
+
+def scenario_backup(r, f):
+    """The first save of each session keeps the old file: <hash>-<name>.1.txt
+    newest, .2, .3; the oldest one goes."""
+    d = r.work / 'bk'
+    d.mkdir()
+    path = d / 'b.txt'
+    path.write_bytes(b'v0\n')
+    backup = r.work / 'backup'
+
+    def kept():
+        out = {}
+        for g in (1, 2, 3, 4):
+            files = sorted(backup.glob(f'*-b.{g}.txt')) if backup.exists() else []
+            if files:
+                out[g] = files[0].read_bytes()
+        return out
+    s = r.run(path, 'novel_backup.keys', 'backup1', fake=True)
+    require(path.read_bytes() == b'abv0\n', f'saved {path.read_bytes()!r}')
+    require(kept() == {1: b'v0\n'}, f'one backup of the first save only: {kept()}')
+    require(s[0]['notice'].startswith('保存しました'), s[0]['notice'])
+    count = len(s)
+    for text in (b'cabv0\n', b'ccabv0\n', b'cccabv0\n'):
+        before = path.read_bytes()
+        count += len(r.run(path, 'novel_backup_again.keys', 'backup-again', fake=True))
+        require(path.read_bytes() == text, f'saved {path.read_bytes()!r}')
+        require(kept()[1] == before, 'the newest backup is the file before this session')
+    require(kept() == {1: b'ccabv0\n', 2: b'cabv0\n', 3: b'abv0\n'}, f'three kept, the oldest gone: {kept()}')
+    # The backup cannot be made (its folder is a file): the save goes on and says so.
+    saved = r.env['FDTP_NOVEL_BACKUP']
+    blocker = r.work / 'not-a-folder'
+    blocker.write_text('x')
+    r.env['FDTP_NOVEL_BACKUP'] = str(blocker / 'backup')
+    try:
+        s = r.run(path, 'novel_backup_again.keys', 'backup-fail', fake=True)
+    finally:
+        r.env['FDTP_NOVEL_BACKUP'] = saved
+    require(path.read_bytes() == b'ccccabv0\n' and '控えは取れませんでした' in s[0]['notice'], s[0]['notice'])
+    return count + len(s)
+
+
+def scenario_dict(r, f):
+    """Revision 1 §16: Ctrl+J, F3 and the dictionary box, with the fake fdtp-dict."""
+    d = r.work / 'dict'
+    d.mkdir()
+    (d / 'd.txt').write_text('それをことば\nan apple pie\n', encoding='utf-8')
+    saved = dict(r.env)
+    r.env['FDTP_DICT_HELPER'] = str(TESTS / 'dict_helper_fake.py')
+    try:
+        s = r.run(d / 'd.txt', 'novel_dict.keys', 'dict', fake=True)
+        r.env['FDTP_DICT_FAKE_BOOKS'] = '0'
+        n = r.run(d / 'd.txt', 'novel_dict_none.keys', 'dict-none', fake=True)
+    finally:
+        r.env.clear(); r.env.update(saved)
+    require(len(s) == 10, f'ten snapshots, got {len(s)}')
+    for i in (0, 1, 3, 4, 5, 6, 8):
+        require(s[i]['widget'] == WIDGET_READER and s[i]['widget_label'] == '電子辞書', f'{i + 1}: the box {s[i]["widget"]}')
+        box = s[i]['boxes'][-1]
+        require(box[5] == 3 and box[4] == box[1] + 2 and s[i]['box_lines'] == 4, f'{i + 1}: frame, shadow, rules {box} {s[i]["box_lines"]}')
+    require(s[0]['widget_tab'] == '明鏡国語辞典' and s[0]['widget_heading'] == 'ことば【言葉】', f'1: {s[0]["widget_tab"]} {s[0]["widget_heading"]}')
+    require(s[1]['widget_tab'] == 'ジーニアス英和' and s[1]['widget_heading'] == '「ことば」は見つかりません', f'2: {s[1]["widget_heading"]}')
+    require(s[2]['widget'] == 0 and len(s[2]['boxes']) == 1, '3: Esc closes the box')
+    require(s[3]['widget_tab'] == 'ジーニアス英和' and s[3]['widget_heading'] == 'apple', f'4: {s[3]["widget_heading"]}')
+    require(s[4]['widget_heading'] == 'かき【一】  (1/3)' and s[4]['widget_tab'] == '明鏡国語辞典', f'5: {s[4]["widget_heading"]}')
+    require(s[5]['widget_heading'] == 'かき【二】  (2/3)', f'6: {s[5]["widget_heading"]}')
+    require(s[6]['widget_heading'] == 'かき【三】  (3/3)', f'7: {s[6]["widget_heading"]}')
+    require(s[7]['widget'] == WIDGET_INPUT and s[7]['widget_text'] == 'かき' and s[7]['widget_label'] == '辞書で引く語', f'8: {s[7]["widget_text"]}')
+    require(s[8]['widget_heading'] == 'かき【三】  (3/3)', f'9: back to the box {s[8]["widget_heading"]}')
+    require(any(row[0] == 'Ctrl+j' for row in s[9]['widget_rows']), '10: the help has Ctrl+j')
+    require(n[0]['widget'] == 0 and not any(row[0] == 'Ctrl+j' for row in n[1]['widget_rows']), 'without the books: nothing, no help rows')
+    return len(s) + len(n)
 
 
 def scenario_lossy(r, f):
@@ -926,7 +1001,7 @@ def run_all(runner, f, budget):
                      ('autosave', scenario_autosave), ('autosave-timing', scenario_autosave_timing),
                      ('close', scenario_close), ('ime', scenario_ime), ('scroll', scenario_scroll),
                      ('numbers', scenario_numbers), ('number-growth', scenario_number_growth), ('saveas', scenario_saveas), ('saveas-ime', scenario_saveas_ime),
-                     ('lossy', scenario_lossy)):
+                     ('lossy', scenario_lossy), ('dict', scenario_dict), ('backup', scenario_backup)):
         try:
             count += fn(runner, f)
         except Failure as error:

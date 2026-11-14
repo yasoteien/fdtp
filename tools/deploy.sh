@@ -66,9 +66,11 @@ LIBS="libmupdf.so.25.1 libjbig2dec.so.0 libgumbo.so.3 libmujs.so.3 liblhasa.so.0
 DIST=$APP/build/dist
 rm -rf "$DIST" && mkdir -p "$DIST/bin" "$DIST/lib" "$DIST/libexec"
 # fdtp-localsend (LocalSend, OpenSSL) goes beside fdtp, where fdtp looks first.
-ssh "$BUILD_HOST" "tar -chf - -C $BUILD_DIR/$APP/build-arm-linux-gnueabihf fdtp fdtp-localsend -C $SYSROOT/usr/lib/arm-linux-gnueabihf $LIBS -C $SYSROOT/usr/bin zip lhasa" |
+ssh "$BUILD_HOST" "tar -chf - -C $BUILD_DIR/$APP/build-arm-linux-gnueabihf fdtp fdtp-localsend $(ssh "$BUILD_HOST" "test -f $BUILD_DIR/$APP/build-arm-linux-gnueabihf/fdtp-dict" && echo fdtp-dict) -C $SYSROOT/usr/lib/arm-linux-gnueabihf $LIBS -C $SYSROOT/usr/bin zip lhasa" |
 	tar -C "$DIST" -xf -
 mv "$DIST/fdtp" "$DIST/bin/fdtp.new"; mv "$DIST/fdtp-localsend" "$DIST/zip" "$DIST/bin/"; mv "$DIST/lhasa" "$DIST/libexec/"
+# fdtp-dict (the stock dictionaries' reader) beside fdtp, when it was built
+[ ! -f "$DIST/fdtp-dict" ] || mv "$DIST/fdtp-dict" "$DIST/bin/"
 for f in $LIBS; do mv "$DIST/$f" "$DIST/lib/"; done
 # Xfce's menu entry and its icon (revision 1 item 23): ~/.fdtp/share, then
 # copied into ~/.local/share below. The PNGs come from the same script as

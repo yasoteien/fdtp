@@ -46,6 +46,24 @@ MODULES :=
 MODULE_CFLAGS :=
 MODULE_LIBS :=
 include $(sort $(wildcard $(APP_DIR)/mk/*.mk))
+# The dictionaries' gate (dict_gate.c) is in fdtp-dict, not in fdtp.
+COMMON += dict_ui
+# fdtp-dict, the reader of the stock dictionaries (revision 1 §16): a
+# program of its own, binary only, never linked into fdtp. Its source
+# (src/jds*.c) is private and not in the public tree, which builds without
+# it. Linux only (the macOS version never has it).
+ifeq ($(UNAME)|$(wildcard $(APP_DIR)/src/jds.c),Linux|$(APP_DIR)/src/jds.c)
+DICT_EXE := $(BUILD)/fdtp-dict
+DICT_OBJS := $(addprefix $(BUILD)/dict/,jds_main.o jds.o jds_atok.o jis.o dict_gate.o)
+all: $(DICT_EXE)
+$(BUILD)/dict/%.o: $(APP_DIR)/src/%.c
+	@mkdir -p $(@D) $(BUILD)/tmp
+	$(CC) $(CFLAGS_ALL) $(INCLUDES) $(SYSROOT_CFLAGS) -c $< -o $@
+$(BUILD)/dict/jis.o: $(BUILD)/jis0208.inc
+$(DICT_EXE): $(DICT_OBJS)
+	$(CC) -o $@ $^ $(SYSROOT_LIBS) $(LDFLAGS)
+-include $(DICT_OBJS:.o=.d)
+endif
 COMMON += $(MODULES)
 COMMON_OBJS = $(addprefix $(BUILD)/,$(addsuffix .o,$(COMMON)))
 PLATFORM_OBJS = $(addprefix $(BUILD)/platform/,$(notdir $(PLATFORM_SRCS:.c=.o)))
@@ -107,5 +125,10 @@ stage0-compare: $(CHECK_EXE)
 	CC="$(CC)" python3 -B $(APP_DIR)/tests/compare_stage0.py --build $(BUILD)
 .PHONY: stage0-compare
 endif
-.PHONY: all preview check clean
+test: check
+	python3 -B $(APP_DIR)/tests/check_configure.py
+	python3 -B $(APP_DIR)/tests/check_dict_gate.py
+	python3 -B $(APP_DIR)/tests/check_mount_dict.py
+	python3 -B $(APP_DIR)/tests/check_atok_mozc.py
+.PHONY: all preview check clean test
 -include $(COMMON_OBJS:.o=.d) $(BUILD)/preview_main.d $(BUILD)/fdtp_main.d $(PLATFORM_OBJS:.o=.d)

@@ -282,6 +282,21 @@ void widgets_help(Widgets *w, const char *title, const WidgetHelpItem *items, in
     w->help_count = items && count > 0 ? count : 0;
     w->help_top = 0;
 }
+void widgets_reader(Widgets *w, const char *title, const char *const *tabs, int tab_count, int tab,
+                    const char *heading, const char *text, const char *hint)
+{
+    w->kind = WIDGET_READER;
+    copy_text(w->label, sizeof(w->label), title ? title : "");
+    if (tab_count < 0) tab_count = 0;
+    if (tab_count > WIDGET_READER_TABS) tab_count = WIDGET_READER_TABS;
+    w->reader_tab_count = tab_count;
+    for (int i = 0; i < tab_count; ++i) copy_text(w->reader_tabs[i], sizeof(w->reader_tabs[i]), tabs[i] ? tabs[i] : "");
+    w->reader_tab = tab < 0 || tab >= tab_count ? 0 : tab;
+    copy_text(w->reader_heading, sizeof(w->reader_heading), heading ? heading : "");
+    copy_text(w->reader_text, sizeof(w->reader_text), text ? text : "");
+    copy_text(w->reader_hint, sizeof(w->reader_hint), hint ? hint : "");
+    w->reader_top = 0;
+}
 void widgets_tree_hook(Widgets *w, void (*hook)(void *context), void *context)
 {
     w->tree_hook = hook;
@@ -457,6 +472,7 @@ typedef struct {
     HelpRow row[HELP_ROWS];
 } HelpLayout;
 static void help_layout(const Widgets *w, HelpLayout *L);
+static void reader_rows(const Widgets *w, int *total, int *visible);
 WidgetResult widgets_key(Widgets *w, const Key *k)
 {
     if (w->kind == WIDGET_NONE) return WIDGET_PASS;
@@ -475,6 +491,11 @@ WidgetResult widgets_key(Widgets *w, const Key *k)
         if (k->key == KESC || k->key == KF1 || k->key == KRET || plain_char(k, 'q') || plain_char(k, 'h') || plain_char(k, '?'))
             w->kind = WIDGET_NONE;
         return WIDGET_HANDLED;
+    }
+    if (w->kind == WIDGET_READER) {
+        int total, visible;
+        reader_rows(w, &total, &visible);
+        return scroll_key(k, &w->reader_top, total, visible) ? WIDGET_HANDLED : WIDGET_PASS;
     }
     if (w->kind == WIDGET_ERROR) { w->kind = WIDGET_NONE; return WIDGET_HANDLED; }
     if (w->kind == WIDGET_INPUT && w->list_open && list_key(w, k)) return WIDGET_HANDLED;
@@ -955,6 +976,144 @@ static void draw_help(Widgets *w, Cells *c)
     else snprintf(hint, sizeof(hint), "%s", T("Esc: 戻る"));
     scroll_mark(c, box, hint, 1);
 }
+/* ---- the reader box (revision 1 §16) ----------------------------------- */
+#define READER_ROWS 16384
+typedef struct {
+    int col, row, w, h, text_w, body_row, visible, total;
+    const char *start[READER_ROWS + 1];
+    unsigned char colour[READER_ROWS];   /* the colour at the start of the row */
+} ReaderLayout;
+static int mark_colour(char m) { return m == WIDGET_MARK_STRONG ? YELLOW : m == WIDGET_MARK_LINK ? CYAN : WHITE; }
+/* Characters that do not begin a row (kinsoku). */
+static int no_row_start(uint32_t c)
+{
+    static const uint32_t set[] = {0x3001, 0x3002, 0xff0c, 0xff0e, 0x30fb, 0xff1a, 0xff1b, 0xff1f, 0xff01, 0x30fc,
+                                   0x300d, 0x300f, 0xff09, 0x3011, 0x3015, 0xff3d, 0xff5d, 0x3009, 0x300b, 0x3041,
+                                   0x3043, 0x3045, 0x3047, 0x3049, 0x3063, 0x3083, 0x3085, 0x3087, 0x30a1, 0x30a3,
+                                   0x30a5, 0x30a7, 0x30a9, 0x30c3, 0x30e3, 0x30e5, 0x30e7, ',', '.', ';', ':', '!',
+                                   '?', ')', ']', '}'};
+    for (size_t i = 0; i < sizeof(set) / sizeof(set[0]); ++i) if (set[i] == c) return 1;
+    return 0;
+}
+/* One character of a reader's text, a combining grave or acute (U+0300,
+ * U+0301) joined to the letter before it when the font has the pair
+ * (font24_compose), else left out. */
+static uint32_t reader_char(const char **p)
+{
+    uint32_t ch = font24_decode(p);
+    for (;;) {
+        const char *q = *p;
+        uint32_t next = font24_decode(&q);
+        if (next != 0x300 && next != 0x301) return ch;
+        uint32_t joined = font24_compose(ch, next);
+        if (joined) ch = joined;
+        *p = q;
+    }
+}
+static int is_mark(char m) { return m == WIDGET_MARK_STRONG || m == WIDGET_MARK_LINK || m == WIDGET_MARK_END; }
+static void reader_layout(const Widgets *w, ReaderLayout *L)
+{
+    L->w = FD_COLS - 4 < 76 ? FD_COLS - 4 : 76;
+    L->h = FD_LINE - 1;
+    L->col = centre_col(L->w);
+    L->row = centre_row(L->h);
+    L->text_w = L->w - 4;
+    L->body_row = L->row + 1 + (w->reader_tab_count ? 2 : 0) + 2;
+    int room = L->row + L->h - 1 - L->body_row;
+    const char *p = w->reader_text;
+    int rows = 0, col = 0, colour = WHITE;
+    L->start[0] = p;
+    L->colour[0] = WHITE;
+    rows = 1;
+    const char *prev = NULL;   /* the character before, on this row */
+    int prev_colour = WHITE, prev_w = 0;
+    while (*p && rows < READER_ROWS) {
+        if (is_mark(*p)) { colour = mark_colour(*p++); continue; }
+        const char *at = p;
+        int at_colour = colour;
+        uint32_t ch = reader_char(&p);
+        if (ch == '\n') { L->start[rows] = p; L->colour[rows++] = (unsigned char)colour; col = 0; prev = NULL; continue; }
+        int cw = font24_width(ch);
+        if (col + cw > L->text_w) {
+            if (no_row_start(ch) && prev && L->start[rows - 1] != prev) {
+                /* 。、」 and the like do not start a row: the character before goes with it */
+                L->start[rows] = prev; L->colour[rows++] = (unsigned char)prev_colour; col = prev_w;
+            } else { L->start[rows] = at; L->colour[rows++] = (unsigned char)at_colour; col = 0; }
+        }
+        prev = at; prev_colour = at_colour; prev_w = cw;
+        col += cw;
+    }
+    /* a last empty row (text ending in \n) is not shown */
+    if (rows > 1 && !*L->start[rows - 1]) --rows;
+    L->start[rows] = p;
+    L->total = rows;
+    L->visible = room < 1 ? 1 : room;
+}
+static void reader_rows(const Widgets *w, int *total, int *visible)
+{
+    static ReaderLayout L;   /* large; the UI runs on one thread */
+    reader_layout(w, &L);
+    *total = L.total;
+    *visible = L.visible;
+}
+static void draw_reader(Widgets *w, Cells *c)
+{
+    static ReaderLayout L;
+    reader_layout(w, &L);
+    int last = L.total > L.visible ? L.total - L.visible : 0;
+    if (w->reader_top > last) w->reader_top = last;
+    if (w->reader_top < 0) w->reader_top = 0;
+    int box = cells_box(c, L.col, L.row, L.w, L.h, BOX_KIND);
+    if (box < 0) return;
+    int right = L.col + L.w - 1, y = L.row + 1;
+    /* the title in a gap of the top line */
+    int tw = cells_width(w->label);
+    if (tw > L.w - 6) tw = L.w - 6;
+    if (tw > 0) {
+        c->boxes[box].top_from = (short)(L.col + 2);
+        c->boxes[box].top_to = (short)(L.col + 4 + tw);
+        cells_text(c, L.col + 3, L.row, w->label, YELLOW, BG, tw);
+    }
+    if (w->reader_tab_count) {
+        /* the tabs, a line between two (joining the top line and the rule) */
+        int x = L.col + 2;
+        for (int i = 0; i < w->reader_tab_count && x < right - 2; ++i) {
+            if (i) { cells_box_line(c, 1, x, L.row, y + 1); ++x; }
+            int cur = i == w->reader_tab, n;
+            cells_put(c, x, y, ' ', cur ? BG : CYAN, cur ? CYAN : BG);
+            n = cells_text(c, x + 1, y, w->reader_tabs[i], cur ? BG : CYAN, cur ? CYAN : BG, right - 2 - x);
+            if (x + 1 + n < right) cells_put(c, x + 1 + n, y, ' ', cur ? BG : CYAN, cur ? CYAN : BG);
+            x += n + 2;
+        }
+        c->boxes[box].rule = (short)(y + 1);
+        y += 2;
+    }
+    cells_text(c, L.col + 2, y, w->reader_heading, YELLOW, BG, L.text_w);
+    /* the rule under the heading: a line across, joining the frame */
+    if (w->reader_tab_count) cells_box_line(c, 0, y + 1, L.col, right);
+    else c->boxes[box].rule = (short)(y + 1);
+    for (int i = 0; i < L.visible; ++i) {
+        int r = w->reader_top + i;
+        if (r >= L.total) break;
+        const char *p = L.start[r], *end = L.start[r + 1];
+        int x = L.col + 2, colour = L.colour[r];
+        while (p < end && *p) {
+            if (is_mark(*p)) { colour = mark_colour(*p++); continue; }
+            uint32_t ch = reader_char(&p);
+            if (ch == '\n') break;
+            int cw = font24_width(ch);
+            if (x + cw > L.col + 2 + L.text_w) break;
+            cells_put(c, x, L.body_row + i, ch, colour, BG);
+            x += cw;
+        }
+    }
+    char mark[192];
+    if (L.total > L.visible)
+        snprintf(mark, sizeof(mark), "%s%s↑↓ %d-%d/%d", w->reader_hint, w->reader_hint[0] ? "  " : "",
+                 w->reader_top + 1, w->reader_top + L.visible, L.total);
+    else snprintf(mark, sizeof(mark), "%s", w->reader_hint);
+    if (mark[0]) scroll_mark(c, box, mark, 1);
+}
 int widgets_message(const Widgets *w) { return w->kind == WIDGET_NOTICE || w->kind == WIDGET_ERROR; }
 int widgets_row23(const Widgets *w) { return w->kind == WIDGET_NOTICE; }
 void widgets_input_field(int *row, int *start, int *end)
@@ -980,5 +1139,6 @@ void widgets_draw(Widgets *w, Cells *cells)
     case WIDGET_CHOICE: draw_choice(w, cells); return;
     case WIDGET_INFO: draw_info(w, cells); return;
     case WIDGET_HELP: draw_help(w, cells); return;
+    case WIDGET_READER: draw_reader(w, cells); return;
     }
 }

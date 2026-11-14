@@ -1,0 +1,2 @@
+# The first save keeps the old file (backup); the second one in the same session does not.
+"a" C-s SNAP "b" C-s SNAP ESC

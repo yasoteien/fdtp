@@ -12,10 +12,18 @@
 #define WIDGET_INFO_LINES 256
 /* Kept per history kind, newest first (revision 1 §12). */
 #define WIDGET_HISTORY_KEEP 20
+/* The reader box (widgets_reader): its text, tabs and heading. */
+#define WIDGET_READER_CAP 65536
+#define WIDGET_READER_TABS 8
+/* Marks in a reader's text: from WIDGET_MARK_STRONG (YELLOW) or
+ * WIDGET_MARK_LINK (CYAN) to WIDGET_MARK_END the text has that colour. */
+#define WIDGET_MARK_STRONG '\x01'
+#define WIDGET_MARK_END '\x02'
+#define WIDGET_MARK_LINK '\x03'
 /* WIDGET_INFO and WIDGET_ERROR are boxes closed by any key; App consumes that
  * key (app_key), so the screen below does not see it. */
 typedef enum { WIDGET_NONE, WIDGET_NOTICE, WIDGET_CONFIRM, WIDGET_INPUT, WIDGET_CHOICE,
-               WIDGET_INFO, WIDGET_ERROR, WIDGET_HELP } WidgetKind;
+               WIDGET_INFO, WIDGET_ERROR, WIDGET_HELP, WIDGET_READER } WidgetKind;
 /* One row of a help box (widgets_help): key NULL is a section heading
  * (text), key "" continues the item above (text only). */
 typedef struct { const char *key, *text; } WidgetHelpItem;
@@ -45,6 +53,10 @@ typedef struct {
     const WidgetHelpItem *help;
     int help_count, help_top;
     char info_name[WIDGET_INFO_LINES][64], info_value[WIDGET_INFO_LINES][512];
+    /* Reader box (widgets_reader). */
+    char reader_tabs[WIDGET_READER_TABS][32], reader_heading[512], reader_hint[128];
+    int reader_tab_count, reader_tab, reader_top;
+    char reader_text[WIDGET_READER_CAP];
 } Widgets;
 typedef enum { WIDGET_PASS, WIDGET_HANDLED, WIDGET_ACCEPT, WIDGET_CANCEL } WidgetResult;
 void widgets_init(Widgets *w);
@@ -86,11 +98,23 @@ void widgets_info(Widgets *w, const char *title, const char *const *names, const
  * shows where the view is (「↑↓ PgUp PgDn  1-20/63  Esc: 戻る」). items stay
  * the caller's (static). */
 void widgets_help(Widgets *w, const char *title, const WidgetHelpItem *items, int count);
+/* A reader box (revision 1 §16, the dictionaries): as large as the screen
+ * allows (at most 76 columns), in the middle. The title in the top line of
+ * the frame; a row of tabs (the current one BG on CYAN) with lines between
+ * them; a rule; the heading (YELLOW); a rule; then text, wrapped to the box
+ * (\n breaks a row) with the marks WIDGET_MARK_*, scrolled by ↑↓ PgUp PgDn
+ * Space Home End. The bottom line of the frame shows where the view is and
+ * hint. Every other key is WIDGET_PASS: the caller acts on it, and calls
+ * widgets_reader again to change the box or sets kind NONE to close it.
+ * Strings are copied (cut to their fields). tab_count 0: no tab row. */
+void widgets_reader(Widgets *w, const char *title, const char *const *tabs, int tab_count, int tab,
+                    const char *heading, const char *text, const char *hint);
 /* The F8 hook of destination/path inputs (set by fileops_tree_install). The
  * hook may hide the input (kind NONE) and open it again later. */
 void widgets_tree_hook(Widgets *w, void (*hook)(void *context), void *context);
 /* Notice dismisses and returns PASS. Confirm ACCEPT only for y; n/Esc CANCEL.
  * Input/choice accepted result stays in text/selected, kind becomes NONE.
+ * Reader: its scrolling keys HANDLED, any other key PASS.
  * Info/error: any key closes them, HANDLED (an info box that scrolls keeps
  * the scrolling keys). Help: HANDLED; the closing keys close it. */
 WidgetResult widgets_key(Widgets *w, const Key *k);

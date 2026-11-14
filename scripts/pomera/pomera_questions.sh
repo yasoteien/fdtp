@@ -30,6 +30,8 @@
 # ask_internal             the internal memory: INTERNAL=ro|rw|no (asked only
 #                          when root and a FAT is found there; keep when the
 #                          question was skipped: the setting is left as it is)
+# ask_dict                 stock dictionaries: DICT=yes|no|keep; root and a
+#                          successful fixed-p6 probe required (default yes)
 # ask_pdcharge             PD hub charging: PDCHARGE=yes|no|keep; skipped
 #                          unless the read-only hardware probe passes
 # ask_cve                  CVE-2026-98432: CVE=yes|no|keep; skipped unless
@@ -41,6 +43,7 @@
 # The caller sets PDIR (this directory), UID_NOW (id -u), and PQ_AGAIN:
 # make-install (configure: make install asks again before the PIO change)
 # or now (fdtp-pomera-setup: asked again right before it).
+# FDTP_CONFIGURE_DICT_PROBE replaces the dictionary probe (exit 0: found);
 # FDTP_CONFIGURE_PROBE replaces the internal memory probe (the tests);
 # FDTP_CONFIGURE_HEIF=yes|no whether libheif is installed, and
 # FDTP_CONFIGURE_APT the apt-get command (the tests).
@@ -256,6 +259,55 @@ Answer:"
 		*) say "1・2・3 のどれかで答えてください。" "Please answer 1, 2 or 3." ;;
 		esac
 	done
+}
+
+# DICT=keep when root or the fixed p6 probe is unavailable. The installer
+# repeats the real probe; this replacement is only for the questions' tests.
+ask_dict() {
+	DICT=keep
+	[ "$UID_NOW" = 0 ] || return 0
+	# PQ_DICT_READER=no (configure: a tree without fdtp-dict's source, e.g.
+	# the public one; pomera_setup.sh: no fdtp-dict installed): FDTP cannot
+	# read them, so no question.
+	[ "${PQ_DICT_READER:-yes}" = yes ] || [ -n "${FDTP_CONFIGURE_DICT_PROBE:-}" ] || return 0
+	if [ -n "${FDTP_CONFIGURE_DICT_PROBE:-}" ]; then
+		(eval "$FDTP_CONFIGURE_DICT_PROBE") >/dev/null 2>&1 || return 0
+	else
+		sh "$PDIR/pomera_mount_dict.sh" probe >/dev/null 2>&1 || return 0
+	fi
+	say "== 純正の電子辞書（Pomera DM250 だけ） ==" "== Stock electronic dictionaries (Pomera DM250 only) =="
+	if [ "$MSG" = ja ]; then cat <<EOF
+本体 eMMC の純正電子辞書を /mnt/pomera-dict に読み取り専用でマウントします。
+/etc/fstab に 1 行追加し、元は /etc/fstab.bak-dict に保存します。
+ジャーナルの再生はせず、eMMC には書き込みません。辞書データのコピーは作りません。
+FDTP の小説エディタで Ctrl+J（選んだ語・カーソルの所の語）と F3（語を打つ）で引けます。
+あわせて、ATOK のスポーツ・アニメ・エンタメ辞書の固有名詞を日本語入力（Mozc）に足します
+（人名辞書は足すが切ってあります。使う時は pomera_atok_mozc.py names on）。
+いいえを選ぶと起動時の自動マウント設定を解除します。現在のマウントは残ります。
+戻すには: sudo sh $PDIR/pomera_mount_dict.sh unpersist
+すぐ切り離すには: sudo sh $PDIR/pomera_mount_dict.sh umount
+EOF
+	else cat <<EOF
+Mount the stock electronic dictionaries on the internal eMMC read-only at /mnt/pomera-dict.
+Adds one line to /etc/fstab; saves the original as /etc/fstab.bak-dict.
+No journal replay, eMMC writes or dictionary copies. In FDTP's novel editor,
+Ctrl+J looks up the selection or the word at the cursor and F3 a typed word.
+The proper nouns of ATOK's sports, anime and entertainment dictionaries also go
+into the input method (Mozc); the personal names one is added switched off
+(pomera_atok_mozc.py names on to use it).
+Choosing no removes automatic mounting at boot; the current mount remains.
+To undo: sudo sh $PDIR/pomera_mount_dict.sh unpersist
+To unmount now: sudo sh $PDIR/pomera_mount_dict.sh umount
+EOF
+	fi
+	ask_yn y "純正の電子辞書を FDTP で使えるようにしますか？
+はいの場合：読み取り専用の自動マウントを設定
+いいえの場合：自動マウント設定を解除
+入力:" "Make the stock electronic dictionaries available to FDTP?
+If yes: configure automatic read-only mounting
+If no: remove automatic mounting
+Answer:"
+	DICT=$ANSWER
 }
 
 HEIF_PKGS='libheif1 libheif-plugin-libde265'
@@ -533,10 +585,12 @@ ask_pomera() {
 		ask_leftovers
 		echo
 		ask_internal
+		ask_dict
 	else
 		ask_wifi
 		echo
 		ask_internal
+		ask_dict
 		echo
 		ask_pdcharge
 		echo

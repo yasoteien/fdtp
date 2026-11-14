@@ -7,6 +7,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "widgets.h"
 #include "raster.h"
+#include "font24.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -321,6 +322,114 @@ static void draw_tests(void)
     press(w, "y");
     free(w); free(canvas); free(cells);
 }
+/* The reader box (revision 1 §16): frame, shadow, tabs with lines between
+ * them, two rules, coloured marks, scrolling; other keys pass. */
+static void reader_tests(void)
+{
+    Widgets *w = calloc(1, sizeof(*w));
+    Canvas *canvas = malloc(sizeof(*canvas));
+    Cells *cells = malloc(sizeof(*cells));
+    assert(w && canvas && cells);
+    widgets_init(w);
+    unsigned cyan = 0x00ffff, navy = 0x000055, black = 0, grey = 0x808080;
+    static char text[8192];
+    size_t n = 0;
+    n += (size_t)snprintf(text + n, sizeof(text) - n, "\x01強い\x02と\x03参照\x02と地の文\n");
+    for (int i = 1; i <= 60; ++i) n += (size_t)snprintf(text + n, sizeof(text) - n, "行%02d\n", i);
+    const char *tabs[] = {"一の巻", "二の巻", "三の巻", "四の巻"};
+    cells_init(cells);
+    for (int y = 0; y < FD_ROWS; ++y) for (int x = 0; x < FD_COLS; ++x) cells_put(cells, x, y, 'X', YELLOW, BG);
+    widgets_reader(w, "読む箱", tabs, 4, 1, "見出しの行", text, "Tab: 巻");
+    assert(w->kind == WIDGET_READER);
+    widgets_draw(w, cells);
+    assert(cells->box_count == 1);
+    CellBox b = cells->boxes[0];
+    assert(b.kind == (CELL_BOX_FRAME | CELL_BOX_SHADOW) && b.w == 76 && b.col == 2 && b.row == 1 && b.h == 22);
+    assert(b.rule == b.row + 2);                                   /* under the tabs */
+    int hlines = 0, vlines = 0;
+    for (int i = 0; i < cells->line_count; ++i) {
+        CellLine L = cells->lines[i];
+        if (!L.vertical && L.at == b.row + 4 && L.from == b.col && L.to == b.col + b.w - 1) ++hlines;   /* under the heading */
+        if (L.vertical && L.from == b.row && L.to == b.row + 2) ++vlines;                              /* between two tabs */
+    }
+    assert(hlines == 1 && vlines == 3);
+    assert(cells->data[b.row][b.col + 3].fg == YELLOW && cells->data[b.row][b.col + 3].code == 0x8aad);   /* 読 in the top line */
+    /* the current tab (the second) reversed, the others CYAN on navy */
+    assert(cells->data[b.row + 1][b.col + 3].fg == CYAN && cells->data[b.row + 1][b.col + 3].bg == BG);
+    int second = -1;
+    for (int x = b.col + 2; x < b.col + b.w; ++x) if (cells->data[b.row + 1][x].code == 0x4e8c) { second = x; break; }   /* 二 */
+    assert(second > 0 && cells->data[b.row + 1][second].fg == BG && cells->data[b.row + 1][second].bg == CYAN);
+    assert(cells->data[b.row + 3][b.col + 2].fg == YELLOW && cells->data[b.row + 3][b.col + 2].code == 0x898b);  /* 見 */
+    int body = b.row + 5;
+    assert(cells->data[body][b.col + 2].code == 0x5f37 && cells->data[body][b.col + 2].fg == YELLOW);   /* 強 */
+    assert(cells->data[body][b.col + 6].code == 0x3068 && cells->data[body][b.col + 6].fg == WHITE);     /* と */
+    assert(cells->data[body][b.col + 8].code == 0x53c2 && cells->data[body][b.col + 8].fg == CYAN);      /* 参 */
+    assert(cells->data[body + 1][b.col + 2].code == 0x884c);                                              /* 行01 */
+    assert(cells_shadowed(cells, b.col + b.w, b.row + 1) && cells_shadowed(cells, b.col + 1, b.row + b.h));
+    assert(!cells_shadowed(cells, b.col + b.w, b.row));
+    canvas_init(canvas);
+    FDRect rects[FD_ROWS_MAX];
+    raster_update(canvas, cells, rects);
+    assert(canvas_write_ppm(canvas, in_dir("reader.ppm")) == 0);
+    int mid_x = (b.col + b.w / 2) * 12 + 3, top = b.row * 24 + 11;
+    assert(is_rgb(canvas, (b.col + b.w - 4) * 12 + 3, top, cyan));                  /* top line beyond the title */
+    assert(is_rgb(canvas, mid_x, (b.row + 2) * 24 + 11, cyan));                      /* rule under the tabs */
+    assert(is_rgb(canvas, mid_x, (b.row + 4) * 24 + 11, cyan));                      /* rule under the heading */
+    assert(is_rgb(canvas, mid_x, (b.row + 3) * 24 + 11, navy) || !is_rgb(canvas, mid_x, (b.row + 3) * 24 + 11, cyan));
+    int blacks = 0, greys = 0;
+    for (int y = (b.row + 1) * 24; y < (b.row + b.h) * 24; ++y)
+        for (int x = (b.col + b.w) * 12; x < (b.col + b.w + 1) * 12; ++x) {
+            if (is_rgb(canvas, x, y, black)) ++blacks;
+            else if (is_rgb(canvas, x, y, grey)) ++greys;
+        }
+    assert(blacks > 1000 && greys >= 0);                                             /* the shadow on the right */
+    blacks = 0;
+    for (int x = (b.col + 1) * 12; x < (b.col + b.w + 1) * 12; ++x)
+        if (is_rgb(canvas, x, (b.row + b.h) * 24 + 12, black)) ++blacks;
+    assert(blacks > 600);                                                            /* and below */
+    /* scrolling: the body shows 22-2-4 = 16 rows of 61 */
+    assert(cells->data[b.row + b.h - 1][b.col + b.w - 3 - 1].code != 0);
+    press(w, "DOWN");
+    assert(w->reader_top == 1 && w->kind == WIDGET_READER);
+    press(w, "END");
+    assert(w->reader_top == 61 - 16);   /* 1 + 60 rows; the empty row after the last \n is not shown */
+    press(w, "HOME");
+    assert(w->reader_top == 0);
+    Key k;
+    assert(keys_parse("TAB", &k) && widgets_key(w, &k) == WIDGET_PASS);
+    assert(keys_parse("ESC", &k) && widgets_key(w, &k) == WIDGET_PASS && w->kind == WIDGET_READER);
+    /* without tabs: one rule (the box's own) under the heading */
+    widgets_reader(w, "読む箱", NULL, 0, 0, "見出し", "本文", "");
+    cells_init(cells);
+    widgets_draw(w, cells);
+    b = cells->boxes[0];
+    assert(b.rule == b.row + 2 && cells->line_count == 0 && cells->data[b.row + 3][b.col + 2].code == 0x672c);
+    /* a combining acute or grave joins the letter before it (font24_compose):
+     * x ɔ́ y é Ⓒ z, and q with an acute the font has no pair for: q */
+    widgets_reader(w, "読む箱", NULL, 0, 0, "見出し", "x\xc9\x94\xcc\x81y" "e\xcc\x81" "\xe2\x92\xb8z" "q\xcc\x81", "");
+    cells_init(cells);
+    widgets_draw(w, cells);
+    b = cells->boxes[0];
+    {
+        const Cell *r = cells->data[b.row + 3] + b.col + 2;
+        assert(r[0].code == 'x' && r[1].code == font24_compose(0x254, 0x301) && r[1].code && r[2].code == 'y');
+        assert(r[3].code == 0xe9 && r[4].code == 0x24b8 && r[6].code == 'z' && r[7].code == 'q' && r[8].code == ' ');
+    }
+    assert(font24_width(0x24b8) == 2 && font24_width(font24_compose(0x259, 0x300)) == 1);
+    /* kinsoku: 36 wide characters fill a row (72 columns); the 。 after them
+     * takes the last one to the next row */
+    char k36[256] = "";
+    for (int i = 0; i < 36; ++i) strcat(k36, i == 35 ? "終" : "字");
+    strcat(k36, "。次");
+    widgets_reader(w, "読む箱", NULL, 0, 0, "見出し", k36, "");
+    cells_init(cells);
+    widgets_draw(w, cells);
+    b = cells->boxes[0];
+    assert(cells->data[b.row + 3][b.col + 2 + 68].code == 0x5b57 && cells->data[b.row + 3][b.col + 2 + 70].code != 0x7d42);
+    assert(cells->data[b.row + 4][b.col + 2].code == 0x7d42 && cells->data[b.row + 4][b.col + 4].code == 0x3002);
+    w->kind = WIDGET_NONE;
+    free(w); free(canvas); free(cells);
+}
 int main(int argc, char **argv)
 {
     if (argc != 2) { fprintf(stderr, "usage: popup-harness SCRATCH_DIR\n"); return 2; }
@@ -329,6 +438,7 @@ int main(int argc, char **argv)
     widgets_history_home(0);
     history_tests();
     draw_tests();
-    puts("popup harness: history file, pull-down, boxes, information, overlay passed");
+    reader_tests();
+    puts("popup harness: history file, pull-down, boxes, information, overlay, reader passed");
     return 0;
 }
